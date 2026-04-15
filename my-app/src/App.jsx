@@ -78,7 +78,7 @@ const CSS = `
 :root{--bg:#0a0e1a;--s1:#111827;--s2:#1a1f2e;--s3:#252b3b;--ac:#00e5ff;--ok:#00e096;--wn:#ffab40;--dn:#ff5252;--tx1:#e8eaf6;--tx2:#8890b0;--tx3:#5a6380;--bd:#1e2536}
 *{margin:0;padding:0;box-sizing:border-box}
 body{background:var(--bg);color:var(--tx1);font-family:'Inter','Segoe UI',system-ui,sans-serif;overflow-x:hidden}
-.app{min-height:100vh;position:relative;overflow:hidden}
+.app{min-height:100vh;position:relative;overflow-x:hidden}
 .gridbg{position:fixed;inset:0;background-image:linear-gradient(rgba(0,229,255,.03) 1px,transparent 1px),linear-gradient(90deg,rgba(0,229,255,.03) 1px,transparent 1px);background-size:60px 60px;pointer-events:none;z-index:0}
 .scanbar{position:fixed;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,transparent,var(--ac),transparent);animation:scan 4s infinite;z-index:100;opacity:.6}
 @keyframes scan{0%{transform:translateX(-100%)}100%{transform:translateX(100%)}}
