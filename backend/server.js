@@ -590,7 +590,7 @@ app.post('/api/auth/send-otp', async (req, res) => {
     const resendClient = new Resend(process.env.RESEND_API_KEY);
 
     resendClient.emails.send({
-      from: 'ThreatReady <onboarding@resend.dev>',
+      from: 'ThreatReady <noreply@threatready.io>',
       to: email,
       subject: 'ThreatReady — Your Verification Code',
       html: `
