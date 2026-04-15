@@ -585,65 +585,34 @@ app.post('/api/auth/send-otp', async (req, res) => {
     // Send response immediately - don't wait for email
     res.json({ message: 'OTP sent successfully' });
 
-    // Send email in background (non-blocking)
-//     const emailTransporter = require('nodemailer').createTransport({
-//       host: 'smtp-relay.brevo.com',
-//       port: 587,
-//       secure: false,
-//       auth: {
-//         user: process.env.BREVO_USER,
-//         pass: process.env.BREVO_PASS
-//       }
-//     });
+    // Send email in background using Resend
+    const { Resend } = require('resend');
+    const resendClient = new Resend(process.env.RESEND_API_KEY);
 
-//     emailTransporter.sendMail({
-//       from: '"ThreatReady" <' + process.env.BREVO_USER + '>',
-//       to: email,
-//       subject: 'ThreatReady — Your Verification Code',
-//       html: `
-//         <div style="font-family:sans-serif;max-width:480px;margin:0 auto;background:#0a0e1a;color:#e8eaf6;padding:32px;border-radius:12px">
-//           <h2 style="color:#00e5ff;margin-bottom:8px">ThreatReady Verification</h2>
-//           <p style="color:#8890b0">Use the code below to verify your account. Expires in 15 minutes.</p>
-//           <div style="background:#1a1f2e;border:1px solid #1e2536;border-radius:10px;padding:24px;text-align:center;margin:24px 0">
-//             <div style="font-size:40px;font-weight:900;letter-spacing:14px;color:#00e5ff;font-family:monospace">${otp}</div>
-//           </div>
-//           <p style="color:#5a6380;font-size:12px">Do not share this code with anyone.</p>
-//         </div>
-//       `
-//     }).then(() => {
-//       console.log('OTP email sent to:', email);
-//     }).catch(emailErr => {
-//       console.error('OTP email failed:', emailErr.message);
-//       console.error('Check EMAIL_USER and EMAIL_PASS in Render environment variables');
-//     });
+    resendClient.emails.send({
+      from: 'ThreatReady <onboarding@resend.dev>',
+      to: email,
+      subject: 'ThreatReady — Your Verification Code',
+      html: `
+        <div style="font-family:sans-serif;max-width:480px;margin:0 auto;background:#0a0e1a;color:#e8eaf6;padding:32px;border-radius:12px">
+          <h2 style="color:#00e5ff;margin-bottom:8px">ThreatReady Verification</h2>
+          <p style="color:#8890b0">Use the code below to verify your account. Expires in 15 minutes.</p>
+          <div style="background:#1a1f2e;border:1px solid #1e2536;border-radius:10px;padding:24px;text-align:center;margin:24px 0">
+            <div style="font-size:40px;font-weight:900;letter-spacing:14px;color:#00e5ff;font-family:monospace">${otp}</div>
+          </div>
+          <p style="color:#5a6380;font-size:12px">Do not share this code with anyone.</p>
+        </div>
+      `
+    }).then(() => {
+      console.log('OTP email sent to:', email);
+    }).catch(emailErr => {
+      console.error('OTP email failed:', emailErr.message);
+    });
 
-//   } catch (e) {
-//     console.error('OTP send error:', e.message);
-//     res.status(500).json({ error: e.message });
-//   }
-// });
-
-const { Resend } = require('resend');
-const resend = new Resend(process.env.RESEND_API_KEY);
-
-resend.emails.send({
-  from: 'ThreatReady <onboarding@resend.dev>',
-  to: email,
-  subject: 'ThreatReady — Your Verification Code',
-  html: `
-    <div style="font-family:sans-serif;max-width:480px;margin:0 auto;background:#0a0e1a;color:#e8eaf6;padding:32px;border-radius:12px">
-      <h2 style="color:#00e5ff;margin-bottom:8px">ThreatReady Verification</h2>
-      <p style="color:#8890b0">Use the code below to verify your account. Expires in 15 minutes.</p>
-      <div style="background:#1a1f2e;border:1px solid #1e2536;border-radius:10px;padding:24px;text-align:center;margin:24px 0">
-        <div style="font-size:40px;font-weight:900;letter-spacing:14px;color:#00e5ff;font-family:monospace">${otp}</div>
-      </div>
-      <p style="color:#5a6380;font-size:12px">Do not share this code with anyone.</p>
-    </div>
-  `
-}).then(() => {
-  console.log('OTP email sent to:', email);
-}).catch(emailErr => {
-  console.error('OTP email failed:', emailErr.message);
+  } catch (e) {
+    console.error('OTP send error:', e.message);
+    res.status(500).json({ error: e.message });
+  }
 });
 
 // Verify OTP
