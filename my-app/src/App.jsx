@@ -232,8 +232,8 @@ function ToastContainer() {
               {isLogout(confirm.msg)
                 ? 'You will be signed out and redirected to the home page.'
                 : isDelete(confirm.msg)
-                ? 'This action is permanent and cannot be undone.'
-                : 'Please confirm to proceed with this action.'}
+                  ? 'This action is permanent and cannot be undone.'
+                  : 'Please confirm to proceed with this action.'}
             </div>
             <div className="confirm-btns">
               <button className="confirm-cancel"
@@ -243,8 +243,8 @@ function ToastContainer() {
               <button className={`confirm-ok ${isDelete(confirm.msg) ? 'confirm-ok-delete' : 'confirm-ok-logout'}`}
                 onClick={() => { confirm.onYes?.(); setConfirm(null); }}>
                 {isLogout(confirm.msg) ? 'Yes, Logout'
-                 : isDelete(confirm.msg) ? 'Yes, Delete'
-                 : 'Confirm'}
+                  : isDelete(confirm.msg) ? 'Yes, Delete'
+                    : 'Confirm'}
               </button>
             </div>
           </div>
@@ -452,7 +452,7 @@ function AIAvatar({ isSpeaking, isMuted, qIndex }) {
   return (
     <div style={{ display: "flex", flexDirection: "column", alignItems: "center", marginBottom: 16 }}>
       <div style={{ position: "relative", width: 180, height: 200 }}>
-        
+
         {/* Outer pulse ring when speaking */}
         {isSpeaking && (
           <>
@@ -482,11 +482,11 @@ function AIAvatar({ isSpeaking, isMuted, qIndex }) {
             : "0 4px 20px rgba(0,0,0,0.5)"
         }}>
           <img
-            src="/avatar-hacker.png"
+            src="/avatar-hacker.jpeg"
             alt="AI Interviewer"
             style={{ width: "100%", height: "100%", objectFit: "cover", objectPosition: "center top" }}
           />
-          
+
           {/* Dark overlay when muted */}
           {isMuted && (
             <div style={{
@@ -505,7 +505,7 @@ function AIAvatar({ isSpeaking, isMuted, qIndex }) {
               padding: "20px 10px 8px",
               display: "flex", justifyContent: "center", gap: 4, alignItems: "flex-end"
             }}>
-              {[1,2,3,4,5,6,7].map(i => (
+              {[1, 2, 3, 4, 5, 6, 7].map(i => (
                 <div key={i} style={{
                   width: 3, borderRadius: 3,
                   background: isFemale ? "#ff6b9d" : "#00e5ff",
@@ -534,7 +534,7 @@ function AIAvatar({ isSpeaking, isMuted, qIndex }) {
         {isFemale ? "ARIA" : "NEXUS"} · AI INTERVIEWER
       </div>
       <div style={{ display: "flex", gap: 3, marginTop: 6, height: 16, alignItems: "flex-end" }}>
-        {[1,2,3,4,5].map(i => (
+        {[1, 2, 3, 4, 5].map(i => (
           <div key={i} style={{
             width: 3, borderRadius: 3,
             background: isFemale ? "#ff6b9d" : "#00e5ff",
@@ -794,7 +794,7 @@ export default function ThreatReady() {
       const stats = await sr.json(); if (!stats.error) setB2bStats(stats);
       const cands = await cr.json(); if (cands.candidates) setCandidates(cands.candidates);
       const assess = await ar.json(); if (assess.assessments) setAssessments(assess.assessments);
-    } catch(e) { console.log('B2B load error:', e.message); }
+    } catch (e) { console.log('B2B load error:', e.message); }
     setB2bLoading(false);
   };
   useEffect(() => {
@@ -835,7 +835,7 @@ export default function ThreatReady() {
       if (notif.notifications) { setNotifications(notif.notifications); setUnreadCount(notif.unread_count || 0); }
       if (dc.challenge) { setDailyChallenge(dc.challenge); setDailyAnswered(dc.already_answered); if (dc.response) setDailyResult(dc.response); }
       if (hist.history) setScenarioHistory(hist.history.map(h => h.scenario_id));
-    } catch(e) { console.log('Dashboard extras load error:', e.message); }
+    } catch (e) { console.log('Dashboard extras load error:', e.message); }
   };
 
   useEffect(() => {
@@ -1234,12 +1234,12 @@ export default function ThreatReady() {
 
       // ARIA: higher pitch, slightly faster
       // NEXUS: lower pitch, slightly slower
-      utterance.rate   = useFemale ? 0.92 : 0.88;
-      utterance.pitch  = useFemale ? 1.2  : 0.8;
+      utterance.rate = useFemale ? 0.92 : 0.88;
+      utterance.pitch = useFemale ? 1.2 : 0.8;
       utterance.volume = 1.0;
 
       utterance.onstart = () => setIsSpeaking(true);
-      utterance.onend   = () => setIsSpeaking(false);
+      utterance.onend = () => setIsSpeaking(false);
       utterance.onerror = () => setIsSpeaking(false);
 
       window.speechSynthesis.speak(utterance);
@@ -1863,10 +1863,12 @@ export default function ThreatReady() {
                 Enter your email address and we'll send you a 6-digit reset code.
               </p>
               {forgotMsg && (
-                <div style={{ padding: 10, borderRadius: 8, marginBottom: 12, fontSize: 12,
+                <div style={{
+                  padding: 10, borderRadius: 8, marginBottom: 12, fontSize: 12,
                   background: forgotMsg.includes("✅") ? "rgba(0,224,150,.1)" : "rgba(255,82,82,.1)",
                   border: forgotMsg.includes("✅") ? "1px solid rgba(0,224,150,.3)" : "1px solid rgba(255,82,82,.3)",
-                  color: forgotMsg.includes("✅") ? "var(--ok)" : "var(--dn)" }}>
+                  color: forgotMsg.includes("✅") ? "var(--ok)" : "var(--dn)"
+                }}>
                   {forgotMsg}
                 </div>
               )}
@@ -1893,7 +1895,7 @@ export default function ThreatReady() {
                     } else {
                       setForgotMsg("❌ " + (data.error || "Failed to send reset code"));
                     }
-                  } catch(e) {
+                  } catch (e) {
                     setForgotMsg("❌ Server error: " + e.message);
                   }
                   setForgotLoading(false);
@@ -1917,10 +1919,12 @@ export default function ThreatReady() {
               <p style={{ fontSize: 12, color: "var(--tx2)", marginBottom: 4 }}>Code sent to</p>
               <p style={{ fontSize: 13, color: "var(--ac)", fontWeight: 700, marginBottom: 20 }}>{forgotEmail}</p>
               {forgotMsg && (
-                <div style={{ padding: 10, borderRadius: 8, marginBottom: 12, fontSize: 12,
+                <div style={{
+                  padding: 10, borderRadius: 8, marginBottom: 12, fontSize: 12,
                   background: forgotMsg.includes("✅") ? "rgba(0,224,150,.1)" : "rgba(255,82,82,.1)",
                   border: forgotMsg.includes("✅") ? "1px solid rgba(0,224,150,.3)" : "1px solid rgba(255,82,82,.3)",
-                  color: forgotMsg.includes("✅") ? "var(--ok)" : "var(--dn)" }}>
+                  color: forgotMsg.includes("✅") ? "var(--ok)" : "var(--dn)"
+                }}>
                   {forgotMsg}
                 </div>
               )}
@@ -1950,7 +1954,7 @@ export default function ThreatReady() {
                     } else {
                       setForgotMsg("❌ " + (data.error || "Reset failed. Check your code."));
                     }
-                  } catch(e) {
+                  } catch (e) {
                     setForgotMsg("❌ Server error: " + e.message);
                   }
                   setForgotLoading(false);
@@ -2414,7 +2418,7 @@ export default function ThreatReady() {
                     {notifications.length === 0
                       ? <div style={{ padding: 16, fontSize: 11, color: "var(--tx3)", textAlign: "center" }}>No notifications yet</div>
                       : notifications.map((n, i) => (
-                        <div key={n.id || i} style={{ padding: "10px 14px", borderBottom: i < notifications.length-1 ? "1px solid #1e2536" : "none", background: n.is_read ? "transparent" : "rgba(0,229,255,.04)" }}>
+                        <div key={n.id || i} style={{ padding: "10px 14px", borderBottom: i < notifications.length - 1 ? "1px solid #1e2536" : "none", background: n.is_read ? "transparent" : "rgba(0,229,255,.04)" }}>
                           <div style={{ fontSize: 12, fontWeight: 600 }}>{n.title}</div>
                           <div style={{ fontSize: 10, color: "var(--tx3)", marginTop: 2 }}>{n.message}</div>
                           <div style={{ fontSize: 9, color: "var(--tx3)", marginTop: 2 }}>{new Date(n.created_at).toLocaleDateString()}</div>
@@ -2490,9 +2494,11 @@ export default function ThreatReady() {
                     value={dailyAnswer} onChange={e => setDailyAnswer(e.target.value)}
                     style={{ minHeight: 80, marginBottom: 12, fontSize: 12 }} />
                   {dailyResult && (
-                    <div style={{ padding: 12, borderRadius: 10, marginBottom: 12,
+                    <div style={{
+                      padding: 12, borderRadius: 10, marginBottom: 12,
                       background: dailyResult.score >= 60 ? "rgba(0,224,150,.1)" : "rgba(255,82,82,.1)",
-                      border: `1px solid ${dailyResult.score >= 60 ? "rgba(0,224,150,.3)" : "rgba(255,82,82,.3)"}` }}>
+                      border: `1px solid ${dailyResult.score >= 60 ? "rgba(0,224,150,.3)" : "rgba(255,82,82,.3)"}`
+                    }}>
                       <div style={{ fontSize: 13, fontWeight: 700, color: dailyResult.score >= 60 ? "var(--ok)" : "var(--dn)" }}>
                         Score: {dailyResult.score}/100 · {dailyResult.correct ? "✅ Correct!" : "❌ Needs improvement"}
                       </div>
@@ -2521,7 +2527,7 @@ export default function ThreatReady() {
                             } else {
                               showToast(data.error || 'Submit failed', 'error');
                             }
-                          } catch(e) { showToast('Error: ' + e.message, 'error'); }
+                          } catch (e) { showToast('Error: ' + e.message, 'error'); }
                           setDailyLoading(false);
                         }}>
                         {dailyLoading ? 'Evaluating...' : 'Submit Answer →'}
@@ -2587,11 +2593,13 @@ export default function ThreatReady() {
                 </div>
               ) : (
                 leaderboard.slice(0, 5).map((p, i) => (
-                  <div key={p.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 0", borderBottom: i < leaderboard.slice(0,5).length - 1 ? "1px solid var(--bd)" : "none" }}>
+                  <div key={p.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 0", borderBottom: i < leaderboard.slice(0, 5).length - 1 ? "1px solid var(--bd)" : "none" }}>
                     <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                      <span className="mono" style={{ fontSize: 12, fontWeight: 700,
-                        color: i === 0 ? "#f59e0b" : i === 1 ? "#94a3b8" : i === 2 ? "#b45309" : "var(--tx3)" }}>
-                        {i === 0 ? "🥇" : i === 1 ? "🥈" : i === 2 ? "🥉" : `#${i+1}`}
+                      <span className="mono" style={{
+                        fontSize: 12, fontWeight: 700,
+                        color: i === 0 ? "#f59e0b" : i === 1 ? "#94a3b8" : i === 2 ? "#b45309" : "var(--tx3)"
+                      }}>
+                        {i === 0 ? "🥇" : i === 1 ? "🥈" : i === 2 ? "🥉" : `#${i + 1}`}
                       </span>
                       <span style={{ fontSize: 12, color: p.id === user?.id ? "var(--ac)" : "var(--tx1)", fontWeight: p.id === user?.id ? 700 : 400 }}>
                         {p.id === user?.id ? "You" : p.name || "Anonymous"}
@@ -2785,15 +2793,17 @@ export default function ThreatReady() {
                   <div className="lbl" style={{ marginBottom: 10, textAlign: "left" }}>SELECT INTERVIEWER PERSONA</div>
                   <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 10, marginBottom: 24 }}>
                     {[["🙂", "Friendly", "Encouraging but thorough", "friendly"],
-                      ["⚖️", "Standard", "Balanced and fair", "standard"],
-                      ["😤", "Tough", "Challenges everything", "tough"]
+                    ["⚖️", "Standard", "Balanced and fair", "standard"],
+                    ["😤", "Tough", "Challenges everything", "tough"]
                     ].map(([icon, label, desc, val]) => (
                       <div key={val} onClick={() => setInterviewPersona(val)}
                         className="card card-glow"
-                        style={{ padding: 16, cursor: "pointer", textAlign: "center",
+                        style={{
+                          padding: 16, cursor: "pointer", textAlign: "center",
                           borderColor: interviewPersona === val ? "var(--ac)" : "var(--bd)",
                           background: interviewPersona === val ? "rgba(0,229,255,.06)" : undefined,
-                          transition: "all .2s" }}>
+                          transition: "all .2s"
+                        }}>
                         <div style={{ fontSize: 24, marginBottom: 6 }}>{icon}</div>
                         <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 3 }}>{label}</div>
                         <div style={{ fontSize: 10, color: "var(--tx3)" }}>{desc}</div>
@@ -2808,9 +2818,11 @@ export default function ThreatReady() {
                     {ROLES.filter(r => subscribedRoles.includes(r.id)).map(role => (
                       <div key={role.id} onClick={() => setActiveRole(role.id)}
                         className="card card-glow"
-                        style={{ padding: 14, cursor: "pointer", display: "flex", alignItems: "center", gap: 12,
+                        style={{
+                          padding: 14, cursor: "pointer", display: "flex", alignItems: "center", gap: 12,
                           borderColor: activeRole === role.id ? "var(--ac)" : "var(--bd)",
-                          background: activeRole === role.id ? "rgba(0,229,255,.06)" : undefined }}>
+                          background: activeRole === role.id ? "rgba(0,229,255,.06)" : undefined
+                        }}>
                         <span style={{ fontSize: 26 }}>{role.icon}</span>
                         <div style={{ textAlign: "left" }}>
                           <div style={{ fontSize: 13, fontWeight: 700 }}>{role.name}</div>
@@ -2835,10 +2847,10 @@ export default function ThreatReady() {
                 <div className="card" style={{ padding: 16 }}>
                   <div className="lbl" style={{ marginBottom: 10 }}>WHAT TO EXPECT</div>
                   <div style={{ display: "grid", gridTemplateColumns: "repeat(2,1fr)", gap: 8 }}>
-                    {[["🎯","Role-specific questions","Tailored to your subscribed role"],
-                      ["🔄","Adaptive follow-ups","AI digs deeper based on your answers"],
-                      ["⏱️","Time pressure","Simulates real interview conditions"],
-                      ["📊","Detailed debrief","Score, strengths, weaknesses, model answers"]
+                    {[["🎯", "Role-specific questions", "Tailored to your subscribed role"],
+                    ["🔄", "Adaptive follow-ups", "AI digs deeper based on your answers"],
+                    ["⏱️", "Time pressure", "Simulates real interview conditions"],
+                    ["📊", "Detailed debrief", "Score, strengths, weaknesses, model answers"]
                     ].map(([icon, title, desc], i) => (
                       <div key={i} style={{ display: "flex", gap: 10, padding: "8px 0", borderBottom: i < 2 ? "1px solid var(--bd)" : "none" }}>
                         <span style={{ fontSize: 20 }}>{icon}</span>
@@ -2918,7 +2930,7 @@ export default function ThreatReady() {
                       });
                       if (res.ok) showToast('Privacy settings saved', 'success');
                       else showToast('Failed to save settings', 'error');
-                    } catch(e) { showToast('Error: ' + e.message, 'error'); }
+                    } catch (e) { showToast('Error: ' + e.message, 'error'); }
                   }} />
                 </label>
               ))}
@@ -2941,30 +2953,30 @@ export default function ThreatReady() {
                   const bdgs = d.badges || [];
 
                   const avgScore = sessions.filter(s => s.overall_score).length > 0
-                    ? (sessions.filter(s => s.overall_score).reduce((a, s) => a + parseFloat(s.overall_score||0), 0) / sessions.filter(s => s.overall_score).length).toFixed(1)
+                    ? (sessions.filter(s => s.overall_score).reduce((a, s) => a + parseFloat(s.overall_score || 0), 0) / sessions.filter(s => s.overall_score).length).toFixed(1)
                     : '—';
 
                   const bestScore = sessions.filter(s => s.overall_score).length > 0
-                    ? Math.max(...sessions.filter(s => s.overall_score).map(s => parseFloat(s.overall_score||0))).toFixed(1)
+                    ? Math.max(...sessions.filter(s => s.overall_score).map(s => parseFloat(s.overall_score || 0))).toFixed(1)
                     : '—';
 
-                  const roleNames = { cloud:'Cloud Security', devsecops:'DevSecOps', appsec:'Application Security', netsec:'Network Security', prodsec:'Product Security', secarch:'Security Architect', dfir:'DFIR & Incident Response', grc:'GRC & Compliance', soc:'SOC Analyst', threat:'Threat Hunter', red:'Red Team', blue:'Blue Team' };
+                  const roleNames = { cloud: 'Cloud Security', devsecops: 'DevSecOps', appsec: 'Application Security', netsec: 'Network Security', prodsec: 'Product Security', secarch: 'Security Architect', dfir: 'DFIR & Incident Response', grc: 'GRC & Compliance', soc: 'SOC Analyst', threat: 'Threat Hunter', red: 'Red Team', blue: 'Blue Team' };
 
                   const scoreRows = scores.map(s => `
                     <tr>
                       <td style="padding:10px;font-weight:600">${roleNames[s.role_id] || s.role_id}</td>
-                      <td style="padding:10px;font-weight:800;color:${s.total_score>=7?'#00e096':s.total_score>=5?'#ffab40':'#ff5252'}">${parseFloat(s.total_score||0).toFixed(1)}/10</td>
-                      <td style="padding:10px;color:${s.badge_level==='Platinum'?'#e2e8f0':s.badge_level==='Gold'?'#f59e0b':s.badge_level==='Silver'?'#94a3b8':'#b45309'}">${s.badge_level || '—'}</td>
+                      <td style="padding:10px;font-weight:800;color:${s.total_score >= 7 ? '#00e096' : s.total_score >= 5 ? '#ffab40' : '#ff5252'}">${parseFloat(s.total_score || 0).toFixed(1)}/10</td>
+                      <td style="padding:10px;color:${s.badge_level === 'Platinum' ? '#e2e8f0' : s.badge_level === 'Gold' ? '#f59e0b' : s.badge_level === 'Silver' ? '#94a3b8' : '#b45309'}">${s.badge_level || '—'}</td>
                       <td style="padding:10px">${s.percentile || 0}th percentile</td>
                       <td style="padding:10px;color:#8890b0">${new Date(s.updated_at).toLocaleDateString()}</td>
                     </tr>`).join('');
 
-                  const sessionRows = sessions.slice(0,10).map(s => `
+                  const sessionRows = sessions.slice(0, 10).map(s => `
                     <tr>
                       <td style="padding:8px;color:#8890b0">${s.scenario_id || '—'}</td>
-                      <td style="padding:8px;font-weight:700;color:${parseFloat(s.overall_score||0)>=7?'#00e096':parseFloat(s.overall_score||0)>=5?'#ffab40':'#ff5252'}">${s.overall_score ? parseFloat(s.overall_score).toFixed(1)+'/10' : 'Incomplete'}</td>
-                      <td style="padding:8px;color:${s.badge==='Gold'?'#f59e0b':s.badge==='Platinum'?'#e2e8f0':'#94a3b8'}">${s.badge || '—'}</td>
-                      <td style="padding:8px;color:#ffab40">+${s.earned_xp||0} XP</td>
+                      <td style="padding:8px;font-weight:700;color:${parseFloat(s.overall_score || 0) >= 7 ? '#00e096' : parseFloat(s.overall_score || 0) >= 5 ? '#ffab40' : '#ff5252'}">${s.overall_score ? parseFloat(s.overall_score).toFixed(1) + '/10' : 'Incomplete'}</td>
+                      <td style="padding:8px;color:${s.badge === 'Gold' ? '#f59e0b' : s.badge === 'Platinum' ? '#e2e8f0' : '#94a3b8'}">${s.badge || '—'}</td>
+                      <td style="padding:8px;color:#ffab40">+${s.earned_xp || 0} XP</td>
                       <td style="padding:8px;color:#8890b0">${s.completed_at ? new Date(s.completed_at).toLocaleDateString() : 'In Progress'}</td>
                     </tr>`).join('');
 
@@ -3002,8 +3014,8 @@ export default function ThreatReady() {
                     </div>
 
                     <div class="stats-grid">
-                      <div class="stat"><div class="stat-val">${st.total_xp||0}</div><div class="stat-lbl">Total XP</div></div>
-                      <div class="stat"><div class="stat-val">${sessions.filter(s=>s.completed_at).length}</div><div class="stat-lbl">Sessions Done</div></div>
+                      <div class="stat"><div class="stat-val">${st.total_xp || 0}</div><div class="stat-lbl">Total XP</div></div>
+                      <div class="stat"><div class="stat-val">${sessions.filter(s => s.completed_at).length}</div><div class="stat-lbl">Sessions Done</div></div>
                       <div class="stat"><div class="stat-val">${avgScore}</div><div class="stat-lbl">Avg Score</div></div>
                       <div class="stat"><div class="stat-val">${bestScore}</div><div class="stat-lbl">Best Score</div></div>
                     </div>
@@ -3038,7 +3050,7 @@ export default function ThreatReady() {
                   w.document.close();
                   setTimeout(() => w.print(), 600);
                   showToast('Report ready — use Print → Save as PDF', 'success');
-                } catch(e) { showToast('Report failed: ' + e.message, 'error'); }
+                } catch (e) { showToast('Report failed: ' + e.message, 'error'); }
               }}>📊 Download My Report (PDF)</button>
               <button className="btn bdn" style={{ fontSize: 11 }} onClick={() => showConfirm('Delete your account permanently? All data will be lost.', async () => { const token = localStorage.getItem('token'); const res = await fetch('https://threatready-db.onrender.com/api/settings/delete-account', { method: 'DELETE', headers: { 'Authorization': `Bearer ${token}` } }); if (res.ok) { localStorage.clear(); setUser(null); setView('landing'); showToast('Account deleted.', 'info'); } })}>🗑️ Delete Account</button>
             </div>
@@ -3168,7 +3180,7 @@ export default function ThreatReady() {
                     <div style={{ fontSize: 10, color: "var(--tx3)" }}>{c.candidate_email || c.email}</div>
                   </div>
                   <div style={{ textAlign: "right" }}>
-                    {c.status === "completed" && <span className="mono" style={{ fontSize: 16, fontWeight: 700, color: (c.overall_score||0) >= 7 ? "var(--ok)" : (c.overall_score||0) >= 5 ? "var(--wn)" : "var(--dn)" }}>{c.overall_score}/10</span>}
+                    {c.status === "completed" && <span className="mono" style={{ fontSize: 16, fontWeight: 700, color: (c.overall_score || 0) >= 7 ? "var(--ok)" : (c.overall_score || 0) >= 5 ? "var(--wn)" : "var(--dn)" }}>{c.overall_score}/10</span>}
                     {c.status === "in_progress" && <span className="tag" style={{ background: "rgba(255,171,64,.1)", color: "var(--wn)", borderColor: "rgba(255,171,64,.2)" }}>In Progress</span>}
                     {c.status === "not_started" && <span className="tag" style={{ background: "rgba(90,99,128,.1)", color: "var(--tx3)" }}>Not Started</span>}
                   </div>
@@ -3223,7 +3235,7 @@ export default function ThreatReady() {
                         } else {
                           showToast('PDF reader not available. Please paste text.', 'warning');
                         }
-                      } catch(err) { showToast('Could not read PDF. Paste text instead.', 'error'); }
+                      } catch (err) { showToast('Could not read PDF. Paste text instead.', 'error'); }
                     };
                     reader.readAsArrayBuffer(file);
                   } else {
@@ -3238,7 +3250,7 @@ export default function ThreatReady() {
                       const data = await res.json();
                       if (data.text) { setNewAssessJD(data.text); showToast('File loaded!', 'success'); }
                       else showToast('Could not read file. Try TXT or PDF.', 'error');
-                    } catch(err) { showToast('Upload failed: ' + err.message, 'error'); }
+                    } catch (err) { showToast('Upload failed: ' + err.message, 'error'); }
                   }
                   e.target.value = '';
                 }}
@@ -3287,7 +3299,7 @@ export default function ThreatReady() {
                       if (data.analysis.recommended_difficulty) setNewAssessDiff(data.analysis.recommended_difficulty);
                       if (data.analysis.suggested_name) setNewAssessName(data.analysis.suggested_name);
                     }
-                  } catch(e) { console.log('JD analyze error:', e.message); }
+                  } catch (e) { console.log('JD analyze error:', e.message); }
                   setJdAnalyzing(false);
                 }}>
                 {jdAnalyzing ? <><span className="loader" style={{ width: 12, height: 12 }} /> &nbsp;Analyzing JD...</> : "🤖 Analyze with AI →"}
@@ -3328,9 +3340,11 @@ export default function ThreatReady() {
             <div className="card fadeUp" style={{ padding: 20 }}>
               <div className="lbl" style={{ marginBottom: 12 }}>STEP 2 — ASSESSMENT DETAILS</div>
               {assessMsg && (
-                <div style={{ padding: 10, borderRadius: 8, marginBottom: 12, fontSize: 12,
+                <div style={{
+                  padding: 10, borderRadius: 8, marginBottom: 12, fontSize: 12,
                   background: assessMsg.includes("✅") ? "rgba(0,224,150,.1)" : "rgba(255,82,82,.1)",
-                  color: assessMsg.includes("✅") ? "var(--ok)" : "var(--dn)" }}>
+                  color: assessMsg.includes("✅") ? "var(--ok)" : "var(--dn)"
+                }}>
                   {assessMsg}
                 </div>
               )}
@@ -3347,11 +3361,13 @@ export default function ThreatReady() {
                 <option value="expert">💎 Expert</option>
               </select>
               <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 8, marginBottom: 16 }}>
-                {[["quick","⚡ Quick Screen","15 min"],["standard","📋 Standard","30 min"],["deep","🔬 Deep Dive","45 min"]].map(([val, label, time]) => (
+                {[["quick", "⚡ Quick Screen", "15 min"], ["standard", "📋 Standard", "30 min"], ["deep", "🔬 Deep Dive", "45 min"]].map(([val, label, time]) => (
                   <div key={val} onClick={() => setNewAssessType(val)} className="card card-glow"
-                    style={{ padding: 12, cursor: "pointer", textAlign: "center",
+                    style={{
+                      padding: 12, cursor: "pointer", textAlign: "center",
                       borderColor: newAssessType === val ? "var(--ac)" : undefined,
-                      background: newAssessType === val ? "rgba(0,229,255,.05)" : undefined }}>
+                      background: newAssessType === val ? "rgba(0,229,255,.05)" : undefined
+                    }}>
                     <div style={{ fontSize: 12, fontWeight: 700 }}>{label}</div>
                     <div style={{ fontSize: 9, color: "var(--tx3)", marginTop: 3 }}>{time}</div>
                   </div>
@@ -3385,7 +3401,7 @@ export default function ThreatReady() {
                     } else {
                       setAssessMsg('❌ Error: ' + (data.error || 'Failed to create'));
                     }
-                  } catch(e) { setAssessMsg('❌ ' + e.message); }
+                  } catch (e) { setAssessMsg('❌ ' + e.message); }
                 }}>
                 Create Assessment →
               </button>
@@ -3398,9 +3414,11 @@ export default function ThreatReady() {
             <div className="card fadeUp" style={{ padding: 16, marginBottom: 16, borderColor: "var(--ac)" }}>
               <div className="lbl" style={{ marginBottom: 10 }}>INVITE CANDIDATE</div>
               {inviteMsg && (
-                <div style={{ padding: 8, borderRadius: 8, marginBottom: 8, fontSize: 11,
+                <div style={{
+                  padding: 8, borderRadius: 8, marginBottom: 8, fontSize: 11,
                   background: inviteMsg.includes("✅") ? "rgba(0,224,150,.1)" : "rgba(255,82,82,.1)",
-                  color: inviteMsg.includes("✅") ? "var(--ok)" : "var(--dn)" }}>
+                  color: inviteMsg.includes("✅") ? "var(--ok)" : "var(--dn)"
+                }}>
                   {inviteMsg}
                 </div>
               )}
@@ -3438,7 +3456,7 @@ export default function ThreatReady() {
                     } else {
                       setInviteMsg('❌ ' + (data.error || 'Failed'));
                     }
-                  } catch(e) { setInviteMsg('❌ ' + e.message); }
+                  } catch (e) { setInviteMsg('❌ ' + e.message); }
                 }}>
                 📧 Send Invite Email
               </button>
@@ -3450,7 +3468,7 @@ export default function ThreatReady() {
               <button className="btn bs" style={{ fontSize: 10, padding: "4px 10px" }}
                 onClick={() => {
                   const csv = ['Name,Email,Role,Difficulty,Score,Status,Invited']
-                    .concat(candidates.map(c => `${c.candidate_name},${c.candidate_email},${c.role_id},${c.difficulty},${c.overall_score || ''},${c.status},${c.invited_at?.substring(0,10) || ''}`))
+                    .concat(candidates.map(c => `${c.candidate_name},${c.candidate_email},${c.role_id},${c.difficulty},${c.overall_score || ''},${c.status},${c.invited_at?.substring(0, 10) || ''}`))
                     .join('');
                   const a = document.createElement('a');
                   a.href = 'data:text/csv,' + encodeURIComponent(csv);
@@ -3477,8 +3495,10 @@ export default function ThreatReady() {
                   <span className="mono" style={{ fontWeight: 700, color: c.overall_score ? (c.overall_score >= 7 ? "var(--ok)" : c.overall_score >= 5 ? "var(--wn)" : "var(--dn)") : "var(--tx3)" }}>
                     {c.overall_score ? `${c.overall_score}/10` : "—"}
                   </span>
-                  <span style={{ fontSize: 9, fontWeight: 600,
-                    color: c.status === "completed" ? "var(--ok)" : c.status === "in_progress" ? "var(--wn)" : "var(--tx3)" }}>
+                  <span style={{
+                    fontSize: 9, fontWeight: 600,
+                    color: c.status === "completed" ? "var(--ok)" : c.status === "in_progress" ? "var(--wn)" : "var(--tx3)"
+                  }}>
                     {c.status === "completed" ? "✓ Done" : c.status === "in_progress" ? "● Active" : "○ Pending"}
                   </span>
                 </div>
@@ -3523,7 +3543,7 @@ export default function ThreatReady() {
                     <div key={m.id} style={{ display: "grid", gridTemplateColumns: "1.5fr 1fr 1fr 1fr 1fr", padding: "12px 14px", borderTop: "1px solid var(--bd)", fontSize: 11, alignItems: "center" }}>
                       <div>
                         <div style={{ fontWeight: 600 }}>{m.name}</div>
-                        <div style={{ fontSize: 9, color: "var(--tx3)", marginTop: 2 }}>{m.completed_at?.substring(0,10)}</div>
+                        <div style={{ fontSize: 9, color: "var(--tx3)", marginTop: 2 }}>{m.completed_at?.substring(0, 10)}</div>
                       </div>
                       <div style={{ textAlign: "center" }}>
                         <span style={{ fontSize: 16 }}>{role?.icon || "🔒"}</span>
@@ -3551,8 +3571,8 @@ export default function ThreatReady() {
                 <div className="lbl" style={{ marginBottom: 10 }}>INSIGHTS</div>
                 <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 10, marginBottom: 12 }}>
                   {[
-                    ["Avg Score", (teamMembers.reduce((s,m) => s + m.score, 0) / teamMembers.length).toFixed(1) + "/10", "var(--ac)"],
-                    ["Top Scorer", teamMembers.sort((a,b) => b.score - a.score)[0]?.name?.split(' ')[0] || "—", "var(--ok)"],
+                    ["Avg Score", (teamMembers.reduce((s, m) => s + m.score, 0) / teamMembers.length).toFixed(1) + "/10", "var(--ac)"],
+                    ["Top Scorer", teamMembers.sort((a, b) => b.score - a.score)[0]?.name?.split(' ')[0] || "—", "var(--ok)"],
                     ["Needs Help", teamMembers.filter(m => m.score < 5).length + " candidates", "var(--dn)"]
                   ].map(([l, v, c], i) => (
                     <div key={i} className="statbox">
@@ -3597,13 +3617,13 @@ export default function ThreatReady() {
                         const score = parseFloat(c.overall_score || 0);
                         const badge = score >= 8 ? 'Platinum' : score >= 7 ? 'Gold' : score >= 6 ? 'Silver' : score >= 4 ? 'Bronze' : 'Not Ready';
                         const role = ROLES.find(r => r.id === c.role_id)?.name || c.role_id;
-                        return `${i+1},${c.candidate_name || c.candidate_email},${c.candidate_email},${role},${c.difficulty},${score}/10,${badge},${c.completed_at?.substring(0,10) || ''}`;
+                        return `${i + 1},${c.candidate_name || c.candidate_email},${c.candidate_email},${role},${c.difficulty},${score}/10,${badge},${c.completed_at?.substring(0, 10) || ''}`;
                       });
                     const csv = ['Rank,Name,Email,Role,Difficulty,Score,Badge,Completed Date', ...rows].join('');
                     const blob = new Blob([csv], { type: 'text/csv' });
                     const a = document.createElement('a');
                     a.href = URL.createObjectURL(blob);
-                    a.download = `hiring-report-${new Date().toISOString().substring(0,10)}.csv`;
+                    a.download = `hiring-report-${new Date().toISOString().substring(0, 10)}.csv`;
                     a.click();
                   }}>
                   Download CSV
@@ -3621,7 +3641,7 @@ export default function ThreatReady() {
                       const color = score >= 7 ? 'var(--ok)' : score >= 5 ? 'var(--wn)' : 'var(--dn)';
                       return (
                         <div key={c.id} style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0', borderBottom: i < 2 ? '1px solid var(--bd)' : 'none', fontSize: 11 }}>
-                          <span><span style={{ color: 'var(--ac)', fontWeight: 700, marginRight: 8 }}>#{i+1}</span>{c.candidate_name || c.candidate_email}</span>
+                          <span><span style={{ color: 'var(--ac)', fontWeight: 700, marginRight: 8 }}>#{i + 1}</span>{c.candidate_name || c.candidate_email}</span>
                           <span className="mono" style={{ fontWeight: 700, color }}>{score.toFixed(1)}/10</span>
                         </div>
                       );
@@ -3647,7 +3667,7 @@ export default function ThreatReady() {
                       roleGroups[role].push(parseFloat(c.overall_score));
                     });
                     const rows = Object.entries(roleGroups).map(([role, scores]) => {
-                      const avg = (scores.reduce((s,v) => s+v, 0) / scores.length).toFixed(1);
+                      const avg = (scores.reduce((s, v) => s + v, 0) / scores.length).toFixed(1);
                       const max = Math.max(...scores).toFixed(1);
                       const min = Math.min(...scores).toFixed(1);
                       const gap = avg < 7 ? 'Needs Improvement' : avg < 8 ? 'Good' : 'Excellent';
@@ -3657,7 +3677,7 @@ export default function ThreatReady() {
                     const blob = new Blob([csv], { type: 'text/csv' });
                     const a = document.createElement('a');
                     a.href = URL.createObjectURL(blob);
-                    a.download = `team-skills-report-${new Date().toISOString().substring(0,10)}.csv`;
+                    a.download = `team-skills-report-${new Date().toISOString().substring(0, 10)}.csv`;
                     a.click();
                   }}>
                   Download CSV
@@ -3672,28 +3692,28 @@ export default function ThreatReady() {
                 });
                 return rg;
               })()).length > 0 && (
-                <div style={{ marginTop: 12 }}>
-                  <div style={{ fontSize: 10, color: "var(--tx3)", marginBottom: 6 }}>SKILLS BREAKDOWN</div>
-                  {Object.entries((() => {
-                    const rg = {};
-                    candidates.filter(c => c.status === 'completed' && c.overall_score).forEach(c => {
-                      const role = ROLES.find(r => r.id === c.role_id)?.name || c.role_id || 'Unknown';
-                      if (!rg[role]) rg[role] = [];
-                      rg[role].push(parseFloat(c.overall_score));
-                    });
-                    return rg;
-                  })()).map(([role, scores], i, arr) => {
-                    const avg = (scores.reduce((s,v) => s+v, 0) / scores.length);
-                    const color = avg >= 7 ? 'var(--ok)' : avg >= 5 ? 'var(--wn)' : 'var(--dn)';
-                    return (
-                      <div key={role} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '6px 0', borderBottom: i < arr.length-1 ? '1px solid var(--bd)' : 'none', fontSize: 11 }}>
-                        <span>{role} <span style={{ color: 'var(--tx3)' }}>({scores.length} candidates)</span></span>
-                        <span className="mono" style={{ fontWeight: 700, color }}>{avg.toFixed(1)}/10</span>
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
+                  <div style={{ marginTop: 12 }}>
+                    <div style={{ fontSize: 10, color: "var(--tx3)", marginBottom: 6 }}>SKILLS BREAKDOWN</div>
+                    {Object.entries((() => {
+                      const rg = {};
+                      candidates.filter(c => c.status === 'completed' && c.overall_score).forEach(c => {
+                        const role = ROLES.find(r => r.id === c.role_id)?.name || c.role_id || 'Unknown';
+                        if (!rg[role]) rg[role] = [];
+                        rg[role].push(parseFloat(c.overall_score));
+                      });
+                      return rg;
+                    })()).map(([role, scores], i, arr) => {
+                      const avg = (scores.reduce((s, v) => s + v, 0) / scores.length);
+                      const color = avg >= 7 ? 'var(--ok)' : avg >= 5 ? 'var(--wn)' : 'var(--dn)';
+                      return (
+                        <div key={role} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '6px 0', borderBottom: i < arr.length - 1 ? '1px solid var(--bd)' : 'none', fontSize: 11 }}>
+                          <span>{role} <span style={{ color: 'var(--tx3)' }}>({scores.length} candidates)</span></span>
+                          <span className="mono" style={{ fontWeight: 700, color }}>{avg.toFixed(1)}/10</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
             </div>
 
             {/* Benchmark Report */}
@@ -3715,13 +3735,13 @@ export default function ThreatReady() {
                       const role = ROLES.find(r => r.id === c.role_id)?.name || c.role_id;
                       return `${c.candidate_name || c.candidate_email},${role},${score}/10,${INDUSTRY_AVG}/10,${status}`;
                     });
-                    const avgScore = (completed.reduce((s,c) => s + parseFloat(c.overall_score||0), 0) / completed.length).toFixed(1);
-                    const summary = [`Summary,All Roles,${avgScore}/10,${INDUSTRY_AVG}/10,${avgScore >= INDUSTRY_AVG ? `+${(avgScore-INDUSTRY_AVG).toFixed(1)} above` : `${(avgScore-INDUSTRY_AVG).toFixed(1)} below`} industry avg`];
+                    const avgScore = (completed.reduce((s, c) => s + parseFloat(c.overall_score || 0), 0) / completed.length).toFixed(1);
+                    const summary = [`Summary,All Roles,${avgScore}/10,${INDUSTRY_AVG}/10,${avgScore >= INDUSTRY_AVG ? `+${(avgScore - INDUSTRY_AVG).toFixed(1)} above` : `${(avgScore - INDUSTRY_AVG).toFixed(1)} below`} industry avg`];
                     const csv = ['Candidate,Role,Your Score,Industry Avg,Benchmark', ...rows, '', ...summary].join('');
                     const blob = new Blob([csv], { type: 'text/csv' });
                     const a = document.createElement('a');
                     a.href = URL.createObjectURL(blob);
-                    a.download = `benchmark-report-${new Date().toISOString().substring(0,10)}.csv`;
+                    a.download = `benchmark-report-${new Date().toISOString().substring(0, 10)}.csv`;
                     a.click();
                   }}>
                   Download CSV
@@ -3729,7 +3749,7 @@ export default function ThreatReady() {
               </div>
               {candidates.filter(c => c.status === 'completed' && c.overall_score).length > 0 && (() => {
                 const completed = candidates.filter(c => c.status === 'completed' && c.overall_score);
-                const avgScore = completed.reduce((s,c) => s + parseFloat(c.overall_score||0), 0) / completed.length;
+                const avgScore = completed.reduce((s, c) => s + parseFloat(c.overall_score || 0), 0) / completed.length;
                 const INDUSTRY_AVG = 7.2;
                 const aboveAvg = completed.filter(c => parseFloat(c.overall_score) >= INDUSTRY_AVG).length;
                 return (
@@ -3740,7 +3760,7 @@ export default function ThreatReady() {
                         ["Your Avg", avgScore.toFixed(1) + "/10", avgScore >= INDUSTRY_AVG ? "var(--ok)" : "var(--dn)"],
                         ["Industry Avg", "7.2/10", "var(--ac)"],
                         ["Above Avg", aboveAvg + "/" + completed.length, "var(--wn)"]
-                      ].map(([l,v,c], i) => (
+                      ].map(([l, v, c], i) => (
                         <div key={i} className="statbox" style={{ padding: 10 }}>
                           <div className="statval" style={{ color: c, fontSize: 14 }}>{v}</div>
                           <div className="statlbl">{l}</div>
@@ -3767,7 +3787,7 @@ export default function ThreatReady() {
                   <div>
                     <div style={{ fontSize: 13, fontWeight: 700 }}>{a.name}</div>
                     <div style={{ fontSize: 10, color: "var(--tx3)", marginTop: 3 }}>
-                      {a.role_id} · {a.difficulty} · {a.total_candidates || 0} candidates · Avg: {a.avg_score || "—"}/10 · {a.created_at?.substring(0,10)}
+                      {a.role_id} · {a.difficulty} · {a.total_candidates || 0} candidates · Avg: {a.avg_score || "—"}/10 · {a.created_at?.substring(0, 10)}
                     </div>
                   </div>
                   <div style={{ display: "flex", gap: 6 }}>
@@ -3797,9 +3817,11 @@ export default function ThreatReady() {
             <div className="card fadeUp" style={{ padding: 18, marginBottom: 14 }}>
               <div className="lbl" style={{ marginBottom: 12 }}>COMPANY SETTINGS</div>
               {companySettingsMsg && (
-                <div style={{ padding: 9, borderRadius: 8, marginBottom: 10, fontSize: 11,
+                <div style={{
+                  padding: 9, borderRadius: 8, marginBottom: 10, fontSize: 11,
                   background: companySettingsMsg.includes("✅") ? "rgba(0,224,150,.1)" : "rgba(255,82,82,.1)",
-                  color: companySettingsMsg.includes("✅") ? "var(--ok)" : "var(--dn)" }}>
+                  color: companySettingsMsg.includes("✅") ? "var(--ok)" : "var(--dn)"
+                }}>
                   {companySettingsMsg}
                 </div>
               )}
@@ -3831,7 +3853,7 @@ export default function ThreatReady() {
                     } else {
                       setCompanySettingsMsg('❌ ' + (data.error || 'Failed to save'));
                     }
-                  } catch(e) { setCompanySettingsMsg('❌ ' + e.message); }
+                  } catch (e) { setCompanySettingsMsg('❌ ' + e.message); }
                 }}>
                 Save Changes
               </button>
@@ -3841,9 +3863,11 @@ export default function ThreatReady() {
             <div className="card fadeUp" style={{ padding: 18, marginBottom: 14 }}>
               <div className="lbl" style={{ marginBottom: 12 }}>INTEGRATIONS</div>
               {integrationMsg && (
-                <div style={{ padding: 9, borderRadius: 8, marginBottom: 10, fontSize: 11,
+                <div style={{
+                  padding: 9, borderRadius: 8, marginBottom: 10, fontSize: 11,
                   background: integrationMsg.includes("✅") ? "rgba(0,224,150,.1)" : "rgba(255,82,82,.1)",
-                  color: integrationMsg.includes("✅") ? "var(--ok)" : "var(--dn)" }}>
+                  color: integrationMsg.includes("✅") ? "var(--ok)" : "var(--dn)"
+                }}>
                   {integrationMsg}
                 </div>
               )}
@@ -3875,7 +3899,7 @@ export default function ThreatReady() {
                       const data = await res.json();
                       if (data.success) { setIntegrationMsg('✅ Slack webhook saved!'); setTimeout(() => setIntegrationMsg(''), 3000); }
                       else setIntegrationMsg('❌ ' + (data.error || 'Failed'));
-                    } catch(e) { setIntegrationMsg('❌ ' + e.message); }
+                    } catch (e) { setIntegrationMsg('❌ ' + e.message); }
                   }}>
                   Save Webhook
                 </button>
@@ -3908,7 +3932,7 @@ export default function ThreatReady() {
                       const data = await res.json();
                       if (data.success) { setIntegrationMsg('✅ Zapier webhook saved!'); setTimeout(() => setIntegrationMsg(''), 3000); }
                       else setIntegrationMsg('❌ ' + (data.error || 'Failed'));
-                    } catch(e) { setIntegrationMsg('❌ ' + e.message); }
+                    } catch (e) { setIntegrationMsg('❌ ' + e.message); }
                   }}>
                   Save Webhook
                 </button>
