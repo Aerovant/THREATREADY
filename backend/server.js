@@ -17,6 +17,10 @@ const pool = new Pool({
 
 const JWT_SECRET = process.env.JWT_SECRET;
 
+// ── AI MODEL CONFIGURATION ──
+const MODEL_EVALUATION = 'claude-sonnet-4-20250514'; // Deep evaluation - accurate scoring
+const MODEL_QUESTIONS   = 'claude-haiku-4-5-20251001'; // Question generation - fast & cheap
+
 // ═══════════════════════════════════════════════════════════════
 // AUTH MIDDLEWARE
 // ═══════════════════════════════════════════════════════════════
@@ -341,7 +345,7 @@ app.post('/api/session/answer', auth, async (req, res) => {
     const resumeCtx = resumeResult.rows[0]?.resume_text || '';
 
     const msg = await anthropic.messages.create({
-      model: 'claude-sonnet-4-20250514',
+      model: MODEL_EVALUATION,
       max_tokens: 1000,
       messages: [{
         role: 'user',
@@ -504,7 +508,7 @@ app.post('/api/demo/evaluate', async (req, res) => {
     const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
     const msg = await anthropic.messages.create({
-      model: 'claude-sonnet-4-20250514',
+      model: MODEL_EVALUATION,
       max_tokens: 500,
       messages: [{
         role: 'user',
@@ -544,16 +548,12 @@ app.post('/api/consent/cookie', async (req, res) => {
 const nodemailer = require('nodemailer');
 
 const transporter = nodemailer.createTransport({
-  host: 'smtp.gmail.com',
+  host: 'smtp-relay.brevo.com',
   port: 587,
   secure: false,
-  requireTLS: true,
   auth: {
-    user: process.env.EMAIL_USER,
-    pass: process.env.EMAIL_PASS
-  },
-  tls: {
-    rejectUnauthorized: false
+    user: process.env.BREVO_USER,
+    pass: process.env.BREVO_PASS
   }
 });
 
@@ -587,19 +587,17 @@ app.post('/api/auth/send-otp', async (req, res) => {
 
     // Send email in background (non-blocking)
     const emailTransporter = require('nodemailer').createTransport({
-      host: 'smtp.gmail.com',
+      host: 'smtp-relay.brevo.com',
       port: 587,
       secure: false,
-      requireTLS: true,
       auth: {
-        user: process.env.EMAIL_USER,
-        pass: process.env.EMAIL_PASS
-      },
-      tls: { rejectUnauthorized: false }
+        user: process.env.BREVO_USER,
+        pass: process.env.BREVO_PASS
+      }
     });
 
     emailTransporter.sendMail({
-      from: '"ThreatReady" <' + process.env.EMAIL_USER + '>',
+      from: '"ThreatReady" <' + process.env.BREVO_USER + '>',
       to: email,
       subject: 'ThreatReady — Your Verification Code',
       html: `
@@ -1113,7 +1111,7 @@ app.post('/api/resume/parse', auth, upload.single('resume'), async (req, res) =>
       const Anthropic = require('@anthropic-ai/sdk');
       const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
       const msg = await anthropic.messages.create({
-        model: 'claude-sonnet-4-20250514',
+        model: MODEL_QUESTIONS,
         max_tokens: 500,
         messages: [{
           role: 'user',
@@ -1240,7 +1238,7 @@ app.post('/api/evaluate', async (req, res) => {
     } catch (e) {}
 
     const msg = await anthropic.messages.create({
-      model: 'claude-sonnet-4-20250514',
+      model: MODEL_EVALUATION,
       max_tokens: 1000,
       messages: [{
         role: 'user',
@@ -1340,7 +1338,7 @@ app.post('/api/resume/parse-text', auth, async (req, res) => {
     const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
     const msg = await anthropic.messages.create({
-      model: 'claude-sonnet-4-20250514',
+      model: MODEL_QUESTIONS,
       max_tokens: 800,
       messages: [{
         role: 'user',
@@ -1516,12 +1514,10 @@ app.post('/api/b2b/invite', auth, async (req, res) => {
     try {
       const nodemailer = require('nodemailer');
       const transporter = nodemailer.createTransport({
-        host: 'smtp.gmail.com',
+        host: 'smtp-relay.brevo.com',
         port: 587,
         secure: false,
-        requireTLS: true,
-        auth: { user: process.env.EMAIL_USER, pass: process.env.EMAIL_PASS },
-        tls: { rejectUnauthorized: false }
+        auth: { user: process.env.BREVO_USER, pass: process.env.BREVO_PASS }
       });
 
       // Map role_id to full role name
@@ -1537,7 +1533,7 @@ app.post('/api/b2b/invite', auth, async (req, res) => {
       const diffName = difficulty.charAt(0).toUpperCase() + difficulty.slice(1);
 
       await transporter.sendMail({
-        from: '"ThreatReady" <' + process.env.EMAIL_USER + '>',
+        from: '"ThreatReady" <' + process.env.BREVO_USER + '>',
         to: candidate_email,
         subject: `You have been invited to a ${roleName} Assessment - ThreatReady`,
         html: `
@@ -1617,7 +1613,7 @@ app.post('/api/b2b/analyze-jd', auth, async (req, res) => {
     const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
     const msg = await anthropic.messages.create({
-      model: 'claude-sonnet-4-20250514',
+      model: MODEL_QUESTIONS,
       max_tokens: 600,
       messages: [{
         role: 'user',
@@ -1718,7 +1714,7 @@ app.get('/api/daily-challenge', auth, async (req, res) => {
       const Anthropic = require('@anthropic-ai/sdk');
       const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
       const msg = await anthropic.messages.create({
-        model: 'claude-sonnet-4-20250514',
+        model: MODEL_QUESTIONS,
         max_tokens: 400,
         messages: [{ role: 'user', content: `Generate a quick 2-minute cybersecurity daily challenge question for ${role} role. Respond ONLY in JSON: {"question":"the question text","role":"${role}","difficulty":"beginner","points":50,"hint":"one short hint"}` }]
       });
@@ -1768,7 +1764,7 @@ app.post('/api/daily-challenge/submit', auth, async (req, res) => {
     const Anthropic = require('@anthropic-ai/sdk');
     const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
     const msg = await anthropic.messages.create({
-      model: 'claude-sonnet-4-20250514', max_tokens: 300,
+      model: MODEL_QUESTIONS, max_tokens: 300,
       messages: [{ role: 'user', content: `Daily challenge: "${ch.rows[0].question}"
 Answer: "${answer}"
 Score 0-100 and give brief feedback. JSON only: {"score":75,"correct":true,"feedback":"brief feedback","points_earned":50}` }]
@@ -1905,15 +1901,13 @@ app.post('/api/auth/forgot-password', async (req, res) => {
     try {
       const nodemailer = require('nodemailer');
       const transporter = nodemailer.createTransport({
-        host: 'smtp.gmail.com',
+        host: 'smtp-relay.brevo.com',
         port: 587,
         secure: false,
-        requireTLS: true,
-        auth: { user: process.env.EMAIL_USER, pass: process.env.EMAIL_PASS },
-        tls: { rejectUnauthorized: false }
+        auth: { user: process.env.BREVO_USER, pass: process.env.BREVO_PASS }
       });
       await transporter.sendMail({
-        from: '"ThreatReady" <' + process.env.EMAIL_USER + '>',
+        from: '"ThreatReady" <' + process.env.BREVO_USER + '>',
         to: email,
         subject: 'Password Reset Code - ThreatReady',
         html: `
