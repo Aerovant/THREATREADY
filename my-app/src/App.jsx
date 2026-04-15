@@ -95,7 +95,7 @@ body{background:var(--bg);color:var(--tx1);font-family:'Inter','Segoe UI',system
 
 .orb{position:fixed;border-radius:50%;pointer-events:none;z-index:0;filter:blur(60px)}
 .page{position:relative;z-index:1;min-height:100vh;padding:20px 0}
-.cnt{width: 100%; padding:0 40px}
+.cnt{width: 100%; padding:0 60px}
 .hero{text-align:center;padding:80px 0 40px}
 .hero h1{font-size:clamp(36px,7vw,72px);font-weight:900;line-height:1.1;background:linear-gradient(135deg,#fff,var(--ac));-webkit-background-clip:text;-webkit-text-fill-color:transparent;margin-bottom:14px}
 .hero p{font-size:14px;color:var(--tx2);max-width:760px;margin:0 auto;line-height:1.7}
@@ -1568,8 +1568,8 @@ export default function ThreatReady() {
   if (view === "landing") return (
     <div className="app"><style>{CSS}</style><div className="scanbar" /><div className="gridbg" />
       <ToastContainer />
-      <div className="orb" style={{ width: 400, height: 400, background: "radial-gradient(circle,rgba(0,229,255,.2),transparent)", top: -100, right: -100 }} />
-      <div className="orb" style={{ width: 300, height: 300, background: "radial-gradient(circle,rgba(255,61,113,.12),transparent)", bottom: -50, left: -50 }} />
+      <div className="orb" style={{ width: 600, height: 600, background: "radial-gradient(circle,rgba(0,229,255,.15),transparent)", top: -200, right: -200 }} />
+<div className="orb" style={{ width: 500, height: 500, background: "radial-gradient(circle,rgba(255,61,113,.1),transparent)", bottom: -100, left: -200 }} />
       <div className="page"><div className="cnt">
         {/* HERO */}
         <div className="hero fadeUp">
