@@ -95,7 +95,7 @@ body{background:var(--bg);color:var(--tx1);font-family:'Inter','Segoe UI',system
 
 .orb{position:fixed;border-radius:50%;pointer-events:none;z-index:0;filter:blur(60px)}
 .page{position:relative;z-index:1;min-height:100vh;padding:20px 0}
-.cnt{max-width:1200px;margin:0 auto;padding:0 40px}
+.cnt{width: 100%; padding:0 40px}
 .hero{text-align:center;padding:40px 0 20px}
 .hero h1{font-size:clamp(24px,5vw,42px);font-weight:900;line-height:1.15;background:linear-gradient(135deg,#fff,var(--ac));-webkit-background-clip:text;-webkit-text-fill-color:transparent;margin-bottom:14px}
 .hero p{font-size:14px;color:var(--tx2);max-width:560px;margin:0 auto;line-height:1.7}
