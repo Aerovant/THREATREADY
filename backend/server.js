@@ -633,8 +633,26 @@ app.post('/api/auth/verify-otp', async (req, res) => {
       [user.id]
     );
 
-    console.log('User verified:', email);
-    res.json({ success: true, message: 'Email verified successfully' });
+    // Get full user data
+    const fullUser = await pool.query(
+      'SELECT id, name, email, user_type FROM users WHERE id = $1',
+      [user.id]
+    );
+
+    // Generate JWT token for auto-login
+    const token = jwt.sign(
+      { id: user.id, email },
+      JWT_SECRET,
+      { expiresIn: '30d' }
+    );
+
+    console.log('User verified and auto-logged in:', email);
+    res.json({
+      success: true,
+      message: 'Email verified successfully',
+      token,
+      user: fullUser.rows[0]
+    });
   } catch (e) {
     console.error('OTP verify error:', e.message);
     res.status(500).json({ error: e.message });
