@@ -871,6 +871,15 @@ export default function ThreatReady() {
   }, []);
 
 
+  // ── GITHUB PAGES 404 REDIRECT HANDLER ──
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const redirect = params.get('redirect');
+    if (redirect) {
+      window.history.replaceState(null, '', redirect);
+    }
+  }, []);
+
   // ── OAUTH CALLBACK HANDLER ──
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
