@@ -558,23 +558,21 @@ const transporter = nodemailer.createTransport({
 });
 
 // Send OTP
+const { Resend } = require('resend');
 app.post('/api/auth/send-otp', async (req, res) => {
   console.log('--- SEND OTP ---');
   try {
     const { email } = req.body;
     if (!email) return res.status(400).json({ error: 'Email required' });
 
-    // Check user exists
     const user = await pool.query('SELECT id FROM users WHERE email = $1', [email]);
     if (user.rows.length === 0) {
       return res.status(404).json({ error: 'User not found' });
     }
 
-    // Generate 6-digit OTP
     const otp = Math.floor(100000 + Math.random() * 900000).toString();
-    const expiry = new Date(Date.now() + 15 * 60 * 1000); // 15 minutes
+    const expiry = new Date(Date.now() + 15 * 60 * 1000);
 
-    // Save OTP to DB first
     await pool.query(
       'UPDATE users SET verify_code = $1, verify_expiry = $2 WHERE email = $3',
       [otp, expiry, email]
@@ -582,15 +580,9 @@ app.post('/api/auth/send-otp', async (req, res) => {
 
     console.log('OTP saved to DB:', otp, 'for:', email);
 
-    // Send response immediately - don't wait for email
-    res.json({ message: 'OTP sent successfully' });
-
-    // Send email in background using Resend
-    const { Resend } = require('resend');
     const resendClient = new Resend(process.env.RESEND_API_KEY);
-
     resendClient.emails.send({
-      from: 'ThreatReady <noreply@threatready.io>',
+      from: 'ThreatReady <onboarding@resend.dev>',
       to: email,
       subject: 'ThreatReady — Your Verification Code',
       html: `
@@ -608,6 +600,8 @@ app.post('/api/auth/send-otp', async (req, res) => {
     }).catch(emailErr => {
       console.error('OTP email failed:', emailErr.message);
     });
+
+    res.json({ message: 'OTP sent successfully' });
 
   } catch (e) {
     console.error('OTP send error:', e.message);
