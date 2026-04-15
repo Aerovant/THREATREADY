@@ -98,7 +98,7 @@ body{background:var(--bg);color:var(--tx1);font-family:'Inter','Segoe UI',system
 .cnt{width: 100%; padding:0 40px}
 .hero{text-align:center;padding:40px 0 20px}
 .hero h1{font-size:clamp(24px,5vw,42px);font-weight:900;line-height:1.15;background:linear-gradient(135deg,#fff,var(--ac));-webkit-background-clip:text;-webkit-text-fill-color:transparent;margin-bottom:14px}
-.hero p{font-size:14px;color:var(--tx2);max-width:560px;margin:0 auto;line-height:1.7}
+.hero p{font-size:14px;color:var(--tx2);max-width:760px;margin:0 auto;line-height:1.7}
 .card{background:var(--s1);border:1px solid var(--bd);border-radius:14px;padding:20px;position:relative;transition:all .3s}
 .card-glow:hover{border-color:var(--ac);box-shadow:0 0 20px rgba(0,229,255,.08)}
 .btn{border:none;border-radius:10px;font-weight:700;cursor:pointer;transition:all .2s;font-size:12px;padding:10px 20px;display:inline-flex;align-items:center;justify-content:center;gap:6px}
