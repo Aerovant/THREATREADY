@@ -2157,3 +2157,8 @@ app.listen(PORT, () => {
   console.log('  POST /api/demo/evaluate');
   console.log('');
 });
+
+// Keep Render awake - ping every 10 minutes
+setInterval(() => {
+  fetch('https://threatready-db.onrender.com/health').catch(() => {});
+}, 10 * 60 * 1000);
