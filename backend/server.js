@@ -544,10 +544,16 @@ app.post('/api/consent/cookie', async (req, res) => {
 const nodemailer = require('nodemailer');
 
 const transporter = nodemailer.createTransport({
-  service: 'gmail',
+  host: 'smtp.gmail.com',
+  port: 587,
+  secure: false,
+  requireTLS: true,
   auth: {
     user: process.env.EMAIL_USER,
     pass: process.env.EMAIL_PASS
+  },
+  tls: {
+    rejectUnauthorized: false
   }
 });
 
@@ -581,11 +587,15 @@ app.post('/api/auth/send-otp', async (req, res) => {
 
     // Send email in background (non-blocking)
     const emailTransporter = require('nodemailer').createTransport({
-      service: 'gmail',
+      host: 'smtp.gmail.com',
+      port: 587,
+      secure: false,
+      requireTLS: true,
       auth: {
         user: process.env.EMAIL_USER,
         pass: process.env.EMAIL_PASS
-      }
+      },
+      tls: { rejectUnauthorized: false }
     });
 
     emailTransporter.sendMail({
@@ -1506,8 +1516,12 @@ app.post('/api/b2b/invite', auth, async (req, res) => {
     try {
       const nodemailer = require('nodemailer');
       const transporter = nodemailer.createTransport({
-        service: 'gmail',
-        auth: { user: process.env.EMAIL_USER, pass: process.env.EMAIL_PASS }
+        host: 'smtp.gmail.com',
+        port: 587,
+        secure: false,
+        requireTLS: true,
+        auth: { user: process.env.EMAIL_USER, pass: process.env.EMAIL_PASS },
+        tls: { rejectUnauthorized: false }
       });
 
       // Map role_id to full role name
@@ -1891,8 +1905,12 @@ app.post('/api/auth/forgot-password', async (req, res) => {
     try {
       const nodemailer = require('nodemailer');
       const transporter = nodemailer.createTransport({
-        service: 'gmail',
-        auth: { user: process.env.EMAIL_USER, pass: process.env.EMAIL_PASS }
+        host: 'smtp.gmail.com',
+        port: 587,
+        secure: false,
+        requireTLS: true,
+        auth: { user: process.env.EMAIL_USER, pass: process.env.EMAIL_PASS },
+        tls: { rejectUnauthorized: false }
       });
       await transporter.sendMail({
         from: '"ThreatReady" <' + process.env.EMAIL_USER + '>',
