@@ -568,31 +568,47 @@ app.post('/api/auth/send-otp', async (req, res) => {
     const otp = Math.floor(100000 + Math.random() * 900000).toString();
     const expiry = new Date(Date.now() + 15 * 60 * 1000); // 15 minutes
 
-    // Save OTP to DB
+    // Save OTP to DB first
     await pool.query(
       'UPDATE users SET verify_code = $1, verify_expiry = $2 WHERE email = $3',
       [otp, expiry, email]
     );
 
-    // Send email
-    await transporter.sendMail({
-      from: `"Threatready" <${process.env.EMAIL_USER}>`,
-      to: email,
-      subject: 'Threatready — Your Verification Code',
-      html: `
-        <div style="font-family:sans-serif;max-width:480px;margin:0 auto;background:#0a0e1a;color:#e8eaf6;padding:32px;border-radius:12px">
-          <h2 style="color:#00e5ff;margin-bottom:8px">Threatready  Verification</h2>
-          <p style="color:#8890b0">Use the code below to verify your account.</p>
-          <div style="background:#1a1f2e;border:1px solid #1e2536;border-radius:10px;padding:24px;text-align:center;margin:24px 0">
-            <div style="font-size:36px;font-weight:900;letter-spacing:12px;color:#00e5ff;font-family:monospace">${otp}</div>
-          </div>
-          <p style="color:#5a6380;font-size:12px">Expires in 15 minutes. Do not share this code.</p>
-        </div>
-      `
+    console.log('OTP saved to DB:', otp, 'for:', email);
+
+    // Send response immediately - don't wait for email
+    res.json({ message: 'OTP sent successfully' });
+
+    // Send email in background (non-blocking)
+    const emailTransporter = require('nodemailer').createTransport({
+      service: 'gmail',
+      auth: {
+        user: process.env.EMAIL_USER,
+        pass: process.env.EMAIL_PASS
+      }
     });
 
-    console.log('OTP sent to:', email);
-    res.json({ message: 'OTP sent successfully' });
+    emailTransporter.sendMail({
+      from: '"ThreatReady" <' + process.env.EMAIL_USER + '>',
+      to: email,
+      subject: 'ThreatReady — Your Verification Code',
+      html: `
+        <div style="font-family:sans-serif;max-width:480px;margin:0 auto;background:#0a0e1a;color:#e8eaf6;padding:32px;border-radius:12px">
+          <h2 style="color:#00e5ff;margin-bottom:8px">ThreatReady Verification</h2>
+          <p style="color:#8890b0">Use the code below to verify your account. Expires in 15 minutes.</p>
+          <div style="background:#1a1f2e;border:1px solid #1e2536;border-radius:10px;padding:24px;text-align:center;margin:24px 0">
+            <div style="font-size:40px;font-weight:900;letter-spacing:14px;color:#00e5ff;font-family:monospace">${otp}</div>
+          </div>
+          <p style="color:#5a6380;font-size:12px">Do not share this code with anyone.</p>
+        </div>
+      `
+    }).then(() => {
+      console.log('OTP email sent to:', email);
+    }).catch(emailErr => {
+      console.error('OTP email failed:', emailErr.message);
+      console.error('Check EMAIL_USER and EMAIL_PASS in Render environment variables');
+    });
+
   } catch (e) {
     console.error('OTP send error:', e.message);
     res.status(500).json({ error: e.message });
