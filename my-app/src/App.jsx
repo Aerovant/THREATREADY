@@ -95,7 +95,7 @@ body{background:var(--bg);color:var(--tx1);font-family:'Inter','Segoe UI',system
 
 .orb{position:fixed;border-radius:50%;pointer-events:none;z-index:0;filter:blur(60px)}
 .page{position:relative;z-index:1;min-height:100vh;padding:20px 0}
-.cnt{max-width:800px;margin:0 auto;padding:0 20px}
+.cnt{max-width:1200px;margin:0 auto;padding:0 40px}
 .hero{text-align:center;padding:40px 0 20px}
 .hero h1{font-size:clamp(24px,5vw,42px);font-weight:900;line-height:1.15;background:linear-gradient(135deg,#fff,var(--ac));-webkit-background-clip:text;-webkit-text-fill-color:transparent;margin-bottom:14px}
 .hero p{font-size:14px;color:var(--tx2);max-width:560px;margin:0 auto;line-height:1.7}
@@ -1010,21 +1010,24 @@ export default function ThreatReady() {
         const data = await res.json();
         if (!res.ok) { setAuthError(data.error || "Signup failed"); return; }
 
-        localStorage.setItem("token", data.token);
-        setUser(data.user);
-        localStorage.setItem('cyberprep_user', JSON.stringify(data.user));
+        // Signup success — send OTP immediately
+        try {
+          await fetch("https://threatready-db.onrender.com/api/auth/send-otp", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ email: authEmail })
+          });
+        } catch(otpErr) {
+          console.log('OTP send error:', otpErr.message);
+        }
 
-        const type = detectUserType(authEmail, data.user);
-
-        setUserType(type);
-        localStorage.setItem('cyberprep_usertype', type);
-
-        // Go to Ready to Prepare
-        setAuthStep("detect");
-
+        // Go to OTP verification screen
+        setOtpCode("");
+        setOtpError("");
+        setAuthStep("verify");
 
       } catch (err) {
-        setAuthError("Cannot connect to server. Is backend running on port 4000?");
+        setAuthError("Cannot connect to server.");
       }
 
     } else {
@@ -1111,28 +1114,29 @@ export default function ThreatReady() {
 
 
   // ── VERIFY EMAIL ──
-  const verifyEmail = () => {
-    const detected = detectUserType(authEmail);
-    setUserType(detected);
-    setAuthStep("detect");
-  };
-
-  // ── CONFIRM USER TYPE ──
-
-  const confirmUserType = async (type) => {
-    setUserType(type);
-    if (type === "b2b") {
-      setView("b2b-dashboard");
-    } else {
-      // Send OTP now
+  const verifyEmail = async () => {
+    // Send OTP immediately after signup - no detect step needed
+    try {
       await fetch("https://threatready-db.onrender.com/api/auth/send-otp", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email: authEmail })
       });
-      setOtpCode("");
-      setOtpError("");
-      setAuthStep("verify");
+    } catch(e) {
+      console.log('OTP send error:', e.message);
+    }
+    setOtpCode("");
+    setOtpError("");
+    setAuthStep("verify");
+  };
+
+  // ── CONFIRM USER TYPE ──
+  const confirmUserType = async (type) => {
+    setUserType(type);
+    if (type === "b2b") {
+      setView("b2b-dashboard");
+    } else {
+      setView("dashboard");
     }
   };
 
@@ -1779,14 +1783,14 @@ export default function ThreatReady() {
                     });
                     const data = await res.json();
                     if (!res.ok) { setOtpError(data.error || "Invalid code"); return; }
-                    // Go to Sign In
-                    localStorage.removeItem("token");
-                    setUser(null);
-                    setAuthPassword("");
+
+                    // Verified — go to login page
                     setOtpCode("");
+                    setAuthPassword("");
                     setAuthError("✅ Email verified! Please sign in.");
                     setAuthMode("login");
                     setAuthStep("form");
+                    showToast("Email verified! Now sign in.", "success");
                   } catch (err) {
                     setOtpError("Cannot connect to server");
                   }
