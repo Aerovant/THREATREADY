@@ -78,7 +78,7 @@ const CSS = `
 :root{--bg:#0a0e1a;--s1:#111827;--s2:#1a1f2e;--s3:#252b3b;--ac:#00e5ff;--ok:#00e096;--wn:#ffab40;--dn:#ff5252;--tx1:#e8eaf6;--tx2:#8890b0;--tx3:#5a6380;--bd:#1e2536}
 *{margin:0;padding:0;box-sizing:border-box}
 body{background:var(--bg);color:var(--tx1);font-family:'Inter','Segoe UI',system-ui,sans-serif;overflow-x:hidden}
-.app{min-height:100vh;position:relative;overflow-x:hidden}
+.app{min-height:100vh;position:relative;overflow-x:hidden;width:100%}
 .gridbg{position:fixed;inset:0;background-image:linear-gradient(rgba(0,229,255,.03) 1px,transparent 1px),linear-gradient(90deg,rgba(0,229,255,.03) 1px,transparent 1px);background-size:60px 60px;pointer-events:none;z-index:0}
 .scanbar{position:fixed;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,transparent,var(--ac),transparent);animation:scan 4s infinite;z-index:100;opacity:.6}
 @keyframes scan{0%{transform:translateX(-100%)}100%{transform:translateX(100%)}}
@@ -94,8 +94,8 @@ body{background:var(--bg);color:var(--tx1);font-family:'Inter','Segoe UI',system
 @keyframes soundBar3{from{height:4px}to{height:14px}}
 
 .orb{position:fixed;border-radius:50%;pointer-events:none;z-index:0;filter:blur(60px)}
-.page{position:relative;z-index:1;min-height:100vh;padding:20px 0}
-.cnt{width: 100%; padding:0 60px}
+.page{position:relative;z-index:1;min-height:100vh;padding:20px 0;width:100%}
+.cnt{width:100%;padding:0 24px;box-sizing:border-box}
 .hero{text-align:center;padding:80px 0 40px}
 .hero h1{font-size:clamp(36px,7vw,72px);font-weight:900;line-height:1.1;background:linear-gradient(135deg,#fff,var(--ac));-webkit-background-clip:text;-webkit-text-fill-color:transparent;margin-bottom:14px}
 .hero p{font-size:14px;color:var(--tx2);max-width:760px;margin:0 auto;line-height:1.7}
@@ -1568,8 +1568,8 @@ export default function ThreatReady() {
   if (view === "landing") return (
     <div className="app"><style>{CSS}</style><div className="scanbar" /><div className="gridbg" />
       <ToastContainer />
-      <div className="orb" style={{ width: 600, height: 600, background: "radial-gradient(circle,rgba(0,229,255,.15),transparent)", top: -200, right: -200 }} />
-<div className="orb" style={{ width: 500, height: 500, background: "radial-gradient(circle,rgba(255,61,113,.1),transparent)", bottom: -100, left: -200 }} />
+      <div className="orb" style={{ width: 600, height: 600, background: "radial-gradient(circle,rgba(0,229,255,.15),transparent)", top: -200, right: 0 }} />
+      <div className="orb" style={{ width: 500, height: 500, background: "radial-gradient(circle,rgba(255,61,113,.1),transparent)", bottom: -100, left: 0 }} />
       <div className="page"><div className="cnt">
         {/* HERO */}
         <div className="hero fadeUp">
