@@ -968,28 +968,20 @@ export default function ThreatReady() {
 
   // ── DETECT B2C/B2B ──
 
-  const detectUserType = (email, userFromDB) => {
-    console.log('detectUserType called:', email, 'userFromDB:', userFromDB);
-    if (userFromDB?.user_type) {
-      console.log('Using DB user_type:', userFromDB.user_type);
-      return userFromDB.user_type;
-    }
-
-    // Check if user has access to a specific role
-    const hasRoleAccess = (roleId) => {
-      if (subscribedRoles.includes(roleId)) return true;   // paid for this role
-      if (freeAttempts > 0 && !isPaid) return true;        // free trial
-      return false;
-    };
-
+  const detectUserType = (email) => {
+    if (!email) return "b2c";
+    // Personal email domains → B2C (Preparing)
+    // Company/work email domains → B2B (Hiring)
     const personalDomains = [
       "gmail.com", "yahoo.com", "hotmail.com", "outlook.com",
       "protonmail.com", "icloud.com", "aol.com", "mail.com",
-      "yahoo.in", "rediffmail.com", "live.com", "msn.com"
+      "yahoo.in", "rediffmail.com", "live.com", "msn.com",
+      "ymail.com", "googlemail.com", "zoho.com", "tutanota.com"
     ];
-    const domain = email.split("@")[1]?.toLowerCase();
-    console.log('Domain detected:', domain, 'Result:', personalDomains.includes(domain) ? "b2c" : "b2b");
-    return personalDomains.includes(domain) ? "b2c" : "b2b";
+    const domain = email.split("@")[1]?.toLowerCase().trim();
+    const type = (domain && personalDomains.includes(domain)) ? "b2c" : "b2b";
+    console.log(`[Auth] Email: ${email} | Domain: ${domain} | Routed to: ${type === "b2c" ? "B2C (Preparing)" : "B2B (Hiring)"}`);
+    return type;
   };
 
 
@@ -1937,12 +1929,18 @@ export default function ThreatReady() {
                       localStorage.setItem('cyberprep_user', JSON.stringify(data.user));
                       setUser(data.user);
                       setSettingsName(data.user.name || '');
-                      const type = detectUserType(authEmail, data.user);
+                      // Always detect from email domain — never trust DB default
+                      const type = detectUserType(authEmail);
                       setUserType(type);
                       localStorage.setItem('cyberprep_usertype', type);
                       setOtpCode("");
-                      setAuthStep("detect");
                       showToast("Email verified! Welcome to CyberPrep.", "success");
+                      // Route directly — no manual detect step needed
+                      if (type === "b2b") {
+                        setView("b2b-dashboard");
+                      } else {
+                        setView("dashboard");
+                      }
                     } else {
                       // Fallback — ask them to sign in
                       setOtpCode("");
