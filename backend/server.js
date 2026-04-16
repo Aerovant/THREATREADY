@@ -19,7 +19,7 @@ const JWT_SECRET = process.env.JWT_SECRET;
 
 // ── AI MODEL CONFIGURATION ──
 const MODEL_EVALUATION = 'claude-sonnet-4-20250514'; // Deep evaluation - accurate scoring
-const MODEL_QUESTIONS   = 'claude-haiku-4-5-20251001'; // Question generation - fast & cheap
+const MODEL_QUESTIONS = 'claude-haiku-4-5-20251001'; // Question generation - fast & cheap
 
 // ═══════════════════════════════════════════════════════════════
 // AUTH MIDDLEWARE
@@ -144,13 +144,20 @@ app.get('/api/auth/me', auth, async (req, res) => {
   try {
     const result = await pool.query(
       `SELECT u.id, u.name, u.email, u.created_at,
-              s.plan, s.status, s.trial_end, s.subscribed_roles
+              s.plan, s.status, s.trial_end, s.subscribed_roles,
+              s.billing_period, s.end_date
        FROM users u
        LEFT JOIN subscriptions s ON s.user_id = u.id
        WHERE u.id = $1`,
       [req.user.id]
     );
     if (result.rows.length === 0) return res.status(404).json({ error: 'User not found' });
+
+    // Ensure billing_period column exists (safe migration)
+    try {
+      await pool.query("ALTER TABLE subscriptions ADD COLUMN IF NOT EXISTS billing_period VARCHAR(10) DEFAULT 'monthly'");
+      await pool.query("ALTER TABLE payments ADD COLUMN IF NOT EXISTS billing_period VARCHAR(10) DEFAULT 'monthly'");
+    } catch (migErr) { /* columns already exist */ }
 
     const stats = await pool.query('SELECT * FROM user_stats WHERE user_id = $1', [req.user.id]);
 
@@ -172,38 +179,45 @@ const razorpay = new Razorpay({
   key_secret: process.env.RAZORPAY_KEY_SECRET
 });
 
-const calculatePrice = (roleCount) => {
+const calculatePrice = (roleCount, billingPeriod = 'monthly') => {
   const base = roleCount * 399;
-  if (roleCount >= 3) return Math.round(base * 0.7);
-  if (roleCount >= 2) return Math.round(base * 0.82);
-  return base;
+  let discounted;
+  if (roleCount >= 3) discounted = Math.round(base * 0.7);
+  else if (roleCount >= 2) discounted = Math.round(base * 0.82);
+  else discounted = base;
+
+  if (billingPeriod === 'yearly') {
+    return Math.round(discounted * 12 * 0.8); // additional 20% off for yearly
+  }
+  return discounted;
 };
 
 // Create payment order
 app.post('/api/payment/create-order', auth, async (req, res) => {
   console.log('--- PAYMENT ORDER ---');
   try {
-    const { roles } = req.body;
+    const { roles, billing_period = 'monthly' } = req.body;
     if (!roles || !roles.length) {
       return res.status(400).json({ error: 'Select at least one role' });
     }
 
-    const amount = calculatePrice(roles.length) * 100; // Razorpay uses paise
+    const amount = calculatePrice(roles.length, billing_period) * 100; // Razorpay uses paise
 
     const order = await razorpay.orders.create({
       amount,
       currency: 'INR',
       receipt: `order_${req.user.id}_${Date.now()}`,
-      notes: { user_id: String(req.user.id), roles: roles.join(',') }
+      notes: { user_id: String(req.user.id), roles: roles.join(','), billing_period }
     });
 
-    console.log('Order created:', order.id, 'Amount: INR', amount / 100);
+    console.log('Order created:', order.id, 'Amount: INR', amount / 100, 'Period:', billing_period);
     res.json({
       order_id: order.id,
       amount: order.amount,
       currency: order.currency,
       key_id: process.env.RAZORPAY_KEY_ID,
-      roles
+      roles,
+      billing_period
     });
   } catch (e) {
     console.error('Payment order error:', e.message);
@@ -215,7 +229,7 @@ app.post('/api/payment/create-order', auth, async (req, res) => {
 app.post('/api/payment/verify', auth, async (req, res) => {
   console.log('--- PAYMENT VERIFY ---');
   try {
-    const { razorpay_order_id, razorpay_payment_id, razorpay_signature, roles } = req.body;
+    const { razorpay_order_id, razorpay_payment_id, razorpay_signature, roles, billing_period = 'monthly' } = req.body;
 
     const expectedSignature = crypto
       .createHmac('sha256', process.env.RAZORPAY_KEY_SECRET)
@@ -227,27 +241,31 @@ app.post('/api/payment/verify', auth, async (req, res) => {
       return res.status(400).json({ error: 'Payment verification failed' });
     }
 
-    // Activate subscription
+    // Set end date based on billing period
     const endDate = new Date();
-    endDate.setMonth(endDate.getMonth() + 1);
+    if (billing_period === 'yearly') {
+      endDate.setFullYear(endDate.getFullYear() + 1);
+    } else {
+      endDate.setMonth(endDate.getMonth() + 1);
+    }
 
     await pool.query(
-      `INSERT INTO subscriptions (user_id, plan, status, subscribed_roles, payment_id, start_date, end_date, created_at)
-       VALUES ($1, 'paid', 'active', $2, $3, NOW(), $4, NOW())
+      `INSERT INTO subscriptions (user_id, plan, status, subscribed_roles, payment_id, start_date, end_date, billing_period, created_at)
+       VALUES ($1, 'paid', 'active', $2, $3, NOW(), $4, $5, NOW())
        ON CONFLICT (user_id) DO UPDATE SET
          plan = 'paid', status = 'active', subscribed_roles = $2,
-         payment_id = $3, end_date = $4`,
-      [req.user.id, JSON.stringify(roles), razorpay_payment_id, endDate]
+         payment_id = $3, end_date = $4, billing_period = $5`,
+      [req.user.id, JSON.stringify(roles), razorpay_payment_id, endDate, billing_period]
     );
 
     // Save payment record
     await pool.query(
-      'INSERT INTO payments (user_id, razorpay_order_id, razorpay_payment_id, amount, status, roles, created_at) VALUES ($1, $2, $3, $4, $5, $6, NOW())',
-      [req.user.id, razorpay_order_id, razorpay_payment_id, calculatePrice(roles.length) * 100, 'captured', JSON.stringify(roles)]
+      'INSERT INTO payments (user_id, razorpay_order_id, razorpay_payment_id, amount, status, roles, billing_period, created_at) VALUES ($1, $2, $3, $4, $5, $6, $7, NOW())',
+      [req.user.id, razorpay_order_id, razorpay_payment_id, calculatePrice(roles.length, billing_period) * 100, 'captured', JSON.stringify(roles), billing_period]
     );
 
-    console.log('PAYMENT VERIFIED! Subscription activated for user:', req.user.id);
-    res.json({ success: true, subscribed_roles: roles, valid_until: endDate });
+    console.log('PAYMENT VERIFIED! Subscription activated for user:', req.user.id, 'Period:', billing_period, 'Until:', endDate.toISOString().split('T')[0]);
+    res.json({ success: true, subscribed_roles: roles, valid_until: endDate, billing_period });
   } catch (e) {
     console.error('Payment verify error:', e.message);
     res.status(500).json({ error: 'Payment verification error' });
@@ -449,7 +467,7 @@ app.post('/api/session/complete', auth, async (req, res) => {
          ON CONFLICT (user_id, scenario_id) DO UPDATE SET score=$4, completed_at=NOW()`,
         [req.user.id, scenario_id, role_id, overall_score]
       );
-    } catch(histErr) { console.log('History save:', histErr.message); }
+    } catch (histErr) { console.log('History save:', histErr.message); }
 
     console.log('SESSION COMPLETE! XP earned:', earned_xp, 'Badge:', badge);
     res.json({ success: true });
@@ -1206,10 +1224,10 @@ app.post('/api/evaluate', async (req, res) => {
     const diffRubric = difficulty === "beginner"
       ? "Be encouraging. Give credit for partial understanding. Highlight what they got right first."
       : difficulty === "intermediate"
-      ? "Be balanced. Credit correct reasoning but penalize technical gaps."
-      : difficulty === "advanced"
-      ? "Be strict. Apply interview-grade standards. Challenge incomplete thinking."
-      : "Be rigorous. Expert-level expectations. Challenge assumptions and require defensive reasoning.";
+        ? "Be balanced. Credit correct reasoning but penalize technical gaps."
+        : difficulty === "advanced"
+          ? "Be strict. Apply interview-grade standards. Challenge incomplete thinking."
+          : "Be rigorous. Expert-level expectations. Challenge assumptions and require defensive reasoning.";
 
     const Anthropic = require('@anthropic-ai/sdk');
     const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
@@ -1221,7 +1239,7 @@ app.post('/api/evaluate', async (req, res) => {
         const resumeResult = await pool.query('SELECT resume_text FROM resume_profiles WHERE user_id = $1', [req.user.id]);
         resumeCtx = resumeResult.rows[0]?.resume_text || '';
       }
-    } catch (e) {}
+    } catch (e) { }
 
     const msg = await anthropic.messages.create({
       model: MODEL_EVALUATION,
@@ -1266,12 +1284,12 @@ Respond ONLY in valid JSON with no markdown:
           `INSERT INTO evaluations (session_id, question_id, score, communication_score, depth_score, strengths, weaknesses, improved_answer, follow_up_topic, evaluated_at)
            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, NOW())`,
           [session_id, String(question_id), evalResult.score || 5,
-           evalResult.communication_score || 5, evalResult.depth_score || 5,
-           evalResult.strengths || '', evalResult.weaknesses || '',
-           evalResult.improved_answer || '', evalResult.follow_up_topic || '']
+            evalResult.communication_score || 5, evalResult.depth_score || 5,
+            evalResult.strengths || '', evalResult.weaknesses || '',
+            evalResult.improved_answer || '', evalResult.follow_up_topic || '']
         );
         console.log('DB save SUCCESS: score', evalResult.score);
-      } catch(dbErr) {
+      } catch (dbErr) {
         console.error('DB SAVE FAILED:', dbErr.message);
       }
     } else {
@@ -1353,7 +1371,7 @@ For recommended_difficulty use: beginner, intermediate, advanced, expert`
     let parsed;
     try {
       parsed = JSON.parse(raw.replace(/\`\`\`json|\`\`\`/g, '').trim());
-    } catch(e) {
+    } catch (e) {
       parsed = { key_points: text.substring(0, 500) };
     }
 
@@ -1491,37 +1509,19 @@ app.post('/api/b2b/invite', auth, async (req, res) => {
        VALUES ($1, $2, $3, $4, $5, $6, $7, 'not_started', NOW())
        RETURNING *`,
       [req.user.id, assessment_id || null, candidate_email,
-       candidate_name || candidate_email.split('@')[0],
-       role_id, difficulty, token]
+      candidate_name || candidate_email.split('@')[0],
+        role_id, difficulty, token]
     );
 
     const inviteLink = (process.env.FRONTEND_URL || 'http://localhost:5173') + '/assess?token=' + token;
 
     try {
-      const nodemailer = require('nodemailer');
-      const transporter = nodemailer.createTransport({
-        host: 'smtp-relay.brevo.com',
-        port: 587,
-        secure: false,
-        auth: { user: process.env.BREVO_USER, pass: process.env.BREVO_PASS }
-      });
-
-      // Map role_id to full role name
-      const roleNames = {
-        cloud: 'Cloud Security', devsecops: 'DevSecOps',
-        appsec: 'Application Security', netsec: 'Network Security',
-        prodsec: 'Product Security', secarch: 'Security Architect',
-        dfir: 'DFIR & Incident Response', grc: 'GRC & Compliance',
-        soc: 'SOC Analyst', threat: 'Threat Hunter',
-        red: 'Red Team', blue: 'Blue Team'
-      };
-      const roleName = roleNames[role_id] || role_id;
-      const diffName = difficulty.charAt(0).toUpperCase() + difficulty.slice(1);
-
-      await transporter.sendMail({
-        from: '"ThreatReady" <' + process.env.BREVO_USER + '>',
+    const { Resend } = require('resend');
+      const resendClient = new Resend(process.env.RESEND_API_KEY);
+      await resendClient.emails.send({
+        from: 'ThreatReady <noreply@threatready.io>',
         to: candidate_email,
-        subject: `You have been invited to a ${roleName} Assessment - ThreatReady`,
+        subject: `You've been invited to a ${roleName} Assessment — ThreatReady`,
         html: `
           <div style="font-family:sans-serif;max-width:500px;margin:0 auto;background:#0a0e1a;color:#e8eaf6;padding:32px;border-radius:12px">
             <h2 style="color:#00e5ff;margin-bottom:8px">ThreatReady — ${roleName} Assessment</h2>
@@ -1540,8 +1540,9 @@ app.post('/api/b2b/invite', auth, async (req, res) => {
             <p style="color:#5a6380;font-size:12px">This link is valid for 7 days. Do not share it with others.</p>
           </div>
         `
-      });
-      console.log('Invite email sent to:', candidate_email, '| Role:', roleName);
+      }).then(() => console.log('Invite email sent to:', candidate_email, '| Role:', roleName))
+        .catch(e => console.log('Email failed (non-critical):', e.message));
+        
     } catch (emailErr) {
       console.log('Email failed (non-critical):', emailErr.message);
     }
@@ -1625,7 +1626,7 @@ Respond ONLY in valid JSON with no markdown:
     let analysis;
     try {
       analysis = JSON.parse(raw.replace(/\`\`\`json|\`\`\`/g, '').trim());
-    } catch(e) {
+    } catch (e) {
       return res.status(500).json({ error: 'AI could not parse JD' });
     }
 
@@ -1675,7 +1676,7 @@ app.get('/api/leaderboard', auth, async (req, res) => {
       leaderboard: result.rows,
       my_rank: userRank.rows[0]?.rank || null
     });
-  } catch(e) {
+  } catch (e) {
     console.error('Leaderboard error:', e.message);
     res.status(500).json({ error: e.message });
   }
@@ -1686,8 +1687,17 @@ app.get('/api/leaderboard', auth, async (req, res) => {
 // ═══════════════════════════════════════════════════════════════
 app.get('/api/daily-challenge', auth, async (req, res) => {
   try {
+    // Safe migration — ensure required columns exist
+    await pool.query(`ALTER TABLE daily_challenges ADD COLUMN IF NOT EXISTS question TEXT`).catch(()=>{});
+    await pool.query(`ALTER TABLE daily_challenges ADD COLUMN IF NOT EXISTS role_id VARCHAR(50)`).catch(()=>{});
+    await pool.query(`ALTER TABLE daily_challenges ADD COLUMN IF NOT EXISTS hint TEXT`).catch(()=>{});
+    await pool.query(`ALTER TABLE daily_challenges ADD COLUMN IF NOT EXISTS points INTEGER DEFAULT 50`).catch(()=>{});
+    await pool.query(`ALTER TABLE daily_challenges ADD COLUMN IF NOT EXISTS is_active BOOLEAN DEFAULT true`).catch(()=>{});
+    await pool.query(`ALTER TABLE daily_challenges ADD COLUMN IF NOT EXISTS challenge_date DATE`).catch(()=>{});
+
     // Get today's challenge
     const today = new Date().toISOString().split('T')[0];
+
     let challenge = await pool.query(
       `SELECT * FROM daily_challenges WHERE challenge_date = $1 AND is_active = true LIMIT 1`,
       [today]
@@ -1704,7 +1714,7 @@ app.get('/api/daily-challenge', auth, async (req, res) => {
         max_tokens: 400,
         messages: [{ role: 'user', content: `Generate a quick 2-minute cybersecurity daily challenge question for ${role} role. Respond ONLY in JSON: {"question":"the question text","role":"${role}","difficulty":"beginner","points":50,"hint":"one short hint"}` }]
       });
-      const q = JSON.parse(msg.content[0].text.replace(/\`\`\`json|\`\`\`/g,'').trim());
+      const q = JSON.parse(msg.content[0].text.replace(/\`\`\`json|\`\`\`/g, '').trim());
       const inserted = await pool.query(
         `INSERT INTO daily_challenges (question, role_id, difficulty, points, hint, challenge_date, is_active, created_at)
          VALUES ($1,$2,$3,$4,$5,$6,true,NOW()) RETURNING *`,
@@ -1724,7 +1734,7 @@ app.get('/api/daily-challenge', auth, async (req, res) => {
       already_answered: answered.rows.length > 0,
       response: answered.rows[0] || null
     });
-  } catch(e) {
+  } catch (e) {
     console.error('Daily challenge error:', e.message);
     res.status(500).json({ error: e.message });
   }
@@ -1751,11 +1761,12 @@ app.post('/api/daily-challenge/submit', auth, async (req, res) => {
     const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
     const msg = await anthropic.messages.create({
       model: MODEL_QUESTIONS, max_tokens: 300,
-      messages: [{ role: 'user', content: `Daily challenge: "${ch.rows[0].question}"
+      messages: [{
+        role: 'user', content: `Daily challenge: "${ch.rows[0].question}"
 Answer: "${answer}"
 Score 0-100 and give brief feedback. JSON only: {"score":75,"correct":true,"feedback":"brief feedback","points_earned":50}` }]
     });
-    const result = JSON.parse(msg.content[0].text.replace(/\`\`\`json|\`\`\`/g,'').trim());
+    const result = JSON.parse(msg.content[0].text.replace(/\`\`\`json|\`\`\`/g, '').trim());
 
     // Save response
     await pool.query(
@@ -1775,7 +1786,7 @@ Score 0-100 and give brief feedback. JSON only: {"score":75,"correct":true,"feed
     }
 
     res.json({ result, challenge: ch.rows[0] });
-  } catch(e) {
+  } catch (e) {
     console.error('Daily challenge submit error:', e.message);
     res.status(500).json({ error: e.message });
   }
@@ -1792,7 +1803,7 @@ app.get('/api/notifications', auth, async (req, res) => {
     );
     const unread = result.rows.filter(n => !n.is_read).length;
     res.json({ notifications: result.rows, unread_count: unread });
-  } catch(e) {
+  } catch (e) {
     res.status(500).json({ error: e.message });
   }
 });
@@ -1804,7 +1815,7 @@ app.post('/api/notifications/read', auth, async (req, res) => {
       [req.user.id]
     );
     res.json({ success: true });
-  } catch(e) {
+  } catch (e) {
     res.status(500).json({ error: e.message });
   }
 });
@@ -1817,7 +1828,7 @@ async function createNotification(userId, title, message, type = 'info') {
        VALUES ($1,$2,$3,$4,false,NOW())`,
       [userId, title, message, type]
     );
-  } catch(e) {
+  } catch (e) {
     console.log('Notification create error:', e.message);
   }
 }
@@ -1833,7 +1844,7 @@ app.get('/api/scenario-history', auth, async (req, res) => {
       [req.user.id]
     );
     res.json({ history: result.rows });
-  } catch(e) {
+  } catch (e) {
     res.status(500).json({ error: e.message });
   }
 });
@@ -1848,7 +1859,7 @@ app.post('/api/scenario-history', auth, async (req, res) => {
       [req.user.id, scenario_id, role_id, score]
     );
     res.json({ success: true });
-  } catch(e) {
+  } catch (e) {
     res.status(500).json({ error: e.message });
   }
 });
@@ -1883,14 +1894,14 @@ app.post('/api/auth/forgot-password', async (req, res) => {
 
     console.log('Reset code for', email, ':', code);
 
-    // Send email via Resend
+    // Send email
     try {
       const { Resend } = require('resend');
       const resendClient = new Resend(process.env.RESEND_API_KEY);
-      await resendClient.emails.send({
+      resendClient.emails.send({
         from: 'ThreatReady <noreply@threatready.io>',
         to: email,
-        subject: 'Password Reset Code - ThreatReady',
+        subject: 'ThreatReady — Password Reset Code',
         html: `
           <div style="font-family:sans-serif;max-width:480px;margin:0 auto;background:#0a0e1a;color:#e8eaf6;padding:32px;border-radius:12px">
             <h2 style="color:#00e5ff;margin-bottom:8px">ThreatReady — Password Reset</h2>
@@ -1902,15 +1913,16 @@ app.post('/api/auth/forgot-password', async (req, res) => {
             <p style="color:#5a6380;font-size:12px">If you did not request this, you can safely ignore this email.</p>
           </div>
         `
-      });
-      console.log('Reset email sent to:', email);
-    } catch(emailErr) {
+      }).then(() => console.log('Reset email sent to:', email))
+        .catch(e => console.error('Reset email failed:', e.message));
+
+    } catch (emailErr) {
       console.error('Email send failed:', emailErr.message);
       // Code is still saved in DB even if email fails
     }
 
     res.json({ success: true });
-  } catch(e) {
+  } catch (e) {
     console.error('Forgot password error:', e.message);
     res.status(500).json({ error: e.message });
   }
@@ -1943,7 +1955,7 @@ app.post('/api/auth/reset-password', async (req, res) => {
 
     console.log('Password reset success for:', email);
     res.json({ success: true });
-  } catch(e) {
+  } catch (e) {
     console.error('Reset password error:', e.message);
     res.status(500).json({ error: e.message });
   }
@@ -1973,7 +1985,7 @@ app.post('/api/settings/profile', auth, async (req, res) => {
 
     console.log('Profile updated for user:', req.user.id);
     res.json({ success: true, user: updated.rows[0] });
-  } catch(e) {
+  } catch (e) {
     console.error('Settings profile error:', e.message);
     res.status(500).json({ error: e.message });
   }
@@ -1990,7 +2002,7 @@ app.post('/api/settings/privacy', auth, async (req, res) => {
       await pool.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS profile_public BOOLEAN DEFAULT true');
       await pool.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS in_leaderboard BOOLEAN DEFAULT true');
       await pool.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS allow_benchmarking BOOLEAN DEFAULT false');
-    } catch(migErr) {
+    } catch (migErr) {
       // Columns already exist - ignore
     }
 
@@ -2001,7 +2013,7 @@ app.post('/api/settings/privacy', auth, async (req, res) => {
 
     console.log('Privacy updated for user:', req.user.id);
     res.json({ success: true });
-  } catch(e) {
+  } catch (e) {
     console.error('Settings privacy error:', e.message);
     res.status(500).json({ error: e.message });
   }
@@ -2040,7 +2052,7 @@ app.get('/api/settings/export', auth, async (req, res) => {
 
     console.log('Data exported for user:', req.user.id);
     res.json(exportData);
-  } catch(e) {
+  } catch (e) {
     console.error('Settings export error:', e.message);
     res.status(500).json({ error: e.message });
   }
@@ -2072,7 +2084,7 @@ app.delete('/api/settings/delete-account', auth, async (req, res) => {
 
     console.log('Account deleted for user:', userId);
     res.json({ success: true });
-  } catch(e) {
+  } catch (e) {
     console.error('Delete account error:', e.message);
     res.status(500).json({ error: e.message });
   }
@@ -2086,7 +2098,7 @@ app.get('/api/settings', auth, async (req, res) => {
       [req.user.id]
     );
     res.json({ settings: result.rows[0] || {} });
-  } catch(e) {
+  } catch (e) {
     res.status(500).json({ error: e.message });
   }
 });
@@ -2105,14 +2117,14 @@ app.get('/api/b2b/settings', auth, async (req, res) => {
       await pool.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS team_size VARCHAR(20)');
       await pool.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS slack_webhook TEXT');
       await pool.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS zapier_webhook TEXT');
-    } catch(e) {}
+    } catch (e) { }
 
     const result = await pool.query(
       'SELECT company_name, team_size, slack_webhook, zapier_webhook FROM users WHERE id = $1',
       [req.user.id]
     );
     res.json({ settings: result.rows[0] || {} });
-  } catch(e) {
+  } catch (e) {
     console.error('B2B settings GET error:', e.message);
     res.status(500).json({ error: e.message });
   }
@@ -2130,7 +2142,7 @@ app.post('/api/b2b/settings', auth, async (req, res) => {
       await pool.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS team_size VARCHAR(20)');
       await pool.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS slack_webhook TEXT');
       await pool.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS zapier_webhook TEXT');
-    } catch(e) {}
+    } catch (e) { }
 
     // Build dynamic update
     const updates = [];
@@ -2138,9 +2150,9 @@ app.post('/api/b2b/settings', auth, async (req, res) => {
     let idx = 1;
 
     if (company_name !== undefined) { updates.push(`company_name = $${idx++}`); values.push(company_name); }
-    if (team_size !== undefined)    { updates.push(`team_size = $${idx++}`); values.push(team_size); }
-    if (slack_webhook !== undefined){ updates.push(`slack_webhook = $${idx++}`); values.push(slack_webhook); }
-    if (zapier_webhook !== undefined){ updates.push(`zapier_webhook = $${idx++}`); values.push(zapier_webhook); }
+    if (team_size !== undefined) { updates.push(`team_size = $${idx++}`); values.push(team_size); }
+    if (slack_webhook !== undefined) { updates.push(`slack_webhook = $${idx++}`); values.push(slack_webhook); }
+    if (zapier_webhook !== undefined) { updates.push(`zapier_webhook = $${idx++}`); values.push(zapier_webhook); }
 
     if (updates.length === 0) return res.json({ success: true });
 
@@ -2152,7 +2164,7 @@ app.post('/api/b2b/settings', auth, async (req, res) => {
 
     console.log('B2B settings saved for user:', req.user.id);
     res.json({ success: true });
-  } catch(e) {
+  } catch (e) {
     console.error('B2B settings POST error:', e.message);
     res.status(500).json({ error: e.message });
   }
@@ -2187,5 +2199,5 @@ app.listen(PORT, () => {
 
 // Keep Render awake - ping every 10 minutes
 setInterval(() => {
-  fetch('https://threatready-db.onrender.com/health').catch(() => {});
+  fetch('https://threatready-db.onrender.com/health').catch(() => { });
 }, 10 * 60 * 1000);
