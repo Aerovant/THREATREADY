@@ -1516,30 +1516,12 @@ app.post('/api/b2b/invite', auth, async (req, res) => {
     const inviteLink = (process.env.FRONTEND_URL || 'http://localhost:5173') + '/assess?token=' + token;
 
     try {
-      const nodemailer = require('nodemailer');
-      const transporter = nodemailer.createTransport({
-        host: 'smtp-relay.brevo.com',
-        port: 587,
-        secure: false,
-        auth: { user: process.env.BREVO_USER, pass: process.env.BREVO_PASS }
-      });
-
-      // Map role_id to full role name
-      const roleNames = {
-        cloud: 'Cloud Security', devsecops: 'DevSecOps',
-        appsec: 'Application Security', netsec: 'Network Security',
-        prodsec: 'Product Security', secarch: 'Security Architect',
-        dfir: 'DFIR & Incident Response', grc: 'GRC & Compliance',
-        soc: 'SOC Analyst', threat: 'Threat Hunter',
-        red: 'Red Team', blue: 'Blue Team'
-      };
-      const roleName = roleNames[role_id] || role_id;
-      const diffName = difficulty.charAt(0).toUpperCase() + difficulty.slice(1);
-
-      await transporter.sendMail({
-        from: '"ThreatReady" <' + process.env.BREVO_USER + '>',
+    const { Resend } = require('resend');
+      const resendClient = new Resend(process.env.RESEND_API_KEY);
+      resendClient.emails.send({
+        from: 'ThreatReady <noreply@threatready.io>',
         to: candidate_email,
-        subject: `You have been invited to a ${roleName} Assessment - ThreatReady`,
+        subject: `You've been invited to a ${roleName} Assessment — ThreatReady`,
         html: `
           <div style="font-family:sans-serif;max-width:500px;margin:0 auto;background:#0a0e1a;color:#e8eaf6;padding:32px;border-radius:12px">
             <h2 style="color:#00e5ff;margin-bottom:8px">ThreatReady — ${roleName} Assessment</h2>
@@ -1558,8 +1540,9 @@ app.post('/api/b2b/invite', auth, async (req, res) => {
             <p style="color:#5a6380;font-size:12px">This link is valid for 7 days. Do not share it with others.</p>
           </div>
         `
-      });
-      console.log('Invite email sent to:', candidate_email, '| Role:', roleName);
+      }).then(() => console.log('Invite email sent to:', candidate_email, '| Role:', roleName))
+        .catch(e => console.log('Email failed (non-critical):', e.message));
+        
     } catch (emailErr) {
       console.log('Email failed (non-critical):', emailErr.message);
     }
@@ -1704,8 +1687,17 @@ app.get('/api/leaderboard', auth, async (req, res) => {
 // ═══════════════════════════════════════════════════════════════
 app.get('/api/daily-challenge', auth, async (req, res) => {
   try {
+    // Safe migration — ensure required columns exist
+    await pool.query(`ALTER TABLE daily_challenges ADD COLUMN IF NOT EXISTS question TEXT`).catch(()=>{});
+    await pool.query(`ALTER TABLE daily_challenges ADD COLUMN IF NOT EXISTS role_id VARCHAR(50)`).catch(()=>{});
+    await pool.query(`ALTER TABLE daily_challenges ADD COLUMN IF NOT EXISTS hint TEXT`).catch(()=>{});
+    await pool.query(`ALTER TABLE daily_challenges ADD COLUMN IF NOT EXISTS points INTEGER DEFAULT 50`).catch(()=>{});
+    await pool.query(`ALTER TABLE daily_challenges ADD COLUMN IF NOT EXISTS is_active BOOLEAN DEFAULT true`).catch(()=>{});
+    await pool.query(`ALTER TABLE daily_challenges ADD COLUMN IF NOT EXISTS challenge_date DATE`).catch(()=>{});
+
     // Get today's challenge
     const today = new Date().toISOString().split('T')[0];
+
     let challenge = await pool.query(
       `SELECT * FROM daily_challenges WHERE challenge_date = $1 AND is_active = true LIMIT 1`,
       [today]
@@ -1923,7 +1915,7 @@ app.post('/api/auth/forgot-password', async (req, res) => {
         `
       }).then(() => console.log('Reset email sent to:', email))
         .catch(e => console.error('Reset email failed:', e.message));
-        
+
     } catch (emailErr) {
       console.error('Email send failed:', emailErr.message);
       // Code is still saved in DB even if email fails
