@@ -1099,7 +1099,7 @@ export default function ThreatReady() {
         }
         setSettingsName(data.user.name || '');
 
-        const type = detectUserType(authEmail, data.user);
+        const type = detectUserType(authEmail);
         console.log('TYPE DETECTED:', type);
         setUserType(type);
         localStorage.setItem('cyberprep_usertype', type);
