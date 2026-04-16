@@ -144,13 +144,20 @@ app.get('/api/auth/me', auth, async (req, res) => {
   try {
     const result = await pool.query(
       `SELECT u.id, u.name, u.email, u.created_at,
-              s.plan, s.status, s.trial_end, s.subscribed_roles
+              s.plan, s.status, s.trial_end, s.subscribed_roles,
+              s.billing_period, s.end_date
        FROM users u
        LEFT JOIN subscriptions s ON s.user_id = u.id
        WHERE u.id = $1`,
       [req.user.id]
     );
     if (result.rows.length === 0) return res.status(404).json({ error: 'User not found' });
+
+    // Ensure billing_period column exists (safe migration)
+    try {
+      await pool.query("ALTER TABLE subscriptions ADD COLUMN IF NOT EXISTS billing_period VARCHAR(10) DEFAULT 'monthly'");
+      await pool.query("ALTER TABLE payments ADD COLUMN IF NOT EXISTS billing_period VARCHAR(10) DEFAULT 'monthly'");
+    } catch(migErr) { /* columns already exist */ }
 
     const stats = await pool.query('SELECT * FROM user_stats WHERE user_id = $1', [req.user.id]);
 
@@ -172,38 +179,45 @@ const razorpay = new Razorpay({
   key_secret: process.env.RAZORPAY_KEY_SECRET
 });
 
-const calculatePrice = (roleCount) => {
+const calculatePrice = (roleCount, billingPeriod = 'monthly') => {
   const base = roleCount * 399;
-  if (roleCount >= 3) return Math.round(base * 0.7);
-  if (roleCount >= 2) return Math.round(base * 0.82);
-  return base;
+  let discounted;
+  if (roleCount >= 3) discounted = Math.round(base * 0.7);
+  else if (roleCount >= 2) discounted = Math.round(base * 0.82);
+  else discounted = base;
+
+  if (billingPeriod === 'yearly') {
+    return Math.round(discounted * 12 * 0.8); // additional 20% off for yearly
+  }
+  return discounted;
 };
 
 // Create payment order
 app.post('/api/payment/create-order', auth, async (req, res) => {
   console.log('--- PAYMENT ORDER ---');
   try {
-    const { roles } = req.body;
+    const { roles, billing_period = 'monthly' } = req.body;
     if (!roles || !roles.length) {
       return res.status(400).json({ error: 'Select at least one role' });
     }
 
-    const amount = calculatePrice(roles.length) * 100; // Razorpay uses paise
+    const amount = calculatePrice(roles.length, billing_period) * 100; // Razorpay uses paise
 
     const order = await razorpay.orders.create({
       amount,
       currency: 'INR',
       receipt: `order_${req.user.id}_${Date.now()}`,
-      notes: { user_id: String(req.user.id), roles: roles.join(',') }
+      notes: { user_id: String(req.user.id), roles: roles.join(','), billing_period }
     });
 
-    console.log('Order created:', order.id, 'Amount: INR', amount / 100);
+    console.log('Order created:', order.id, 'Amount: INR', amount / 100, 'Period:', billing_period);
     res.json({
       order_id: order.id,
       amount: order.amount,
       currency: order.currency,
       key_id: process.env.RAZORPAY_KEY_ID,
-      roles
+      roles,
+      billing_period
     });
   } catch (e) {
     console.error('Payment order error:', e.message);
@@ -215,7 +229,7 @@ app.post('/api/payment/create-order', auth, async (req, res) => {
 app.post('/api/payment/verify', auth, async (req, res) => {
   console.log('--- PAYMENT VERIFY ---');
   try {
-    const { razorpay_order_id, razorpay_payment_id, razorpay_signature, roles } = req.body;
+    const { razorpay_order_id, razorpay_payment_id, razorpay_signature, roles, billing_period = 'monthly' } = req.body;
 
     const expectedSignature = crypto
       .createHmac('sha256', process.env.RAZORPAY_KEY_SECRET)
@@ -227,27 +241,31 @@ app.post('/api/payment/verify', auth, async (req, res) => {
       return res.status(400).json({ error: 'Payment verification failed' });
     }
 
-    // Activate subscription
+    // Set end date based on billing period
     const endDate = new Date();
-    endDate.setMonth(endDate.getMonth() + 1);
+    if (billing_period === 'yearly') {
+      endDate.setFullYear(endDate.getFullYear() + 1);
+    } else {
+      endDate.setMonth(endDate.getMonth() + 1);
+    }
 
     await pool.query(
-      `INSERT INTO subscriptions (user_id, plan, status, subscribed_roles, payment_id, start_date, end_date, created_at)
-       VALUES ($1, 'paid', 'active', $2, $3, NOW(), $4, NOW())
+      `INSERT INTO subscriptions (user_id, plan, status, subscribed_roles, payment_id, start_date, end_date, billing_period, created_at)
+       VALUES ($1, 'paid', 'active', $2, $3, NOW(), $4, $5, NOW())
        ON CONFLICT (user_id) DO UPDATE SET
          plan = 'paid', status = 'active', subscribed_roles = $2,
-         payment_id = $3, end_date = $4`,
-      [req.user.id, JSON.stringify(roles), razorpay_payment_id, endDate]
+         payment_id = $3, end_date = $4, billing_period = $5`,
+      [req.user.id, JSON.stringify(roles), razorpay_payment_id, endDate, billing_period]
     );
 
     // Save payment record
     await pool.query(
-      'INSERT INTO payments (user_id, razorpay_order_id, razorpay_payment_id, amount, status, roles, created_at) VALUES ($1, $2, $3, $4, $5, $6, NOW())',
-      [req.user.id, razorpay_order_id, razorpay_payment_id, calculatePrice(roles.length) * 100, 'captured', JSON.stringify(roles)]
+      'INSERT INTO payments (user_id, razorpay_order_id, razorpay_payment_id, amount, status, roles, billing_period, created_at) VALUES ($1, $2, $3, $4, $5, $6, $7, NOW())',
+      [req.user.id, razorpay_order_id, razorpay_payment_id, calculatePrice(roles.length, billing_period) * 100, 'captured', JSON.stringify(roles), billing_period]
     );
 
-    console.log('PAYMENT VERIFIED! Subscription activated for user:', req.user.id);
-    res.json({ success: true, subscribed_roles: roles, valid_until: endDate });
+    console.log('PAYMENT VERIFIED! Subscription activated for user:', req.user.id, 'Period:', billing_period, 'Until:', endDate.toISOString().split('T')[0]);
+    res.json({ success: true, subscribed_roles: roles, valid_until: endDate, billing_period });
   } catch (e) {
     console.error('Payment verify error:', e.message);
     res.status(500).json({ error: 'Payment verification error' });
