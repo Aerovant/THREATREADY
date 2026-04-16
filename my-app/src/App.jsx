@@ -3415,10 +3415,12 @@ export default function ThreatReady() {
     const b2bTabs = [
       { id: "home", label: "🏠 Overview" },
       { id: "interview", label: "📝 Create Assessment" },
-      { id: "candidates", label: "👥 Candidates" },
-      { id: "teamskills", label: "📊 Team Skills" },
-      { id: "reports", label: "📋 Reports" },
-      { id: "library", label: "📚 Library" },
+      { id: "scores", label: "👥 Candidates" },
+      { id: "badges", label: "📋 Reports" },
+
+      { id: "profile", label: "📊 Team Skills" },
+
+      { id: "billing", label: "📚 Library" },
       { id: "settings", label: "⚙️ Settings" }
     ];
 
@@ -3781,19 +3783,7 @@ export default function ThreatReady() {
           {/* ── B5: INTERVIEW (Create Assessment + Invite Candidates) ── */}
           {b2bTab === "interview" && (<>
             {/* Subscription gate */}
-            {subscribedRoles.length === 0 && (
-              <div className="card" style={{ padding: 40, textAlign: "center", marginBottom: 16 }}>
-                <div style={{ fontSize: 56, marginBottom: 16 }}>🔒</div>
-                <h3 style={{ fontSize: 20, fontWeight: 800, marginBottom: 10 }}>Subscribe to Create Assessments</h3>
-                <p style={{ fontSize: 12, color: "var(--tx2)", marginBottom: 20, lineHeight: 1.8 }}>
-                  Subscribe to a role to unlock candidate assessments, invite management, and full reporting.
-                </p>
-                <button className="btn bp" style={{ padding: "14px 40px", fontSize: 14 }}
-                  onClick={() => { setB2bTab("billing"); localStorage.setItem('cyberprep_b2btab', 'billing'); }}>
-                  Subscribe to Unlock →
-                </button>
-              </div>
-            )}
+            
 
             {/* Create Assessment form */}
             <div className="card fadeUp" style={{ padding: 20, marginBottom: 14, borderColor: jdAnalysis ? "var(--ok)" : "var(--bd)" }}>
@@ -3942,10 +3932,15 @@ export default function ThreatReady() {
               </button>
             </div>
 
+          </>)}
+
+          {/* ── B6: LIBRARY (Saved Assessments + Invite Candidate) ── */}
+          {b2bTab === "billing" && (<>
+            
             {/* Invite Candidate */}
             <div className="card fadeUp" style={{ padding: 20, marginBottom: 14 }}>
               <div className="lbl" style={{ marginBottom: 12 }}>INVITE CANDIDATE</div>
-              <input className="input" type="email" placeholder="Candidate email address"
+              <input id="invite-email-input" className="input" type="email" placeholder="Candidate email address"
                 value={inviteEmail} onChange={e => setInviteEmail(e.target.value)} style={{ marginBottom: 10 }} />
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 12 }}>
                 <select className="input" value={inviteRole} onChange={e => setInviteRole(e.target.value)}>
@@ -4020,68 +4015,47 @@ export default function ThreatReady() {
                 </div>
               ))}
             </div>
-          </>)}
 
-          {/* ── B6: BILLING (same as B2C) ── */}
-          {b2bTab === "billing" && (<>
-            <div style={{ display: "flex", background: "var(--s2)", borderRadius: 10, padding: 4, maxWidth: 300, margin: "0 auto 24px", gap: 4 }}>
-              <button className={`btn ${billingPeriod === "monthly" ? "bp" : "bs"}`} style={{ flex: 1, padding: "8px 0", fontSize: 13, border: "none" }} onClick={() => setBillingPeriod("monthly")}>Monthly</button>
-              <button className={`btn ${billingPeriod === "yearly" ? "bp" : "bs"}`} style={{ flex: 1, padding: "8px 0", fontSize: 13, border: "none", display: "flex", alignItems: "center", justifyContent: "center", gap: 6 }} onClick={() => setBillingPeriod("yearly")}>
-                Yearly <span style={{ fontSize: 9, background: "rgba(0,224,150,.2)", color: "var(--ok)", borderRadius: 20, padding: "1px 7px", fontWeight: 700 }}>-20%</span>
+            {/* Saved Assessments */}
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 24, marginBottom: 10 }}>
+              <div className="lbl">SAVED ASSESSMENTS ({assessments.length})</div>
+              <button className="btn bp" style={{ fontSize: 11, padding: "6px 14px" }}
+                onClick={() => { setB2bTab("interview"); localStorage.setItem('cyberprep_b2btab', 'interview'); }}>
+                + New Assessment
               </button>
             </div>
-            <div className="card fadeUp" style={{ padding: 16, marginBottom: 16 }}>
-              <div className="lbl" style={{ marginBottom: 8 }}>CURRENT PLAN</div>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                <div>
-                  <div style={{ fontSize: 14, fontWeight: 700 }}>{isPaid ? `${subscribedRoles.length} Role${subscribedRoles.length > 1 ? "s" : ""} · Active` : "Free Trial"}</div>
-                  <div style={{ fontSize: 11, color: "var(--tx2)", marginTop: 4 }}>
-                    {isPaid ? subscribedRoles.map(r => ROLES.find(x => x.id === r)?.name).filter(Boolean).join(", ") : `${freeAttempts} attempts remaining`}
-                  </div>
-                </div>
-                {isPaid && <span style={{ fontSize: 11, color: "var(--ok)", fontWeight: 700 }}>● Active</span>}
+            {assessments.length === 0 && !b2bLoading && (
+              <div style={{ padding: 16, textAlign: "center", color: "var(--tx3)", fontSize: 12 }}>
+                No assessments yet. Create one from the Create Assessment tab.
               </div>
-            </div>
-            <div className="lbl" style={{ marginBottom: 12 }}>{isPaid ? "ADD MORE ROLES" : "SUBSCRIBE TO UNLOCK ALL LEVELS"}</div>
-            <div className="rgrid">
-              {ROLES.map((r, i) => {
-                const sel = selectedRoles.includes(r.id);
-                const subscribed = subscribedRoles.includes(r.id);
-                const yearlyPrice = Math.round(r.price * 12 * 0.8);
-                const savings = r.price * 12 - yearlyPrice;
-                return (
-                  <div key={r.id} className={`sub-card fadeUp ${sel || subscribed ? "sel" : ""}`}
-                    style={{ animationDelay: `${i * .03}s`, borderColor: subscribed ? "var(--ok)" : sel ? r.color : undefined, cursor: subscribed ? "default" : "pointer" }}
-                    onClick={() => { if (!subscribed) toggleRole(r.id); }}>
-                    {subscribed && <div style={{ position: "absolute", top: 8, right: 8, fontSize: 8, color: "var(--ok)", fontWeight: 800, background: "rgba(0,224,150,.1)", padding: "2px 7px", borderRadius: 10, border: "1px solid rgba(0,224,150,.3)" }}>ACTIVE</div>}
-                    {sel && !subscribed && <div style={{ position: "absolute", top: 10, right: 10, width: 20, height: 20, borderRadius: "50%", background: "var(--ac)", color: "#000", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 10, fontWeight: 700 }}>✓</div>}
-                    <div style={{ fontSize: 28, marginBottom: 6 }}>{r.icon}</div>
-                    <div style={{ fontSize: 11, fontWeight: 700, marginBottom: 4 }}>{r.name}</div>
-                    <div className="mono" style={{ fontSize: 15, fontWeight: 700, color: subscribed ? "var(--ok)" : sel ? r.color : "var(--tx2)" }}>
-                      {billingPeriod === "yearly" ? `₹${yearlyPrice}/yr` : `₹${r.price}/mo`}
+            )}
+            {assessments.map((a, i) => (
+              <div key={a.id} className="card card-glow fadeUp" style={{ padding: 14, marginBottom: 10, animationDelay: `${i * .04}s` }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                  <div>
+                    <div style={{ fontSize: 13, fontWeight: 700 }}>{a.name}</div>
+                    <div style={{ fontSize: 10, color: "var(--tx3)", marginTop: 3 }}>
+                      {ROLES.find(r => r.id === a.role_id)?.name || a.role_id} · {a.difficulty} · {a.total_candidates || 0} candidates · {a.created_at?.substring(0, 10)}
                     </div>
-                    {billingPeriod === "yearly" && !subscribed && <div style={{ fontSize: 9, color: "var(--ok)", marginTop: 2 }}>Save ₹{savings}/yr</div>}
-                    {subscribed && <div style={{ fontSize: 9, color: "var(--ok)", marginTop: 2 }}>🔓 All levels unlocked</div>}
                   </div>
-                );
-              })}
-            </div>
-            {selectedRoles.length >= 2 && (
-              <div style={{ padding: "10px 16px", background: "rgba(0,224,150,.07)", border: "1px solid rgba(0,224,150,.2)", borderRadius: 10, margin: "16px 0", fontSize: 12, color: "var(--ok)", textAlign: "center", fontWeight: 600 }}>
-                {selectedRoles.length >= 3 ? "🎉 30% bundle discount applied!" : "🎉 18% bundle discount applied!"}
-              </div>
-            )}
-            {selectedRoles.length > 0 && (
-              <div className="card fadeUp" style={{ padding: 20, textAlign: "center", borderColor: "var(--ac)", marginTop: 4 }}>
-                <div style={{ fontSize: 11, color: "var(--tx3)", marginBottom: 6 }}>{selectedRoles.length} role{selectedRoles.length > 1 ? "s" : ""} · {billingPeriod}</div>
-                <div className="mono" style={{ fontSize: 32, fontWeight: 700, color: "var(--ac)", marginBottom: 16 }}>
-                  ₹{billingPeriod === "yearly" ? Math.round(getPrice() * 12 * 0.8) : getPrice()}
-                  <span style={{ fontSize: 12, fontWeight: 400, color: "var(--tx2)" }}> /{billingPeriod === "yearly" ? "year" : "month"}</span>
+                  <div style={{ display: "flex", gap: 6 }}>
+                    <button className="btn bs" style={{ fontSize: 9, padding: "4px 8px" }}
+                      onClick={async () => {
+                        const token = localStorage.getItem('token');
+                        const res = await fetch(`https://threatready-db.onrender.com/api/b2b/assessments/${a.id}/duplicate`, {
+                          method: 'POST', headers: { 'Authorization': `Bearer ${token}` }
+                        });
+                        const data = await res.json();
+                        if (data.assessment) { loadB2bData(); showToast('Assessment duplicated!', 'success'); }
+                      }}>Duplicate</button>
+                    <button className="btn bp" style={{ fontSize: 9, padding: "4px 8px" }}
+                      onClick={() => { setInviteRole(a.role_id); setInviteDiff(a.difficulty); }}>
+                      Use for Invite ↑
+                    </button>
+                  </div>
                 </div>
-                <button className="btn bp" style={{ width: "100%", padding: 14, fontSize: 14 }} onClick={subscribe}>Subscribe Now →</button>
               </div>
-            )}
-            {isPaid && <button className="btn bs" style={{ width: "100%", marginTop: 12, fontSize: 11, color: "var(--wn)" }}>Pause Subscription</button>}
+            ))}
           </>)}
 
           {/* ── B7: SETTINGS ── */}
