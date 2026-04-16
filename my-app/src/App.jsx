@@ -3413,14 +3413,13 @@ export default function ThreatReady() {
   // ═══════════════════════════════════════════════════════════
   if (view === "b2b-dashboard") {
     const b2bTabs = [
-      { id: "home", label: "🏠 Home" },
-      { id: "scores", label: "📊 Scores" },
-      { id: "badges", label: "🏆 Badges" },
-      { id: "profile", label: "👤 Profile" },
-      { id: "interview", label: "💎 Interview" },
-      { id: "billing", label: "💳 Billing" },
-      { id: "settings", label: "⚙️ Settings" },
-      { id: "help", label: "❓ Help" }
+      { id: "home", label: "🏠 Overview" },
+      { id: "interview", label: "📝 Create Assessment" },
+      { id: "candidates", label: "👥 Candidates" },
+      { id: "teamskills", label: "📊 Team Skills" },
+      { id: "reports", label: "📋 Reports" },
+      { id: "library", label: "📚 Library" },
+      { id: "settings", label: "⚙️ Settings" }
     ];
 
     return (
@@ -3431,16 +3430,16 @@ export default function ThreatReady() {
           {/* ── HEADER ── */}
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }} className="fadeUp">
             <div>
-              <div style={{ fontSize: 11, color: "var(--ac)", fontWeight: 700, letterSpacing: 2, textTransform: "uppercase", marginBottom: 4 }}>HIRING DASHBOARD</div>
-              <h2 style={{ fontSize: 22, fontWeight: 800 }}>{companyName || user?.email?.split("@")[1]?.split(".")[0]?.toUpperCase() || "Company"}</h2>
+              <h2 style={{ fontSize: 22, fontWeight: 800 }}>Hiring Dashboard</h2>
               <div style={{ fontSize: 12, color: "var(--tx2)", marginTop: 3 }}>
-                {candidates.length} candidate{candidates.length !== 1 ? "s" : ""} · {assessments.length} assessment{assessments.length !== 1 ? "s" : ""} · {isPaid ? `${subscribedRoles.length} role${subscribedRoles.length !== 1 ? "s" : ""} subscribed` : "Free plan"}
+                {isPaid ? `${subscribedRoles.length} track${subscribedRoles.length !== 1 ? "s" : ""}` : `Free trial · ${freeAttempts} attempts left`}
+                {" · "}{candidates.length} candidates · {assessments.length} assessments
               </div>
             </div>
             <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
-              {isPaid && <span style={{ fontSize: 10, color: "var(--ok)", fontWeight: 700, background: "rgba(0,224,150,.1)", border: "1px solid rgba(0,224,150,.2)", padding: "4px 10px", borderRadius: 20 }}>● Active</span>}
-              <button className="btn bs" style={{ padding: "6px 12px", fontSize: 11 }} onClick={() => { setUserType("b2c"); setView("dashboard"); }}>👤 Candidate View</button>
-              <button className="btn bs" style={{ padding: "6px 12px", fontSize: 11 }} onClick={logout}>Logout</button>
+              <span className="tag" style={{ padding: "5px 12px" }}>⚡ {xp} XP</span>
+              <button className="btn bs" style={{ padding: "5px 10px", fontSize: 10 }} onClick={() => { setUserType("b2c"); setView("dashboard"); }}>B2C View</button>
+              <button className="btn bs" style={{ padding: "5px 10px", fontSize: 10 }} onClick={logout}>Logout</button>
             </div>
           </div>
 
@@ -3456,35 +3455,16 @@ export default function ThreatReady() {
 
           {/* ── B1: HOME ── */}
           {b2bTab === "home" && (<>
-            {/* Welcome Banner */}
-            <div className="card fadeUp" style={{ padding: 20, marginBottom: 16, borderColor: "var(--ac)", background: "rgba(0,229,255,.02)" }}>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 12 }}>
-                <div>
-                  <div style={{ fontSize: 16, fontWeight: 800, marginBottom: 4 }}>
-                    Welcome, {user?.name || user?.email?.split("@")[0]} 👋
-                  </div>
-                  <div style={{ fontSize: 12, color: "var(--tx2)" }}>
-                    Assess cybersecurity candidates with AI-powered interview simulations.
-                  </div>
-                </div>
-                <button className="btn bp" style={{ padding: "10px 24px", fontSize: 13 }}
-                  onClick={() => { setB2bTab("interview"); localStorage.setItem('cyberprep_b2btab', 'interview'); }}>
-                  + Create Assessment →
-                </button>
-              </div>
-            </div>
-
             {/* Stats */}
             <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 10, marginBottom: 20 }}>
               {[
-                [b2bStats.total_candidates, "Total Candidates", "👥"],
-                [b2bStats.assessed, "Assessed", "✅"],
-                [b2bStats.total_assessments, "Assessments", "📋"],
-                [b2bStats.avg_score ? parseFloat(b2bStats.avg_score).toFixed(1) + "/10" : "—", "Avg Score", "📊"]
-              ].map(([v, l, icon], i) => (
+                [b2bStats.total_candidates, "Candidates"],
+                [b2bStats.assessed, "Assessed"],
+                [b2bStats.total_assessments, "Assessments"],
+                [b2bStats.avg_score || "—", "Avg Score"]
+              ].map(([v, l], i) => (
                 <div key={i} className="statbox fadeUp" style={{ animationDelay: `${i * .05}s` }}>
-                  <div style={{ fontSize: 18, marginBottom: 4 }}>{icon}</div>
-                  <div className="statval" style={{ color: "var(--ac)", fontSize: 22 }}>
+                  <div className="statval" style={{ color: "var(--ac)", fontSize: 20 }}>
                     {b2bLoading ? <span className="loader" style={{ width: 14, height: 14 }} /> : v}
                   </div>
                   <div className="statlbl">{l}</div>
@@ -3493,66 +3473,34 @@ export default function ThreatReady() {
             </div>
 
             {/* Recent Candidates */}
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
-              <div className="lbl">RECENT CANDIDATES</div>
-              {candidates.length > 0 && (
-                <button className="btn bs" style={{ fontSize: 10, padding: "4px 10px" }}
-                  onClick={() => { setB2bTab("interview"); localStorage.setItem('cyberprep_b2btab', 'interview'); }}>
-                  View All →
-                </button>
-              )}
-            </div>
-
+            <div className="lbl" style={{ marginBottom: 10 }}>RECENT CANDIDATES</div>
             {candidates.length === 0 && !b2bLoading && (
-              <div className="card fadeUp" style={{ padding: 32, textAlign: "center" }}>
-                <div style={{ fontSize: 40, marginBottom: 12 }}>👥</div>
-                <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 6 }}>No candidates yet</div>
-                <div style={{ fontSize: 12, color: "var(--tx3)", marginBottom: 16 }}>
-                  Invite candidates by email to start assessing their cybersecurity skills.
-                </div>
-                <button className="btn bp" style={{ fontSize: 12, padding: "10px 24px" }}
-                  onClick={() => { setB2bTab("interview"); localStorage.setItem('cyberprep_b2btab', 'interview'); }}>
-                  Invite First Candidate →
+              <div className="card fadeUp" style={{ padding: 24, textAlign: "center" }}>
+                <div style={{ fontSize: 11, color: "var(--tx3)", marginBottom: 10 }}>No candidates yet</div>
+                <button className="btn bp" style={{ fontSize: 11 }} onClick={() => { setB2bTab("interview"); localStorage.setItem('cyberprep_b2btab', 'interview'); }}>
+                  Invite Candidates →
                 </button>
               </div>
             )}
-
-            {b2bLoading && <div style={{ textAlign: "center", padding: 20 }}><div className="loader" /></div>}
-
             {candidates.slice(0, 5).map((c, i) => (
-              <div key={c.id} className="card card-glow fadeUp" style={{ padding: 16, marginBottom: 8, animationDelay: `${i * .04}s` }}>
+              <div key={c.id} className="card card-glow fadeUp" style={{ padding: 14, marginBottom: 8, animationDelay: `${i * .04}s` }}>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                    <div style={{ width: 36, height: 36, borderRadius: "50%", background: "var(--s2)", border: "1px solid var(--bd)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14, fontWeight: 700, color: "var(--ac)" }}>
-                      {(c.candidate_name || c.name || "?")[0].toUpperCase()}
-                    </div>
-                    <div>
-                      <div style={{ fontSize: 13, fontWeight: 700 }}>{c.candidate_name || c.name}</div>
-                      <div style={{ fontSize: 10, color: "var(--tx3)" }}>{c.candidate_email || c.email}</div>
-                    </div>
+                  <div>
+                    <div style={{ fontSize: 13, fontWeight: 700 }}>{c.candidate_name || c.name}</div>
+                    <div style={{ fontSize: 10, color: "var(--tx3)" }}>{c.candidate_email || c.email}</div>
                   </div>
                   <div style={{ textAlign: "right" }}>
-                    {c.status === "completed" && (
-                      <div>
-                        <span className="mono" style={{ fontSize: 18, fontWeight: 800, color: (c.overall_score || 0) >= 7 ? "var(--ok)" : (c.overall_score || 0) >= 5 ? "var(--wn)" : "var(--dn)" }}>
-                          {c.overall_score}/10
-                        </span>
-                        <div style={{ fontSize: 9, color: "var(--ok)" }}>Completed</div>
-                      </div>
-                    )}
-                    {c.status === "in_progress" && <span className="tag" style={{ background: "rgba(255,171,64,.1)", color: "var(--wn)", borderColor: "rgba(255,171,64,.2)" }}>● In Progress</span>}
-                    {(!c.status || c.status === "not_started") && <span style={{ fontSize: 10, color: "var(--tx3)" }}>○ Not Started</span>}
+                    {c.status === "completed" && <span className="mono" style={{ fontSize: 16, fontWeight: 700, color: (c.overall_score || 0) >= 7 ? "var(--ok)" : (c.overall_score || 0) >= 5 ? "var(--wn)" : "var(--dn)" }}>{c.overall_score}/10</span>}
+                    {c.status === "in_progress" && <span className="tag" style={{ background: "rgba(255,171,64,.1)", color: "var(--wn)", borderColor: "rgba(255,171,64,.2)" }}>In Progress</span>}
+                    {c.status === "not_started" && <span className="tag" style={{ background: "rgba(90,99,128,.1)", color: "var(--tx3)" }}>Not Started</span>}
                   </div>
                 </div>
               </div>
             ))}
-
-            {candidates.length > 0 && (
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(2,1fr)", gap: 10, marginTop: 16 }}>
-                <button className="btn bp" onClick={() => { setB2bTab("interview"); localStorage.setItem('cyberprep_b2btab', 'interview'); }}>+ Create Assessment</button>
-                <button className="btn bs" onClick={() => { setB2bTab("scores"); localStorage.setItem('cyberprep_b2btab', 'scores'); }}>View All Scores →</button>
-              </div>
-            )}
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(2,1fr)", gap: 10, marginTop: 16 }}>
+              <button className="btn bp" onClick={() => { setB2bTab("interview"); localStorage.setItem('cyberprep_b2btab', 'interview'); }}>+ Create Assessment</button>
+              <button className="btn bs" onClick={() => { setB2bTab("scores"); localStorage.setItem('cyberprep_b2btab', 'scores'); }}>View All Scores →</button>
+            </div>
           </>)}
 
           {/* ── B2: SCORES (Candidate skill scores — empty state guard) ── */}
