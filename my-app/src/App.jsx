@@ -1019,7 +1019,7 @@ export default function ThreatReady() {
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ email: authEmail })
           });
-        } catch(otpErr) {
+        } catch (otpErr) {
           console.log('OTP send error:', otpErr.message);
         }
 
@@ -1124,7 +1124,7 @@ export default function ThreatReady() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email: authEmail })
       });
-    } catch(e) {
+    } catch (e) {
       console.log('OTP send error:', e.message);
     }
     setOtpCode("");
@@ -1597,7 +1597,11 @@ export default function ThreatReady() {
             <div className="lbl" style={{ marginBottom: 8 }}>TRY A REAL ATTACK SCENARIO IN 2 MINUTES</div>
             <div style={{ fontSize: 20, fontWeight: 800 }}>{hookSubline}</div>
             <div style={{ fontSize: 12, color: "var(--tx2)", marginTop: 4 }}>No signup required. Type or dictate your answer. Instant AI score.</div>
-            <div style={{ fontSize: 10, color: "var(--dn)", marginTop: 6, fontWeight: 600 }}>⚠️ This assessment is evaluated by AI</div>
+
+            {/* <div style={{ fontSize: 10, color: "var(--dn)", marginTop: 6, fontWeight: 600 }}>
+              ⚠️ This assessment is evaluated by AI
+            </div> */}
+
           </div>
           {!demoScore ? (
             <div>
@@ -1944,12 +1948,13 @@ export default function ThreatReady() {
                       showToast("Email verified! Welcome to CyberPrep.", "success");
                     } else {
                       // Fallback — ask them to sign in
+                      // Verified — show hiring or preparing choice
                       setOtpCode("");
                       setAuthPassword("");
-                      setAuthError("✅ Email verified! Please sign in.");
-                      setAuthMode("login");
-                      setAuthStep("form");
-                      showToast("Email verified! Now sign in.", "success");
+                      const detectedType = detectUserType(authEmail, null);
+                      setUserType(detectedType);
+                      setAuthStep("detect");
+                      showToast("Email verified! Choose your path.", "success");
                     }
                   } catch (err) {
                     setOtpError("Cannot connect to server");
@@ -2803,32 +2808,32 @@ export default function ThreatReady() {
                 </button>
               </div>
             ) : (<>
-            <div className="lbl" style={{ marginBottom: 12 }}>SCORE TRENDS</div>
-            <div className="card fadeUp" style={{ padding: 16, marginBottom: 16 }}>
-              <ResponsiveContainer width="100%" height={200}>
-                <LineChart data={scoreHistory}>
-                  <XAxis dataKey="date" tick={{ fill: "#8890b0", fontSize: 10 }} />
-                  <YAxis domain={[0, 10]} tick={{ fill: "#8890b0", fontSize: 10 }} />
-                  <Tooltip contentStyle={{ background: "#1a1f2e", border: "1px solid #252b3b", borderRadius: 8 }} />
-                  <Line type="monotone" dataKey="cloud" stroke="#00d4ff" strokeWidth={2} dot={{ r: 3 }} name="Cloud" />
-                  <Line type="monotone" dataKey="devsecops" stroke="#ff6b35" strokeWidth={2} dot={{ r: 3 }} name="DevSecOps" />
-                  <Line type="monotone" dataKey="appsec" stroke="#a855f7" strokeWidth={2} dot={{ r: 3 }} name="AppSec" />
-                </LineChart>
-              </ResponsiveContainer>
-            </div>
-            <div className="lbl" style={{ marginBottom: 8 }}>WEAKNESS TRACKER</div>
-            <div className="card fadeUp" style={{ padding: 16 }}>
-              {[{ area: "Incident Response", avg: 5.2, trend: "↓" }, { area: "Detection Engineering", avg: 5.8, trend: "↑" }, { area: "IAM Security", avg: 7.5, trend: "→" }].map((w, i) => (
-                <div key={i} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 0", borderBottom: i < 2 ? "1px solid var(--bd)" : "none" }}>
-                  <span style={{ fontSize: 12 }}>{w.area}</span>
-                  <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-                    <span className="mono" style={{ fontSize: 12, color: w.avg >= 7 ? "var(--ok)" : w.avg >= 5 ? "var(--wn)" : "var(--dn)" }}>{w.avg}/10</span>
-                    <span style={{ fontSize: 14 }}>{w.trend}</span>
+              <div className="lbl" style={{ marginBottom: 12 }}>SCORE TRENDS</div>
+              <div className="card fadeUp" style={{ padding: 16, marginBottom: 16 }}>
+                <ResponsiveContainer width="100%" height={200}>
+                  <LineChart data={scoreHistory}>
+                    <XAxis dataKey="date" tick={{ fill: "#8890b0", fontSize: 10 }} />
+                    <YAxis domain={[0, 10]} tick={{ fill: "#8890b0", fontSize: 10 }} />
+                    <Tooltip contentStyle={{ background: "#1a1f2e", border: "1px solid #252b3b", borderRadius: 8 }} />
+                    <Line type="monotone" dataKey="cloud" stroke="#00d4ff" strokeWidth={2} dot={{ r: 3 }} name="Cloud" />
+                    <Line type="monotone" dataKey="devsecops" stroke="#ff6b35" strokeWidth={2} dot={{ r: 3 }} name="DevSecOps" />
+                    <Line type="monotone" dataKey="appsec" stroke="#a855f7" strokeWidth={2} dot={{ r: 3 }} name="AppSec" />
+                  </LineChart>
+                </ResponsiveContainer>
+              </div>
+              <div className="lbl" style={{ marginBottom: 8 }}>WEAKNESS TRACKER</div>
+              <div className="card fadeUp" style={{ padding: 16 }}>
+                {[{ area: "Incident Response", avg: 5.2, trend: "↓" }, { area: "Detection Engineering", avg: 5.8, trend: "↑" }, { area: "IAM Security", avg: 7.5, trend: "→" }].map((w, i) => (
+                  <div key={i} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 0", borderBottom: i < 2 ? "1px solid var(--bd)" : "none" }}>
+                    <span style={{ fontSize: 12 }}>{w.area}</span>
+                    <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                      <span className="mono" style={{ fontSize: 12, color: w.avg >= 7 ? "var(--ok)" : w.avg >= 5 ? "var(--wn)" : "var(--dn)" }}>{w.avg}/10</span>
+                      <span style={{ fontSize: 14 }}>{w.trend}</span>
+                    </div>
                   </div>
-                </div>
-              ))}
-            </div>
-          </>)}</>)}
+                ))}
+              </div>
+            </>)}</>)}
 
           {/* ── C3: BADGES ── */}
           {dashTab === "badges" && (<>
@@ -3416,14 +3421,14 @@ export default function ThreatReady() {
   // ═══════════════════════════════════════════════════════════
   if (view === "b2b-dashboard") {
     const b2bTabs = [
-      { id: "home",      label: "🏠 Home" },
-      { id: "scores",    label: "📊 Scores" },
-      { id: "badges",    label: "🏆 Badges" },
-      { id: "profile",   label: "👤 Profile" },
+      { id: "home", label: "🏠 Home" },
+      { id: "scores", label: "📊 Scores" },
+      { id: "badges", label: "🏆 Badges" },
+      { id: "profile", label: "👤 Profile" },
       { id: "interview", label: "💎 Interview" },
-      { id: "billing",   label: "💳 Billing" },
-      { id: "settings",  label: "⚙️ Settings" },
-      { id: "help",      label: "❓ Help" }
+      { id: "billing", label: "💳 Billing" },
+      { id: "settings", label: "⚙️ Settings" },
+      { id: "help", label: "❓ Help" }
     ];
 
     return (
@@ -3696,8 +3701,8 @@ export default function ThreatReady() {
                   <div style={{ marginTop: 12 }}>
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 8 }}>
                       {[["Your Avg", avgScore.toFixed(1) + "/10", avgScore >= INDUSTRY_AVG ? "var(--ok)" : "var(--dn)"],
-                        ["Industry", "7.2/10", "var(--ac)"],
-                        ["Above Avg", aboveAvg + "/" + completed.length, "var(--wn)"]
+                      ["Industry", "7.2/10", "var(--ac)"],
+                      ["Above Avg", aboveAvg + "/" + completed.length, "var(--wn)"]
                       ].map(([l, v, c], i) => (
                         <div key={i} className="statbox" style={{ padding: 10 }}>
                           <div className="statval" style={{ color: c, fontSize: 14 }}>{v}</div>
