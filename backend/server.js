@@ -1883,17 +1883,12 @@ app.post('/api/auth/forgot-password', async (req, res) => {
 
     console.log('Reset code for', email, ':', code);
 
-    // Send email
+    // Send email via Resend
     try {
-      const nodemailer = require('nodemailer');
-      const transporter = nodemailer.createTransport({
-        host: 'smtp-relay.brevo.com',
-        port: 587,
-        secure: false,
-        auth: { user: process.env.BREVO_USER, pass: process.env.BREVO_PASS }
-      });
-      await transporter.sendMail({
-        from: '"ThreatReady" <' + process.env.BREVO_USER + '>',
+      const { Resend } = require('resend');
+      const resendClient = new Resend(process.env.RESEND_API_KEY);
+      await resendClient.emails.send({
+        from: 'ThreatReady <noreply@threatready.io>',
         to: email,
         subject: 'Password Reset Code - ThreatReady',
         html: `
