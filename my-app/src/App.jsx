@@ -1941,28 +1941,13 @@ export default function ThreatReady() {
                     const data = await res.json();
                     if (!res.ok) { setOtpError(data.error || "Invalid code"); return; }
 
-                    // Auto-login after successful OTP verification
-                    if (data.token && data.user) {
-                      localStorage.setItem("token", data.token);
-                      localStorage.setItem('cyberprep_user', JSON.stringify(data.user));
-                      setUser(data.user);
-                      setSettingsName(data.user.name || '');
-                      const type = detectUserType(authEmail, data.user);
-                      setUserType(type);
-                      localStorage.setItem('cyberprep_usertype', type);
-                      setOtpCode("");
-                      setAuthStep("detect");
-                      showToast("Email verified! Welcome to CyberPrep.", "success");
-                    } else {
-                      // Fallback — ask them to sign in
-                      // Verified — show hiring or preparing choice
-                      setOtpCode("");
-                      setAuthPassword("");
-                      const detectedType = detectUserType(authEmail, null);
-                      setUserType(detectedType);
-                      setAuthStep("detect");
-                      showToast("Email verified! Choose your path.", "success");
-                    }
+                    // OTP verified — go to sign in page
+                    setOtpCode("");
+                    setAuthPassword("");
+                    setAuthMode("login");
+                    setAuthStep("form");
+                    setAuthError("✅ Email verified! Please sign in.");
+                    showToast("Email verified! Now sign in to continue.", "success");
                   } catch (err) {
                     setOtpError("Cannot connect to server");
                   }
