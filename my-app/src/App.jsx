@@ -1023,10 +1023,10 @@ export default function ThreatReady() {
           console.log('OTP send error:', otpErr.message);
         }
 
-        // Go to OTP verification screen
-        setOtpCode("");
-        setOtpError("");
-        setAuthStep("verify");
+        // Go to hiring or preparing choice first
+        const detectedType = detectUserType(authEmail, null);
+        setUserType(detectedType);
+        setAuthStep("detect");
 
       } catch (err) {
         setAuthError("Cannot connect to server.");
@@ -1133,14 +1133,21 @@ export default function ThreatReady() {
   };
 
   // ── CONFIRM USER TYPE ──
-  const confirmUserType = async (type) => {
-    setUserType(type);
-    if (type === "b2b") {
-      setView("b2b-dashboard");
-    } else {
-      setView("dashboard");
-    }
-  };
+ const confirmUserType = async (type) => {
+  setUserType(type);
+  localStorage.setItem('cyberprep_usertype', type);
+  // Send OTP and go to verify
+  try {
+    await fetch("https://threatready-db.onrender.com/api/auth/send-otp", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email: authEmail })
+    });
+  } catch(e) {}
+  setOtpCode("");
+  setOtpError("");
+  setAuthStep("verify");
+};
 
   // ── SCENARIO LOGIC ──
 
