@@ -1587,7 +1587,7 @@ app.post('/api/b2b/invite', auth, async (req, res) => {
         [req.user.id, assessment_id || null, email, candidate_name || name, role_id, difficulty, token]
       );
 
-      const inviteLink = (process.env.FRONTEND_URL || 'http://localhost:5173') + '/?assess_token=' + token;
+      const inviteLink = (process.env.FRONTEND_URL || 'http://localhost:5173') + '/assess?token=' + token;
 
       // Send invite email
       resendClient.emails.send({
@@ -1967,6 +1967,21 @@ app.delete('/api/b2b/candidates/:id', auth, async (req, res) => {
     );
     res.json({ success: true });
   } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// B2B Delete Assessment
+app.delete('/api/b2b/assessments/:id', auth, async (req, res) => {
+  try {
+    const result = await pool.query(
+      `DELETE FROM b2b_assessments WHERE id = $1 AND company_user_id = $2 RETURNING id`,
+      [req.params.id, req.user.id]
+    );
+    if (!result.rows[0]) return res.status(404).json({ error: 'Assessment not found' });
+    res.json({ success: true });
+  } catch (e) {
+    console.error('Delete assessment error:', e.message);
     res.status(500).json({ error: e.message });
   }
 });
