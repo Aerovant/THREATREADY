@@ -1650,6 +1650,12 @@ app.get('/api/candidate/assessment', async (req, res) => {
     const { token } = req.query;
     if (!token) return res.status(400).json({ error: 'Token required' });
 
+    // Safe migration — add missing columns if they don't exist
+    await pool.query(`ALTER TABLE candidate_assessments ADD COLUMN IF NOT EXISTS overall_score NUMERIC(4,2)`).catch(()=>{});
+    await pool.query(`ALTER TABLE candidate_assessments ADD COLUMN IF NOT EXISTS completed_at TIMESTAMP`).catch(()=>{});
+    await pool.query(`ALTER TABLE candidate_assessments ADD COLUMN IF NOT EXISTS status VARCHAR(20) DEFAULT 'not_started'`).catch(()=>{});
+    await pool.query(`ALTER TABLE b2b_assessments ADD COLUMN IF NOT EXISTS questions JSONB`).catch(()=>{});
+
     const ca = await pool.query(
       `SELECT ca.*, ba.questions, ba.name as assessment_name, ba.jd_text
        FROM candidate_assessments ca
@@ -1708,6 +1714,10 @@ app.post('/api/candidate/submit', async (req, res) => {
   try {
     const { token, answers, candidate_name, role_id, difficulty } = req.body;
     if (!token || !answers) return res.status(400).json({ error: 'Token and answers required' });
+
+    // Safe migration
+    await pool.query(`ALTER TABLE candidate_assessments ADD COLUMN IF NOT EXISTS overall_score NUMERIC(4,2)`).catch(()=>{});
+    await pool.query(`ALTER TABLE candidate_assessments ADD COLUMN IF NOT EXISTS completed_at TIMESTAMP`).catch(()=>{});
 
     const ca = await pool.query(
       `SELECT ca.*, ba.name as assessment_name
