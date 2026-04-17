@@ -674,7 +674,7 @@ export default function ThreatReady() {
 
   // ── DASHBOARD TABS ──
   const [dashTab, setDashTab] = useState(() => localStorage.getItem('cyberprep_tab') || "home");
-  const [b2bTab, setB2bTab] = useState(() => localStorage.getItem('cyberprep_b2btab') || "home");
+  const [b2bTab, setB2bTab] = useState(() => localStorage.getItem('cyberprep_b2btab') || "overview");
   const [settingsName, setSettingsName] = useState("");
   const [profilePublic, setProfilePublic] = useState(true);
   const [inLeaderboard, setInLeaderboard] = useState(true);
@@ -3409,20 +3409,31 @@ export default function ThreatReady() {
     );
   }
   // ═══════════════════════════════════════════════════════════
-  // PAGE 6: B2B HIRING MANAGER DASHBOARD (8 tabs — mirrors B2C)
+  // ═══════════════════════════════════════════════════════════
+  // PAGE 6: B2B HIRING MANAGER DASHBOARD
+  // Tabs: Overview · Create Assessment · Candidates · Team Skills · Reports · Library · Settings
   // ═══════════════════════════════════════════════════════════
   if (view === "b2b-dashboard") {
     const b2bTabs = [
-      { id: "home", label: "🏠 Overview" },
-      { id: "interview", label: "📝 Create Assessment" },
-      { id: "scores", label: "👥 Candidates" },
-      { id: "badges", label: "📋 Reports" },
-
-      { id: "profile", label: "📊 Team Skills" },
-
-      { id: "billing", label: "📚 Library" },
-      { id: "settings", label: "⚙️ Settings" }
+      { id: "overview",   label: "📊 Overview" },
+      { id: "create",     label: "📝 Create Assessment" },
+      { id: "candidates", label: "👥 Candidates" },
+      { id: "teamskills", label: "🏢 Team Skills" },
+      { id: "reports",    label: "📄 Reports" },
+      { id: "library",    label: "📚 Library" },
+      { id: "settings",   label: "⚙️ Settings" }
     ];
+
+    const teamMembers = candidates
+      .filter(c => c.status === 'completed' && c.overall_score)
+      .map(c => ({
+        id: c.id,
+        name: c.candidate_name || c.candidate_email,
+        role: c.role_id,
+        score: parseFloat(c.overall_score) || 0,
+        difficulty: c.difficulty,
+        completed_at: c.completed_at
+      }));
 
     return (
       <div className="app"><style>{CSS}</style><div className="scanbar" /><div className="gridbg" />
@@ -3432,16 +3443,14 @@ export default function ThreatReady() {
           {/* ── HEADER ── */}
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }} className="fadeUp">
             <div>
-              <h2 style={{ fontSize: 22, fontWeight: 800 }}>Hiring Dashboard</h2>
+              <h2 style={{ fontSize: 22, fontWeight: 800 }}>🏢 Hiring Dashboard</h2>
               <div style={{ fontSize: 12, color: "var(--tx2)", marginTop: 3 }}>
-                {isPaid ? `${subscribedRoles.length} track${subscribedRoles.length !== 1 ? "s" : ""}` : `Free trial · ${freeAttempts} attempts left`}
-                {" · "}{candidates.length} candidates · {assessments.length} assessments
+                {user?.email?.split("@")[1]} · {candidates.length} candidates · {assessments.length} assessments
               </div>
             </div>
-            <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
-              <span className="tag" style={{ padding: "5px 12px" }}>⚡ {xp} XP</span>
-              <button className="btn bs" style={{ padding: "5px 10px", fontSize: 10 }} onClick={() => { setUserType("b2c"); setView("dashboard"); }}>B2C View</button>
-              <button className="btn bs" style={{ padding: "5px 10px", fontSize: 10 }} onClick={logout}>Logout</button>
+            <div style={{ display: "flex", gap: 8 }}>
+              <button className="btn bs" style={{ padding: "6px 14px", fontSize: 12 }} onClick={() => { setUserType("b2c"); setView("dashboard"); }}>Switch to B2C</button>
+              <button className="btn bs" style={{ padding: "6px 14px", fontSize: 12 }} onClick={logout}>Logout</button>
             </div>
           </div>
 
@@ -3455,18 +3464,19 @@ export default function ThreatReady() {
             ))}
           </div>
 
-          {/* ── B1: HOME ── */}
-          {b2bTab === "home" && (<>
-            {/* Stats */}
+          {/* ══════════════════════════════════════════
+              TAB 1: OVERVIEW
+          ══════════════════════════════════════════ */}
+          {b2bTab === "overview" && (<>
             <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 10, marginBottom: 20 }}>
               {[
-                [b2bStats.total_candidates, "Candidates"],
+                [b2bStats.total_candidates, "Total Candidates"],
                 [b2bStats.assessed, "Assessed"],
                 [b2bStats.total_assessments, "Assessments"],
-                [b2bStats.avg_score || "—", "Avg Score"]
+                [b2bStats.avg_score ? parseFloat(b2bStats.avg_score).toFixed(1) : "—", "Avg Score"]
               ].map(([v, l], i) => (
                 <div key={i} className="statbox fadeUp" style={{ animationDelay: `${i * .05}s` }}>
-                  <div className="statval" style={{ color: "var(--ac)", fontSize: 20 }}>
+                  <div className="statval" style={{ color: "var(--ac)", fontSize: 22 }}>
                     {b2bLoading ? <span className="loader" style={{ width: 14, height: 14 }} /> : v}
                   </div>
                   <div className="statlbl">{l}</div>
@@ -3474,64 +3484,322 @@ export default function ThreatReady() {
               ))}
             </div>
 
-            {/* Recent Candidates */}
             <div className="lbl" style={{ marginBottom: 10 }}>RECENT CANDIDATES</div>
             {candidates.length === 0 && !b2bLoading && (
-              <div className="card fadeUp" style={{ padding: 24, textAlign: "center" }}>
-                <div style={{ fontSize: 11, color: "var(--tx3)", marginBottom: 10 }}>No candidates yet</div>
-                <button className="btn bp" style={{ fontSize: 11 }} onClick={() => { setB2bTab("interview"); localStorage.setItem('cyberprep_b2btab', 'interview'); }}>
-                  Invite Candidates →
+              <div className="card fadeUp" style={{ padding: 32, textAlign: "center" }}>
+                <div style={{ fontSize: 40, marginBottom: 12 }}>👥</div>
+                <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 6 }}>No candidates yet</div>
+                <div style={{ fontSize: 12, color: "var(--tx3)", marginBottom: 16 }}>Invite candidates to start assessing their cybersecurity skills.</div>
+                <button className="btn bp" style={{ fontSize: 12, padding: "10px 24px" }}
+                  onClick={() => { setB2bTab("candidates"); localStorage.setItem('cyberprep_b2btab', 'candidates'); }}>
+                  Invite First Candidate →
                 </button>
               </div>
             )}
+            {b2bLoading && <div style={{ textAlign: "center", padding: 20 }}><div className="loader" /></div>}
             {candidates.slice(0, 5).map((c, i) => (
               <div key={c.id} className="card card-glow fadeUp" style={{ padding: 14, marginBottom: 8, animationDelay: `${i * .04}s` }}>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                  <div>
-                    <div style={{ fontSize: 13, fontWeight: 700 }}>{c.candidate_name || c.name}</div>
-                    <div style={{ fontSize: 10, color: "var(--tx3)" }}>{c.candidate_email || c.email}</div>
+                  <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                    <div style={{ width: 36, height: 36, borderRadius: "50%", background: "var(--s2)", border: "1px solid var(--bd)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14, fontWeight: 700, color: "var(--ac)" }}>
+                      {(c.candidate_name || c.candidate_email || "?")[0].toUpperCase()}
+                    </div>
+                    <div>
+                      <div style={{ fontSize: 13, fontWeight: 700 }}>{c.candidate_name || c.candidate_email?.split("@")[0]}</div>
+                      <div style={{ fontSize: 10, color: "var(--tx3)" }}>{c.candidate_email}</div>
+                    </div>
                   </div>
                   <div style={{ textAlign: "right" }}>
-                    {c.status === "completed" && <span className="mono" style={{ fontSize: 16, fontWeight: 700, color: (c.overall_score || 0) >= 7 ? "var(--ok)" : (c.overall_score || 0) >= 5 ? "var(--wn)" : "var(--dn)" }}>{c.overall_score}/10</span>}
-                    {c.status === "in_progress" && <span className="tag" style={{ background: "rgba(255,171,64,.1)", color: "var(--wn)", borderColor: "rgba(255,171,64,.2)" }}>In Progress</span>}
-                    {c.status === "not_started" && <span className="tag" style={{ background: "rgba(90,99,128,.1)", color: "var(--tx3)" }}>Not Started</span>}
+                    {c.status === "completed" && (
+                      <div>
+                        <span className="mono" style={{ fontSize: 16, fontWeight: 800, color: parseFloat(c.overall_score) >= 7 ? "var(--ok)" : parseFloat(c.overall_score) >= 5 ? "var(--wn)" : "var(--dn)" }}>
+                          {parseFloat(c.overall_score).toFixed(1)}/10
+                        </span>
+                        <div style={{ fontSize: 9, color: "var(--ok)" }}>✓ Completed</div>
+                      </div>
+                    )}
+                    {c.status === "in_progress" && <span className="tag" style={{ background: "rgba(255,171,64,.1)", color: "var(--wn)", borderColor: "rgba(255,171,64,.2)" }}>● In Progress</span>}
+                    {(!c.status || c.status === "not_started") && <span style={{ fontSize: 10, color: "var(--tx3)" }}>○ Not Started</span>}
                   </div>
                 </div>
               </div>
             ))}
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(2,1fr)", gap: 10, marginTop: 16 }}>
-              <button className="btn bp" onClick={() => { setB2bTab("interview"); localStorage.setItem('cyberprep_b2btab', 'interview'); }}>+ Create Assessment</button>
-              <button className="btn bs" onClick={() => { setB2bTab("scores"); localStorage.setItem('cyberprep_b2btab', 'scores'); }}>View All Scores →</button>
+            {candidates.length > 0 && (
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(2,1fr)", gap: 10, marginTop: 12 }}>
+                <button className="btn bp" onClick={() => { setB2bTab("create"); localStorage.setItem('cyberprep_b2btab', 'create'); }}>+ Create Assessment</button>
+                <button className="btn bs" onClick={() => { setB2bTab("candidates"); localStorage.setItem('cyberprep_b2btab', 'candidates'); }}>View All Candidates →</button>
+              </div>
+            )}
+          </>)}
+
+          {/* ══════════════════════════════════════════
+              TAB 2: CREATE ASSESSMENT
+          ══════════════════════════════════════════ */}
+          {b2bTab === "create" && (<>
+            <div className="card fadeUp" style={{ padding: 22, marginBottom: 14, borderColor: jdAnalysis ? "var(--ok)" : "var(--bd)" }}>
+              <div className="lbl" style={{ marginBottom: 10 }}>STEP 1 — JOB DESCRIPTION (Optional)</div>
+              <div style={{ fontSize: 11, color: "var(--tx2)", marginBottom: 10 }}>
+                Paste or upload a JD — AI will auto-suggest role and difficulty.
+              </div>
+              <input type="file" id="jd-file-input" accept=".pdf,.txt,.doc,.docx" style={{ display: "none" }}
+                onChange={async (e) => {
+                  const file = e.target.files[0];
+                  if (!file) return;
+                  setJdAnalysis(null);
+                  if (file.type === 'text/plain' || file.name.endsWith('.txt')) {
+                    const reader = new FileReader();
+                    reader.onload = ev => { setNewAssessJD(ev.target.result); showToast('File loaded!', 'success'); };
+                    reader.readAsText(file);
+                  } else if (file.name.endsWith('.pdf')) {
+                    const reader = new FileReader();
+                    reader.onload = async (ev) => {
+                      try {
+                        const pdfjsLib = window['pdfjs-dist/build/pdf'];
+                        if (pdfjsLib) {
+                          pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+                          const pdf = await pdfjsLib.getDocument({ data: ev.target.result }).promise;
+                          let text = '';
+                          for (let i = 1; i <= pdf.numPages; i++) {
+                            const page = await pdf.getPage(i);
+                            const ct = await page.getTextContent();
+                            text += ct.items.map(x => x.str).join(' ') + '\n';
+                          }
+                          setNewAssessJD(text.trim());
+                          showToast('PDF loaded!', 'success');
+                        }
+                      } catch (err) { showToast('Could not read PDF. Paste text instead.', 'error'); }
+                    };
+                    reader.readAsArrayBuffer(file);
+                  }
+                  e.target.value = '';
+                }}
+              />
+              <div style={{ display: "flex", gap: 8, marginBottom: 8 }}>
+                <button className="btn bs" style={{ fontSize: 11, padding: "6px 14px" }} onClick={() => document.getElementById('jd-file-input').click()}>📎 Upload JD</button>
+                <span style={{ fontSize: 10, color: "var(--tx3)", alignSelf: "center" }}>PDF · TXT · DOC</span>
+                {newAssessJD && <button className="btn bs" style={{ marginLeft: "auto", fontSize: 10, padding: "4px 8px", color: "var(--dn)", borderColor: "var(--dn)" }} onClick={() => { setNewAssessJD(''); setJdAnalysis(null); }}>✕ Clear</button>}
+              </div>
+              <textarea className="input" placeholder="Or paste job description here..." value={newAssessJD}
+                onChange={e => { setNewAssessJD(e.target.value); setJdAnalysis(null); }}
+                style={{ minHeight: 90, marginBottom: 10, fontSize: 12 }} />
+              <button className="btn bp" style={{ fontSize: 11, padding: "8px 20px" }}
+                disabled={!newAssessJD.trim() || jdAnalyzing}
+                onClick={async () => {
+                  setJdAnalyzing(true); setJdAnalysis(null);
+                  try {
+                    const token = localStorage.getItem('token');
+                    const res = await fetch('https://threatready-db.onrender.com/api/b2b/analyze-jd', {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                      body: JSON.stringify({ jd_text: newAssessJD })
+                    });
+                    const data = await res.json();
+                    if (data.analysis) {
+                      setJdAnalysis(data.analysis);
+                      if (data.analysis.recommended_role) setNewAssessRole(data.analysis.recommended_role);
+                      if (data.analysis.recommended_difficulty) setNewAssessDiff(data.analysis.recommended_difficulty);
+                      if (data.analysis.suggested_name) setNewAssessName(data.analysis.suggested_name);
+                      showToast('JD analyzed! Role and difficulty auto-set.', 'success');
+                    }
+                  } catch (e) { showToast('JD analysis failed: ' + e.message, 'error'); }
+                  setJdAnalyzing(false);
+                }}>
+                {jdAnalyzing ? <><span className="loader" style={{ width: 12, height: 12 }} /> &nbsp;Analyzing...</> : "🤖 Analyze with AI →"}
+              </button>
+              {jdAnalysis && (
+                <div style={{ marginTop: 10, padding: 12, background: "rgba(0,224,150,.07)", borderRadius: 10, border: "1px solid rgba(0,224,150,.2)", fontSize: 11 }}>
+                  <div style={{ color: "var(--ok)", fontWeight: 700, marginBottom: 6 }}>✅ AI Analysis Complete</div>
+                  {jdAnalysis.summary && <div style={{ color: "var(--tx2)", marginBottom: 6 }}>{jdAnalysis.summary}</div>}
+                  {jdAnalysis.key_skills?.length > 0 && (
+                    <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
+                      {jdAnalysis.key_skills.map((s, i) => <span key={i} className="tag" style={{ fontSize: 9 }}>{s}</span>)}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+
+            <div className="card fadeUp" style={{ padding: 22 }}>
+              <div className="lbl" style={{ marginBottom: 12 }}>STEP 2 — CONFIGURE ASSESSMENT</div>
+              <div style={{ marginBottom: 10 }}>
+                <div style={{ fontSize: 10, color: "var(--tx3)", marginBottom: 4 }}>ASSESSMENT NAME</div>
+                <input className="input" placeholder="e.g. Senior Cloud Engineer — Q2 2026" value={newAssessName} onChange={e => setNewAssessName(e.target.value)} />
+              </div>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 10 }}>
+                <div>
+                  <div style={{ fontSize: 10, color: "var(--tx3)", marginBottom: 4 }}>ROLE</div>
+                  <select className="input" value={newAssessRole} onChange={e => setNewAssessRole(e.target.value)}>
+                    {ROLES.map(r => <option key={r.id} value={r.id}>{r.icon} {r.name}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <div style={{ fontSize: 10, color: "var(--tx3)", marginBottom: 4 }}>DIFFICULTY</div>
+                  <select className="input" value={newAssessDiff} onChange={e => setNewAssessDiff(e.target.value)}>
+                    {DIFFICULTIES.map(d => <option key={d.id} value={d.id}>{d.icon} {d.name}</option>)}
+                  </select>
+                </div>
+              </div>
+              {assessMsg && (
+                <div style={{ padding: 9, borderRadius: 8, marginBottom: 10, fontSize: 11, background: assessMsg.includes("✅") ? "rgba(0,224,150,.1)" : "rgba(255,82,82,.1)", color: assessMsg.includes("✅") ? "var(--ok)" : "var(--dn)" }}>
+                  {assessMsg}
+                </div>
+              )}
+              <button className="btn bp" style={{ width: "100%", padding: 13, fontSize: 14 }}
+                disabled={!newAssessName.trim()}
+                onClick={async () => {
+                  setAssessMsg('Creating...');
+                  try {
+                    const token = localStorage.getItem('token');
+                    const res = await fetch('https://threatready-db.onrender.com/api/b2b/assessments', {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                      body: JSON.stringify({ name: newAssessName, role_id: newAssessRole, difficulty: newAssessDiff, jd_context: newAssessJD })
+                    });
+                    const data = await res.json();
+                    if (data.assessment) {
+                      setAssessMsg('✅ Assessment created! Go to Candidates tab to invite people.');
+                      setNewAssessName(''); setNewAssessJD(''); setJdAnalysis(null);
+                      loadB2bData();
+                      setTimeout(() => setAssessMsg(''), 4000);
+                    } else {
+                      setAssessMsg('❌ ' + (data.error || 'Failed to create'));
+                    }
+                  } catch (e) { setAssessMsg('❌ ' + e.message); }
+                }}>
+                Create Assessment →
+              </button>
             </div>
           </>)}
 
-          {/* ── B2: SCORES (Candidate skill scores — empty state guard) ── */}
-          {b2bTab === "scores" && (<>
-            {candidates.filter(c => c.status === "completed" && c.overall_score).length === 0 ? (
-              <div className="card fadeUp" style={{ padding: 48, textAlign: "center" }}>
-                <div style={{ fontSize: 56, marginBottom: 16 }}>📊</div>
-                <h3 style={{ fontSize: 18, fontWeight: 800, marginBottom: 8 }}>No Scores Yet</h3>
-                <p style={{ fontSize: 12, color: "var(--tx2)", marginBottom: 20, lineHeight: 1.7 }}>
-                  Invite candidates and have them complete assessments to see their scores and skill benchmarks here.
-                </p>
-                <button className="btn bp" style={{ padding: "10px 28px" }} onClick={() => { setB2bTab("interview"); localStorage.setItem('cyberprep_b2btab', 'interview'); }}>
+          {/* ══════════════════════════════════════════
+              TAB 3: CANDIDATES
+          ══════════════════════════════════════════ */}
+          {b2bTab === "candidates" && (<>
+            {/* Invite Form */}
+            <div className="card fadeUp" style={{ padding: 22, marginBottom: 16, borderColor: "var(--ac)", background: "rgba(0,229,255,.02)" }}>
+              <div className="lbl" style={{ marginBottom: 12 }}>INVITE CANDIDATE</div>
+              <input id="invite-email-input" className="input" type="email" placeholder="candidate@company.com"
+                value={inviteEmail} onChange={e => setInviteEmail(e.target.value)} style={{ marginBottom: 10 }} />
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 12 }}>
+                <div>
+                  <div style={{ fontSize: 10, color: "var(--tx3)", marginBottom: 4 }}>ROLE</div>
+                  <select className="input" value={inviteRole} onChange={e => setInviteRole(e.target.value)}>
+                    {ROLES.map(r => <option key={r.id} value={r.id}>{r.icon} {r.name}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <div style={{ fontSize: 10, color: "var(--tx3)", marginBottom: 4 }}>DIFFICULTY</div>
+                  <select className="input" value={inviteDiff} onChange={e => setInviteDiff(e.target.value)}>
+                    {DIFFICULTIES.map(d => <option key={d.id} value={d.id}>{d.icon} {d.name}</option>)}
+                  </select>
+                </div>
+              </div>
+              {inviteMsg && (
+                <div style={{ padding: 9, borderRadius: 8, marginBottom: 10, fontSize: 11, background: inviteMsg.includes("✅") ? "rgba(0,224,150,.1)" : "rgba(255,82,82,.1)", color: inviteMsg.includes("✅") ? "var(--ok)" : "var(--dn)" }}>
+                  {inviteMsg}
+                </div>
+              )}
+              <button className="btn bp" style={{ width: "100%", padding: 12, fontSize: 14 }}
+                disabled={!inviteEmail.trim()}
+                onClick={async () => {
+                  if (!inviteEmail.trim()) return;
+                  setInviteMsg('Sending invite...');
+                  try {
+                    const token = localStorage.getItem('token');
+                    const res = await fetch('https://threatready-db.onrender.com/api/b2b/invite', {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                      body: JSON.stringify({ candidate_email: inviteEmail, role_id: inviteRole, difficulty: inviteDiff })
+                    });
+                    const data = await res.json();
+                    if (data.candidate) {
+                      setInviteMsg('✅ Invite sent to ' + inviteEmail);
+                      setInviteEmail('');
+                      loadB2bData();
+                      setTimeout(() => setInviteMsg(''), 3000);
+                    } else {
+                      setInviteMsg('❌ ' + (data.error || 'Failed to send invite'));
+                    }
+                  } catch (e) { setInviteMsg('❌ ' + e.message); }
+                }}>
+                📧 Send Invite Email
+              </button>
+            </div>
+
+            {/* Candidates Table */}
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
+              <div className="lbl">ALL CANDIDATES ({candidates.length})</div>
+              <button className="btn bs" style={{ fontSize: 10, padding: "4px 10px" }}
+                onClick={() => {
+                  const csv = ['Name,Email,Role,Difficulty,Score,Status,Invited']
+                    .concat(candidates.map(c =>
+                      `${c.candidate_name || ''},${c.candidate_email || ''},${c.role_id || ''},${c.difficulty || ''},${c.overall_score || ''},${c.status || ''},${c.invited_at?.substring(0, 10) || ''}`
+                    )).join('\n');
+                  const a = document.createElement('a');
+                  a.href = 'data:text/csv,' + encodeURIComponent(csv);
+                  a.download = 'candidates.csv'; a.click();
+                }}>📥 Export CSV</button>
+            </div>
+            {b2bLoading && <div style={{ textAlign: "center", padding: 20 }}><div className="loader" /></div>}
+            <div className="card fadeUp" style={{ padding: 0, overflow: "hidden" }}>
+              <div style={{ display: "grid", gridTemplateColumns: "2fr 2fr 1fr 1fr 1fr", padding: "10px 14px", background: "var(--s2)", fontSize: 9, fontWeight: 700, color: "var(--ac)", letterSpacing: 1, textTransform: "uppercase" }}>
+                <span>Name</span><span>Email</span><span>Role</span><span>Score</span><span>Status</span>
+              </div>
+              {candidates.length === 0 && !b2bLoading && (
+                <div style={{ padding: 20, textAlign: "center", color: "var(--tx3)", fontSize: 12 }}>
+                  No candidates yet. Use the invite form above.
+                </div>
+              )}
+              {candidates.map((c, i) => (
+                <div key={c.id} style={{ display: "grid", gridTemplateColumns: "2fr 2fr 1fr 1fr 1fr", padding: "10px 14px", borderTop: "1px solid var(--bd)", fontSize: 11, alignItems: "center" }}>
+                  <span style={{ fontWeight: 600 }}>{c.candidate_name || c.candidate_email?.split("@")[0] || '—'}</span>
+                  <span style={{ color: "var(--tx3)", fontSize: 10 }}>{c.candidate_email}</span>
+                  <span>{ROLES.find(r => r.id === c.role_id)?.icon || "—"}</span>
+                  <span className="mono" style={{ fontWeight: 700, color: c.overall_score ? (parseFloat(c.overall_score) >= 7 ? "var(--ok)" : parseFloat(c.overall_score) >= 5 ? "var(--wn)" : "var(--dn)") : "var(--tx3)" }}>
+                    {c.overall_score ? `${parseFloat(c.overall_score).toFixed(1)}/10` : "—"}
+                  </span>
+                  <span style={{ fontSize: 9, fontWeight: 600, color: c.status === "completed" ? "var(--ok)" : c.status === "in_progress" ? "var(--wn)" : "var(--tx3)" }}>
+                    {c.status === "completed" ? "✓ Done" : c.status === "in_progress" ? "● Active" : "○ Pending"}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </>)}
+
+          {/* ══════════════════════════════════════════
+              TAB 4: TEAM SKILLS
+          ══════════════════════════════════════════ */}
+          {b2bTab === "teamskills" && (<>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+              <div className="lbl">CANDIDATE SKILL SCORES</div>
+              <button className="btn bs" style={{ fontSize: 10, padding: "4px 10px" }} onClick={loadB2bData}>🔄 Refresh</button>
+            </div>
+            {b2bLoading && <div style={{ textAlign: "center", padding: 20 }}><div className="loader" /></div>}
+            {!b2bLoading && teamMembers.length === 0 && (
+              <div className="card fadeUp" style={{ padding: 40, textAlign: "center" }}>
+                <div style={{ fontSize: 40, marginBottom: 12 }}>📊</div>
+                <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 6 }}>No completed assessments yet</div>
+                <div style={{ fontSize: 12, color: "var(--tx3)", marginBottom: 16 }}>
+                  Invite candidates and have them complete assessments to see scores here.
+                </div>
+                <button className="btn bp" style={{ fontSize: 12, padding: "10px 24px" }}
+                  onClick={() => { setB2bTab("candidates"); localStorage.setItem('cyberprep_b2btab', 'candidates'); }}>
                   Invite Candidates →
                 </button>
               </div>
-            ) : (<>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
-                <div className="lbl">CANDIDATE SKILL SCORES</div>
-                <button className="btn bs" style={{ fontSize: 10, padding: "4px 10px" }} onClick={loadB2bData}>🔄 Refresh</button>
-              </div>
-              {b2bLoading && <div style={{ textAlign: "center", padding: 20 }}><div className="loader" /></div>}
+            )}
+            {teamMembers.length > 0 && (<>
               <div className="card fadeUp" style={{ padding: 0, overflow: "hidden", marginBottom: 16 }}>
                 <div style={{ display: "grid", gridTemplateColumns: "1.5fr 1fr 1fr 1fr 1fr", padding: "10px 14px", background: "var(--s2)", fontSize: 9, fontWeight: 700, color: "var(--ac)", letterSpacing: 1, textTransform: "uppercase" }}>
-                  <span>Candidate</span><span style={{ textAlign: "center" }}>Role</span><span style={{ textAlign: "center" }}>Difficulty</span><span style={{ textAlign: "center" }}>Score</span><span style={{ textAlign: "center" }}>Badge</span>
+                  <span>Candidate</span>
+                  <span style={{ textAlign: "center" }}>Role</span>
+                  <span style={{ textAlign: "center" }}>Difficulty</span>
+                  <span style={{ textAlign: "center" }}>Score</span>
+                  <span style={{ textAlign: "center" }}>Badge</span>
                 </div>
-                {teamMembers.map((m, i) => {
-                  const score = m.score;
-                  const badge = score >= 8 ? "Platinum" : score >= 7 ? "Gold" : score >= 6 ? "Silver" : score >= 4 ? "Bronze" : "Not Ready";
-                  const badgeColor = score >= 8 ? "#e2e8f0" : score >= 7 ? "#f59e0b" : score >= 6 ? "#94a3b8" : score >= 4 ? "#b45309" : "var(--dn)";
+                {teamMembers.sort((a, b) => b.score - a.score).map((m, i) => {
+                  const badge = m.score >= 8 ? "Platinum" : m.score >= 7 ? "Gold" : m.score >= 6 ? "Silver" : m.score >= 4 ? "Bronze" : "Not Ready";
+                  const badgeColor = m.score >= 8 ? "#e2e8f0" : m.score >= 7 ? "#f59e0b" : m.score >= 6 ? "#94a3b8" : m.score >= 4 ? "#b45309" : "var(--dn)";
                   const role = ROLES.find(r => r.id === m.role);
                   return (
                     <div key={m.id} style={{ display: "grid", gridTemplateColumns: "1.5fr 1fr 1fr 1fr 1fr", padding: "12px 14px", borderTop: "1px solid var(--bd)", fontSize: 11, alignItems: "center" }}>
@@ -3540,27 +3808,26 @@ export default function ThreatReady() {
                         <div style={{ fontSize: 9, color: "var(--tx3)", marginTop: 2 }}>{m.completed_at?.substring(0, 10)}</div>
                       </div>
                       <div style={{ textAlign: "center" }}>
-                        <span style={{ fontSize: 16 }}>{role?.icon || "🔒"}</span>
+                        <div style={{ fontSize: 18 }}>{role?.icon || "?"}</div>
                         <div style={{ fontSize: 9, color: "var(--tx3)" }}>{role?.name || m.role}</div>
                       </div>
                       <div style={{ textAlign: "center" }}>
                         <span className={`diff diff-${m.difficulty}`} style={{ fontSize: 8 }}>{m.difficulty}</span>
                       </div>
                       <div style={{ textAlign: "center" }}>
-                        <span className="mono" style={{ fontSize: 18, fontWeight: 800, color: score >= 7 ? "var(--ok)" : score >= 5 ? "var(--wn)" : "var(--dn)" }}>
-                          {score.toFixed(1)}
+                        <span className="mono" style={{ fontSize: 20, fontWeight: 800, color: m.score >= 7 ? "var(--ok)" : m.score >= 5 ? "var(--wn)" : "var(--dn)" }}>
+                          {m.score.toFixed(1)}
                         </span>
                         <div style={{ fontSize: 9, color: "var(--tx3)" }}>/10</div>
                       </div>
                       <div style={{ textAlign: "center" }}>
-                        <span style={{ fontSize: 9, fontWeight: 700, color: badgeColor }}>{badge}</span>
+                        <span style={{ fontSize: 10, fontWeight: 700, color: badgeColor }}>{badge}</span>
                       </div>
                     </div>
                   );
                 })}
               </div>
-              {/* Summary insights */}
-              <div className="card fadeUp" style={{ padding: 14, fontSize: 11, lineHeight: 1.8, color: "var(--tx2)" }}>
+              <div className="card fadeUp" style={{ padding: 14, fontSize: 11, lineHeight: 1.9, color: "var(--tx2)" }}>
                 <div className="lbl" style={{ marginBottom: 8 }}>INSIGHTS</div>
                 {teamMembers.filter(m => m.score >= 7).length > 0 && (
                   <div>✅ <strong style={{ color: "var(--ok)" }}>{teamMembers.filter(m => m.score >= 7).length} candidate(s)</strong> scored 7+ — strong hires</div>
@@ -3575,50 +3842,46 @@ export default function ThreatReady() {
             </>)}
           </>)}
 
-          {/* ── B3: BADGES (Reports) ── */}
-          {b2bTab === "badges" && (<>
-            <div className="lbl" style={{ marginBottom: 12 }}>ASSESSMENT REPORTS</div>
+          {/* ══════════════════════════════════════════
+              TAB 5: REPORTS
+          ══════════════════════════════════════════ */}
+          {b2bTab === "reports" && (<>
+            <div className="lbl" style={{ marginBottom: 14 }}>DOWNLOAD REPORTS</div>
 
             {/* Hiring Report */}
-            <div className="card card-glow fadeUp" style={{ padding: 16, marginBottom: 10 }}>
+            <div className="card card-glow fadeUp" style={{ padding: 18, marginBottom: 12 }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                 <div>
                   <div style={{ fontSize: 13, fontWeight: 700 }}>📊 Hiring Report</div>
-                  <div style={{ fontSize: 10, color: "var(--tx3)", marginTop: 3 }}>Top candidates ranked with scorecards</div>
+                  <div style={{ fontSize: 10, color: "var(--tx3)", marginTop: 3 }}>All candidates ranked by score with badge and role</div>
                 </div>
-                <button className="btn bp" style={{ fontSize: 10, padding: "6px 14px" }}
+                <button className="btn bp" style={{ fontSize: 11, padding: "7px 16px" }}
                   onClick={() => {
                     const completed = candidates.filter(c => c.status === 'completed' && c.overall_score);
-                    if (completed.length === 0) { showToast('No completed assessments to report yet.', 'warning'); return; }
+                    if (!completed.length) { showToast('No completed assessments yet.', 'warning'); return; }
                     const rows = completed
-                      .sort((a, b) => (b.overall_score || 0) - (a.overall_score || 0))
+                      .sort((a, b) => parseFloat(b.overall_score) - parseFloat(a.overall_score))
                       .map((c, i) => {
                         const score = parseFloat(c.overall_score || 0);
                         const badge = score >= 8 ? 'Platinum' : score >= 7 ? 'Gold' : score >= 6 ? 'Silver' : score >= 4 ? 'Bronze' : 'Not Ready';
-                        const role = ROLES.find(r => r.id === c.role_id)?.name || c.role_id;
-                        return `${i + 1},${c.candidate_name || c.candidate_email},${c.candidate_email},${role},${c.difficulty},${score}/10,${badge},${c.completed_at?.substring(0, 10) || ''}`;
+                        return `${i + 1},${c.candidate_name || ''},${c.candidate_email},${ROLES.find(r => r.id === c.role_id)?.name || c.role_id},${c.difficulty},${score.toFixed(1)}/10,${badge},${c.completed_at?.substring(0, 10) || ''}`;
                       });
-                    const csv = ['Rank,Name,Email,Role,Difficulty,Score,Badge,Completed Date', ...rows].join('\n');
-                    const a = document.createElement('a');
-                    a.href = 'data:text/csv,' + encodeURIComponent(csv);
-                    a.download = `hiring-report-${new Date().toISOString().substring(0, 10)}.csv`;
-                    a.click();
-                  }}>
-                  Download CSV
-                </button>
+                    const csv = ['Rank,Name,Email,Role,Difficulty,Score,Badge,Date', ...rows].join('\n');
+                    const a = document.createElement('a'); a.href = 'data:text/csv,' + encodeURIComponent(csv);
+                    a.download = `hiring-report-${new Date().toISOString().substring(0, 10)}.csv`; a.click();
+                    showToast('Hiring report downloaded!', 'success');
+                  }}>Download CSV</button>
               </div>
-              {candidates.filter(c => c.status === 'completed').length > 0 && (
+              {candidates.filter(c => c.status === 'completed' && c.overall_score).length > 0 && (
                 <div style={{ marginTop: 12 }}>
-                  <div style={{ fontSize: 10, color: "var(--tx3)", marginBottom: 6 }}>TOP CANDIDATES</div>
-                  {candidates
-                    .filter(c => c.status === 'completed' && c.overall_score)
-                    .sort((a, b) => (b.overall_score || 0) - (a.overall_score || 0))
-                    .slice(0, 3)
-                    .map((c, i) => {
+                  <div style={{ fontSize: 10, color: "var(--tx3)", marginBottom: 6 }}>TOP 3 CANDIDATES</div>
+                  {candidates.filter(c => c.status === 'completed' && c.overall_score)
+                    .sort((a, b) => parseFloat(b.overall_score) - parseFloat(a.overall_score))
+                    .slice(0, 3).map((c, i) => {
                       const score = parseFloat(c.overall_score || 0);
                       return (
                         <div key={c.id} style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0', borderBottom: i < 2 ? '1px solid var(--bd)' : 'none', fontSize: 11 }}>
-                          <span><span style={{ color: 'var(--ac)', fontWeight: 700, marginRight: 8 }}>#{i + 1}</span>{c.candidate_name || c.candidate_email}</span>
+                          <span><span style={{ color: 'var(--ac)', fontWeight: 700, marginRight: 8 }}>{i === 0 ? "🥇" : i === 1 ? "🥈" : "🥉"}</span>{c.candidate_name || c.candidate_email}</span>
                           <span className="mono" style={{ fontWeight: 700, color: score >= 7 ? 'var(--ok)' : score >= 5 ? 'var(--wn)' : 'var(--dn)' }}>{score.toFixed(1)}/10</span>
                         </div>
                       );
@@ -3628,91 +3891,149 @@ export default function ThreatReady() {
             </div>
 
             {/* Team Skills Report */}
-            <div className="card card-glow fadeUp" style={{ padding: 16, marginBottom: 10, animationDelay: "0.05s" }}>
+            <div className="card card-glow fadeUp" style={{ padding: 18, marginBottom: 12, animationDelay: "0.05s" }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                 <div>
                   <div style={{ fontSize: 13, fontWeight: 700 }}>🏢 Team Skills Report</div>
-                  <div style={{ fontSize: 10, color: "var(--tx3)", marginTop: 3 }}>Skill gap analysis across all candidates</div>
+                  <div style={{ fontSize: 10, color: "var(--tx3)", marginTop: 3 }}>Skill gap analysis by role across all candidates</div>
                 </div>
-                <button className="btn bp" style={{ fontSize: 10, padding: "6px 14px" }}
+                <button className="btn bp" style={{ fontSize: 11, padding: "7px 16px" }}
                   onClick={() => {
-                    if (candidates.length === 0) { showToast('No candidates data yet.', 'warning'); return; }
-                    const roleGroups = {};
-                    candidates.filter(c => c.status === 'completed' && c.overall_score).forEach(c => {
+                    const completed = candidates.filter(c => c.status === 'completed' && c.overall_score);
+                    if (!completed.length) { showToast('No completed assessments yet.', 'warning'); return; }
+                    const groups = {};
+                    completed.forEach(c => {
                       const role = ROLES.find(r => r.id === c.role_id)?.name || c.role_id || 'Unknown';
-                      if (!roleGroups[role]) roleGroups[role] = [];
-                      roleGroups[role].push(parseFloat(c.overall_score));
+                      if (!groups[role]) groups[role] = [];
+                      groups[role].push(parseFloat(c.overall_score));
                     });
-                    const rows = Object.entries(roleGroups).map(([role, scores]) => {
+                    const rows = Object.entries(groups).map(([role, scores]) => {
                       const avg = (scores.reduce((s, v) => s + v, 0) / scores.length).toFixed(1);
                       return `${role},${scores.length},${avg}/10,${Math.max(...scores).toFixed(1)}/10,${Math.min(...scores).toFixed(1)}/10`;
                     });
                     const csv = ['Role,Candidates,Avg Score,Best,Lowest', ...rows].join('\n');
-                    const a = document.createElement('a');
-                    a.href = 'data:text/csv,' + encodeURIComponent(csv);
-                    a.download = `team-skills-${new Date().toISOString().substring(0, 10)}.csv`;
-                    a.click();
-                  }}>
-                  Download CSV
-                </button>
+                    const a = document.createElement('a'); a.href = 'data:text/csv,' + encodeURIComponent(csv);
+                    a.download = `team-skills-${new Date().toISOString().substring(0, 10)}.csv`; a.click();
+                    showToast('Team skills report downloaded!', 'success');
+                  }}>Download CSV</button>
               </div>
             </div>
 
             {/* Benchmark Report */}
-            <div className="card card-glow fadeUp" style={{ padding: 16, animationDelay: "0.1s" }}>
+            <div className="card card-glow fadeUp" style={{ padding: 18, animationDelay: "0.1s" }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                 <div>
                   <div style={{ fontSize: 13, fontWeight: 700 }}>📈 Benchmark Report</div>
-                  <div style={{ fontSize: 10, color: "var(--tx3)", marginTop: 3 }}>Your candidates vs. industry average (7.2/10)</div>
+                  <div style={{ fontSize: 10, color: "var(--tx3)", marginTop: 3 }}>Your candidates vs industry average (7.2/10)</div>
                 </div>
-                <button className="btn bp" style={{ fontSize: 10, padding: "6px 14px" }}
+                <button className="btn bp" style={{ fontSize: 11, padding: "7px 16px" }}
                   onClick={() => {
                     const completed = candidates.filter(c => c.status === 'completed' && c.overall_score);
-                    if (completed.length === 0) { showToast('No completed assessments yet.', 'warning'); return; }
+                    if (!completed.length) { showToast('No completed assessments yet.', 'warning'); return; }
                     const INDUSTRY_AVG = 7.2;
                     const rows = completed.map(c => {
                       const score = parseFloat(c.overall_score || 0);
                       const diff = (score - INDUSTRY_AVG).toFixed(1);
-                      const role = ROLES.find(r => r.id === c.role_id)?.name || c.role_id;
-                      return `${c.candidate_name || c.candidate_email},${role},${score}/10,${INDUSTRY_AVG}/10,${score >= INDUSTRY_AVG ? '+' + diff : diff} vs avg`;
+                      return `${c.candidate_name || c.candidate_email},${ROLES.find(r => r.id === c.role_id)?.name || c.role_id},${score.toFixed(1)}/10,${INDUSTRY_AVG}/10,${score >= INDUSTRY_AVG ? '+' + diff : diff} vs avg`;
                     });
                     const csv = ['Candidate,Role,Score,Industry Avg,Benchmark', ...rows].join('\n');
-                    const a = document.createElement('a');
-                    a.href = 'data:text/csv,' + encodeURIComponent(csv);
-                    a.download = `benchmark-${new Date().toISOString().substring(0, 10)}.csv`;
-                    a.click();
-                  }}>
-                  Download CSV
-                </button>
+                    const a = document.createElement('a'); a.href = 'data:text/csv,' + encodeURIComponent(csv);
+                    a.download = `benchmark-${new Date().toISOString().substring(0, 10)}.csv`; a.click();
+                    showToast('Benchmark report downloaded!', 'success');
+                  }}>Download CSV</button>
               </div>
               {candidates.filter(c => c.status === 'completed' && c.overall_score).length > 0 && (() => {
                 const completed = candidates.filter(c => c.status === 'completed' && c.overall_score);
-                const avgScore = completed.reduce((s, c) => s + parseFloat(c.overall_score || 0), 0) / completed.length;
+                const avg = completed.reduce((s, c) => s + parseFloat(c.overall_score || 0), 0) / completed.length;
                 const INDUSTRY_AVG = 7.2;
-                const aboveAvg = completed.filter(c => parseFloat(c.overall_score) >= INDUSTRY_AVG).length;
                 return (
-                  <div style={{ marginTop: 12 }}>
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 8 }}>
-                      {[["Your Avg", avgScore.toFixed(1) + "/10", avgScore >= INDUSTRY_AVG ? "var(--ok)" : "var(--dn)"],
+                  <div style={{ marginTop: 12, display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 8 }}>
+                    {[["Your Avg", avg.toFixed(1) + "/10", avg >= INDUSTRY_AVG ? "var(--ok)" : "var(--dn)"],
                       ["Industry", "7.2/10", "var(--ac)"],
-                      ["Above Avg", aboveAvg + "/" + completed.length, "var(--wn)"]
-                      ].map(([l, v, c], i) => (
-                        <div key={i} className="statbox" style={{ padding: 10 }}>
-                          <div className="statval" style={{ color: c, fontSize: 14 }}>{v}</div>
-                          <div className="statlbl">{l}</div>
-                        </div>
-                      ))}
-                    </div>
+                      ["Above Avg", completed.filter(c => parseFloat(c.overall_score) >= INDUSTRY_AVG).length + "/" + completed.length, "var(--wn)"]
+                    ].map(([l, v, c], i) => (
+                      <div key={i} className="statbox" style={{ padding: 10 }}>
+                        <div className="statval" style={{ color: c, fontSize: 16 }}>{v}</div>
+                        <div className="statlbl">{l}</div>
+                      </div>
+                    ))}
                   </div>
                 );
               })()}
             </div>
           </>)}
 
-          {/* ── B4: PROFILE ── */}
-          {b2bTab === "profile" && (<>
-            <div className="lbl" style={{ marginBottom: 10 }}>COMPANY PROFILE</div>
-            <div className="card fadeUp" style={{ padding: 16, marginBottom: 16 }}>
+          {/* ══════════════════════════════════════════
+              TAB 6: LIBRARY
+          ══════════════════════════════════════════ */}
+          {b2bTab === "library" && (<>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+              <div className="lbl">SAVED ASSESSMENTS ({assessments.length})</div>
+              <button className="btn bp" style={{ fontSize: 11, padding: "6px 14px" }}
+                onClick={() => { setB2bTab("create"); localStorage.setItem('cyberprep_b2btab', 'create'); }}>
+                + New Assessment
+              </button>
+            </div>
+            {b2bLoading && <div style={{ textAlign: "center", padding: 20 }}><div className="loader" /></div>}
+            {assessments.length === 0 && !b2bLoading && (
+              <div className="card fadeUp" style={{ padding: 40, textAlign: "center" }}>
+                <div style={{ fontSize: 40, marginBottom: 12 }}>📚</div>
+                <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 6 }}>No saved assessments yet</div>
+                <div style={{ fontSize: 12, color: "var(--tx3)", marginBottom: 16 }}>Create an assessment and it will appear here.</div>
+                <button className="btn bp" style={{ fontSize: 12, padding: "10px 24px" }}
+                  onClick={() => { setB2bTab("create"); localStorage.setItem('cyberprep_b2btab', 'create'); }}>
+                  Create First Assessment →
+                </button>
+              </div>
+            )}
+            {assessments.map((a, i) => (
+              <div key={a.id} className="card card-glow fadeUp" style={{ padding: 16, marginBottom: 10, animationDelay: `${i * .04}s` }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                  <div>
+                    <div style={{ fontSize: 13, fontWeight: 700 }}>{a.name}</div>
+                    <div style={{ fontSize: 10, color: "var(--tx3)", marginTop: 4, display: "flex", gap: 8, flexWrap: "wrap" }}>
+                      <span>{ROLES.find(r => r.id === a.role_id)?.icon} {ROLES.find(r => r.id === a.role_id)?.name || a.role_id}</span>
+                      <span>·</span>
+                      <span>{a.difficulty}</span>
+                      <span>·</span>
+                      <span>{a.total_candidates || 0} candidates invited</span>
+                      <span>·</span>
+                      <span>Created {a.created_at?.substring(0, 10)}</span>
+                    </div>
+                  </div>
+                  <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
+                    <button className="btn bs" style={{ fontSize: 10, padding: "5px 10px" }}
+                      onClick={async () => {
+                        const token = localStorage.getItem('token');
+                        const res = await fetch(`https://threatready-db.onrender.com/api/b2b/assessments/${a.id}/duplicate`, {
+                          method: 'POST', headers: { 'Authorization': `Bearer ${token}` }
+                        });
+                        const data = await res.json();
+                        if (data.assessment) { loadB2bData(); showToast('Assessment duplicated!', 'success'); }
+                        else showToast('Duplicate failed', 'error');
+                      }}>Duplicate</button>
+                    <button className="btn bp" style={{ fontSize: 10, padding: "5px 10px" }}
+                      onClick={() => {
+                        setInviteRole(a.role_id);
+                        setInviteDiff(a.difficulty);
+                        setB2bTab("candidates");
+                        localStorage.setItem('cyberprep_b2btab', 'candidates');
+                        setTimeout(() => document.getElementById('invite-email-input')?.focus(), 300);
+                        showToast(`Role set to ${ROLES.find(r => r.id === a.role_id)?.name}. Enter candidate email to invite.`, 'info');
+                      }}>Invite →</button>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </>)}
+
+          {/* ══════════════════════════════════════════
+              TAB 7: SETTINGS
+          ══════════════════════════════════════════ */}
+          {b2bTab === "settings" && (<>
+            {/* Company Settings */}
+            <div className="card fadeUp" style={{ padding: 20, marginBottom: 14 }}>
+              <div className="lbl" style={{ marginBottom: 12 }}>COMPANY SETTINGS</div>
               {companySettingsMsg && (
                 <div style={{ padding: 9, borderRadius: 8, marginBottom: 10, fontSize: 11, background: companySettingsMsg.includes("✅") ? "rgba(0,224,150,.1)" : "rgba(255,82,82,.1)", color: companySettingsMsg.includes("✅") ? "var(--ok)" : "var(--dn)" }}>
                   {companySettingsMsg}
@@ -3737,344 +4058,29 @@ export default function ThreatReady() {
                       body: JSON.stringify({ company_name: companyName, team_size: teamSize })
                     });
                     const data = await res.json();
-                    if (data.success) { setCompanySettingsMsg('✅ Saved!'); setTimeout(() => setCompanySettingsMsg(''), 3000); }
+                    if (data.success) { setCompanySettingsMsg('✅ Company settings saved!'); setTimeout(() => setCompanySettingsMsg(''), 3000); }
                     else setCompanySettingsMsg('❌ ' + (data.error || 'Failed'));
                   } catch (e) { setCompanySettingsMsg('❌ ' + e.message); }
                 }}>
-                Save Profile
+                Save Changes
               </button>
             </div>
 
-            <div className="lbl" style={{ marginBottom: 10 }}>SAVED ASSESSMENTS</div>
-            {assessments.length === 0 && !b2bLoading && (
-              <div style={{ padding: 16, textAlign: "center", color: "var(--tx3)", fontSize: 12 }}>
-                No assessments yet. Create one from the Interview tab.
-              </div>
-            )}
-            {assessments.map((a, i) => (
-              <div key={a.id} className="card card-glow fadeUp" style={{ padding: 14, marginBottom: 10, animationDelay: `${i * .04}s` }}>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                  <div>
-                    <div style={{ fontSize: 13, fontWeight: 700 }}>{a.name}</div>
-                    <div style={{ fontSize: 10, color: "var(--tx3)", marginTop: 3 }}>
-                      {a.role_id} · {a.difficulty} · {a.total_candidates || 0} candidates · {a.created_at?.substring(0, 10)}
-                    </div>
-                  </div>
-                  <div style={{ display: "flex", gap: 6 }}>
-                    <button className="btn bs" style={{ fontSize: 9, padding: "4px 8px" }}
-                      onClick={async () => {
-                        const token = localStorage.getItem('token');
-                        const res = await fetch(`https://threatready-db.onrender.com/api/b2b/assessments/${a.id}/duplicate`, {
-                          method: 'POST', headers: { 'Authorization': `Bearer ${token}` }
-                        });
-                        const data = await res.json();
-                        if (data.assessment) loadB2bData();
-                      }}>Duplicate</button>
-                    <button className="btn bp" style={{ fontSize: 9, padding: "4px 8px" }}
-                      onClick={() => { setInviteRole(a.role_id); setInviteDiff(a.difficulty); setB2bTab('interview'); localStorage.setItem('cyberprep_b2btab', 'interview'); }}>
-                      Invite →
-                    </button>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </>)}
-
-          {/* ── B5: INTERVIEW (Create Assessment + Invite Candidates) ── */}
-          {b2bTab === "interview" && (<>
-            {/* Subscription gate */}
-            
-
-            {/* Create Assessment form */}
-            <div className="card fadeUp" style={{ padding: 20, marginBottom: 14, borderColor: jdAnalysis ? "var(--ok)" : "var(--bd)" }}>
-              <div className="lbl" style={{ marginBottom: 8 }}>CREATE ASSESSMENT</div>
-
-              {/* JD Upload */}
-              <div style={{ marginBottom: 14 }}>
-                <div style={{ fontSize: 11, color: "var(--tx2)", marginBottom: 8 }}>
-                  Paste a job description — AI will auto-suggest the role and difficulty.
-                </div>
-                <input type="file" id="jd-file-input" accept=".pdf,.txt,.doc,.docx"
-                  style={{ display: "none" }}
-                  onChange={async (e) => {
-                    const file = e.target.files[0];
-                    if (!file) return;
-                    setJdAnalysis(null);
-                    if (file.type === 'text/plain' || file.name.endsWith('.txt')) {
-                      const reader = new FileReader();
-                      reader.onload = ev => { setNewAssessJD(ev.target.result); showToast('File loaded!', 'success'); };
-                      reader.readAsText(file);
-                    } else if (file.name.endsWith('.pdf')) {
-                      showToast('Reading PDF...', 'info');
-                      const reader = new FileReader();
-                      reader.onload = async (ev) => {
-                        try {
-                          const pdfjsLib = window['pdfjs-dist/build/pdf'];
-                          if (pdfjsLib) {
-                            pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
-                            const pdf = await pdfjsLib.getDocument({ data: ev.target.result }).promise;
-                            let text = '';
-                            for (let i = 1; i <= pdf.numPages; i++) {
-                              const page = await pdf.getPage(i);
-                              const ct = await page.getTextContent();
-                              text += ct.items.map(x => x.str).join(' ') + '\n';
-                            }
-                            setNewAssessJD(text.trim());
-                            showToast('PDF loaded!', 'success');
-                          }
-                        } catch (err) { showToast('Could not read PDF. Paste text instead.', 'error'); }
-                      };
-                      reader.readAsArrayBuffer(file);
-                    }
-                    e.target.value = '';
-                  }}
-                />
-                <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
-                  <button className="btn bs" style={{ fontSize: 11, padding: "6px 14px" }} onClick={() => document.getElementById('jd-file-input').click()}>📎 Upload JD</button>
-                  <span style={{ fontSize: 10, color: "var(--tx3)" }}>PDF · TXT · DOC</span>
-                  {newAssessJD && <button className="btn bs" style={{ marginLeft: "auto", fontSize: 10, padding: "4px 8px", color: "var(--dn)", borderColor: "var(--dn)" }} onClick={() => { setNewAssessJD(''); setJdAnalysis(null); }}>✕ Clear</button>}
-                </div>
-                <textarea className="input" placeholder="Or paste job description text here..." value={newAssessJD}
-                  onChange={e => { setNewAssessJD(e.target.value); setJdAnalysis(null); }}
-                  style={{ minHeight: 80, marginBottom: 10, fontSize: 12 }} />
-                <button className="btn bp" style={{ fontSize: 11, padding: "8px 20px" }}
-                  disabled={!newAssessJD.trim() || jdAnalyzing}
-                  onClick={async () => {
-                    setJdAnalyzing(true); setJdAnalysis(null);
-                    try {
-                      const token = localStorage.getItem('token');
-                      const res = await fetch('https://threatready-db.onrender.com/api/b2b/analyze-jd', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-                        body: JSON.stringify({ jd_text: newAssessJD })
-                      });
-                      const data = await res.json();
-                      if (data.analysis) {
-                        setJdAnalysis(data.analysis);
-                        if (data.analysis.recommended_role) setNewAssessRole(data.analysis.recommended_role);
-                        if (data.analysis.recommended_difficulty) setNewAssessDiff(data.analysis.recommended_difficulty);
-                        if (data.analysis.suggested_name) setNewAssessName(data.analysis.suggested_name);
-                      }
-                    } catch (e) { console.log('JD analyze error:', e.message); }
-                    setJdAnalyzing(false);
-                  }}>
-                  {jdAnalyzing ? <><span className="loader" style={{ width: 12, height: 12 }} /> Analyzing...</> : "🤖 Analyze JD →"}
-                </button>
-                {jdAnalysis && (
-                  <div style={{ marginTop: 10, padding: 12, background: "rgba(0,224,150,.07)", borderRadius: 10, border: "1px solid rgba(0,224,150,.2)", fontSize: 11 }}>
-                    <div style={{ color: "var(--ok)", fontWeight: 700, marginBottom: 6 }}>✅ AI Analysis Complete</div>
-                    {jdAnalysis.summary && <div style={{ color: "var(--tx2)", marginBottom: 4 }}>{jdAnalysis.summary}</div>}
-                    {jdAnalysis.key_skills?.length > 0 && (
-                      <div style={{ display: "flex", flexWrap: "wrap", gap: 4, marginTop: 6 }}>
-                        {jdAnalysis.key_skills.map((s, i) => <span key={i} className="tag" style={{ fontSize: 9 }}>{s}</span>)}
-                      </div>
-                    )}
-                  </div>
-                )}
-              </div>
-
-              {/* Assessment Config */}
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 12 }}>
-                <div>
-                  <div style={{ fontSize: 10, color: "var(--tx3)", marginBottom: 4 }}>ASSESSMENT NAME</div>
-                  <input className="input" placeholder="e.g. Senior Cloud Engineer Q2" value={newAssessName} onChange={e => setNewAssessName(e.target.value)} style={{ fontSize: 12 }} />
-                </div>
-                <div>
-                  <div style={{ fontSize: 10, color: "var(--tx3)", marginBottom: 4 }}>ROLE</div>
-                  <select className="input" value={newAssessRole} onChange={e => setNewAssessRole(e.target.value)} style={{ fontSize: 12 }}>
-                    {ROLES.map(r => <option key={r.id} value={r.id}>{r.icon} {r.name}</option>)}
-                  </select>
-                </div>
-              </div>
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 14 }}>
-                <div>
-                  <div style={{ fontSize: 10, color: "var(--tx3)", marginBottom: 4 }}>DIFFICULTY</div>
-                  <select className="input" value={newAssessDiff} onChange={e => setNewAssessDiff(e.target.value)} style={{ fontSize: 12 }}>
-                    {DIFFICULTIES.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
-                  </select>
-                </div>
-                <div>
-                  <div style={{ fontSize: 10, color: "var(--tx3)", marginBottom: 4 }}>TYPE</div>
-                  <select className="input" value={newAssessType} onChange={e => setNewAssessType(e.target.value)} style={{ fontSize: 12 }}>
-                    <option value="standard">Standard</option>
-                    <option value="timed">Timed Challenge</option>
-                    <option value="take_home">Take Home</option>
-                  </select>
-                </div>
-              </div>
-
-              {assessMsg && (
-                <div style={{ padding: 9, borderRadius: 8, marginBottom: 10, fontSize: 11, background: assessMsg.includes("✅") ? "rgba(0,224,150,.1)" : "rgba(255,82,82,.1)", color: assessMsg.includes("✅") ? "var(--ok)" : "var(--dn)" }}>{assessMsg}</div>
-              )}
-              <button className="btn bp" style={{ width: "100%", padding: 12, fontSize: 13 }}
-                disabled={!newAssessName.trim()}
-                onClick={async () => {
-                  setAssessMsg('Creating assessment...');
-                  try {
-                    const token = localStorage.getItem('token');
-                    const res = await fetch('https://threatready-db.onrender.com/api/b2b/assessments', {
-                      method: 'POST',
-                      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-                      body: JSON.stringify({ name: newAssessName, role_id: newAssessRole, difficulty: newAssessDiff, type: newAssessType, jd_context: newAssessJD })
-                    });
-                    const data = await res.json();
-                    if (data.assessment) {
-                      setAssessMsg('✅ Assessment created! Now invite candidates below.');
-                      setNewAssessName(''); setNewAssessJD(''); setJdAnalysis(null);
-                      loadB2bData();
-                      setTimeout(() => setAssessMsg(''), 3000);
-                    } else {
-                      setAssessMsg('❌ ' + (data.error || 'Failed to create assessment'));
-                    }
-                  } catch (e) { setAssessMsg('❌ ' + e.message); }
-                }}>
-                Create Assessment →
-              </button>
-            </div>
-
-          </>)}
-
-          {/* ── B6: LIBRARY (Saved Assessments + Invite Candidate) ── */}
-          {b2bTab === "billing" && (<>
-            
-            {/* Invite Candidate */}
-            <div className="card fadeUp" style={{ padding: 20, marginBottom: 14 }}>
-              <div className="lbl" style={{ marginBottom: 12 }}>INVITE CANDIDATE</div>
-              <input id="invite-email-input" className="input" type="email" placeholder="Candidate email address"
-                value={inviteEmail} onChange={e => setInviteEmail(e.target.value)} style={{ marginBottom: 10 }} />
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 12 }}>
-                <select className="input" value={inviteRole} onChange={e => setInviteRole(e.target.value)}>
-                  {ROLES.map(r => <option key={r.id} value={r.id}>{r.icon} {r.name}</option>)}
-                </select>
-                <select className="input" value={inviteDiff} onChange={e => setInviteDiff(e.target.value)}>
-                  {DIFFICULTIES.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
-                </select>
-              </div>
-              {inviteMsg && (
-                <div style={{ padding: 8, borderRadius: 8, marginBottom: 10, fontSize: 11, background: inviteMsg.includes("✅") ? "rgba(0,224,150,.1)" : "rgba(255,82,82,.1)", color: inviteMsg.includes("✅") ? "var(--ok)" : "var(--dn)" }}>{inviteMsg}</div>
-              )}
-              <button className="btn bp" style={{ width: "100%", padding: 10 }}
-                disabled={!inviteEmail.trim()}
-                onClick={async () => {
-                  if (!inviteEmail.trim()) return;
-                  setInviteMsg('Sending...');
-                  try {
-                    const token = localStorage.getItem('token');
-                    const res = await fetch('https://threatready-db.onrender.com/api/b2b/invite', {
-                      method: 'POST',
-                      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-                      body: JSON.stringify({ candidate_email: inviteEmail, role_id: inviteRole, difficulty: inviteDiff })
-                    });
-                    const data = await res.json();
-                    if (data.candidate) {
-                      setInviteMsg('✅ Invite sent to ' + inviteEmail);
-                      setInviteEmail('');
-                      loadB2bData();
-                      setTimeout(() => setInviteMsg(''), 3000);
-                    } else {
-                      setInviteMsg('❌ ' + (data.error || 'Failed'));
-                    }
-                  } catch (e) { setInviteMsg('❌ ' + e.message); }
-                }}>
-                📧 Send Invite Email
-              </button>
-            </div>
-
-            {/* Candidates Table */}
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
-              <div className="lbl">ALL CANDIDATES ({candidates.length})</div>
-              <button className="btn bs" style={{ fontSize: 10, padding: "4px 10px" }}
-                onClick={() => {
-                  const csv = ['Name,Email,Role,Difficulty,Score,Status,Invited']
-                    .concat(candidates.map(c => `${c.candidate_name || ''},${c.candidate_email || ''},${c.role_id || ''},${c.difficulty || ''},${c.overall_score || ''},${c.status || ''},${c.invited_at?.substring(0, 10) || ''}`))
-                    .join('\n');
-                  const a = document.createElement('a');
-                  a.href = 'data:text/csv,' + encodeURIComponent(csv);
-                  a.download = 'candidates.csv'; a.click();
-                }}>📥 Export CSV</button>
-            </div>
-            {b2bLoading && <div style={{ textAlign: "center", padding: 20 }}><div className="loader" /></div>}
-            <div className="card fadeUp" style={{ padding: 0, overflow: "hidden" }}>
-              <div style={{ display: "grid", gridTemplateColumns: "2fr 2fr 1fr 1fr 1fr", padding: "10px 14px", background: "var(--s2)", fontSize: 9, fontWeight: 700, color: "var(--ac)", letterSpacing: 1, textTransform: "uppercase" }}>
-                <span>Name</span><span>Email</span><span>Role</span><span>Score</span><span>Status</span>
-              </div>
-              {candidates.length === 0 && !b2bLoading && (
-                <div style={{ padding: 20, textAlign: "center", color: "var(--tx3)", fontSize: 12 }}>No candidates yet. Use the invite form above.</div>
-              )}
-              {candidates.map((c, i) => (
-                <div key={c.id} style={{ display: "grid", gridTemplateColumns: "2fr 2fr 1fr 1fr 1fr", padding: "10px 14px", borderTop: "1px solid var(--bd)", fontSize: 11, alignItems: "center" }}>
-                  <span style={{ fontWeight: 600 }}>{c.candidate_name || c.name || '—'}</span>
-                  <span style={{ color: "var(--tx3)", fontSize: 10 }}>{c.candidate_email || c.email}</span>
-                  <span>{c.role_id ? (ROLES.find(r => r.id === c.role_id)?.icon || c.role_id) : "—"}</span>
-                  <span className="mono" style={{ fontWeight: 700, color: c.overall_score ? (c.overall_score >= 7 ? "var(--ok)" : c.overall_score >= 5 ? "var(--wn)" : "var(--dn)") : "var(--tx3)" }}>
-                    {c.overall_score ? `${c.overall_score}/10` : "—"}
-                  </span>
-                  <span style={{ fontSize: 9, fontWeight: 600, color: c.status === "completed" ? "var(--ok)" : c.status === "in_progress" ? "var(--wn)" : "var(--tx3)" }}>
-                    {c.status === "completed" ? "✓ Done" : c.status === "in_progress" ? "● Active" : "○ Pending"}
-                  </span>
-                </div>
-              ))}
-            </div>
-
-            {/* Saved Assessments */}
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 24, marginBottom: 10 }}>
-              <div className="lbl">SAVED ASSESSMENTS ({assessments.length})</div>
-              <button className="btn bp" style={{ fontSize: 11, padding: "6px 14px" }}
-                onClick={() => { setB2bTab("interview"); localStorage.setItem('cyberprep_b2btab', 'interview'); }}>
-                + New Assessment
-              </button>
-            </div>
-            {assessments.length === 0 && !b2bLoading && (
-              <div style={{ padding: 16, textAlign: "center", color: "var(--tx3)", fontSize: 12 }}>
-                No assessments yet. Create one from the Create Assessment tab.
-              </div>
-            )}
-            {assessments.map((a, i) => (
-              <div key={a.id} className="card card-glow fadeUp" style={{ padding: 14, marginBottom: 10, animationDelay: `${i * .04}s` }}>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                  <div>
-                    <div style={{ fontSize: 13, fontWeight: 700 }}>{a.name}</div>
-                    <div style={{ fontSize: 10, color: "var(--tx3)", marginTop: 3 }}>
-                      {ROLES.find(r => r.id === a.role_id)?.name || a.role_id} · {a.difficulty} · {a.total_candidates || 0} candidates · {a.created_at?.substring(0, 10)}
-                    </div>
-                  </div>
-                  <div style={{ display: "flex", gap: 6 }}>
-                    <button className="btn bs" style={{ fontSize: 9, padding: "4px 8px" }}
-                      onClick={async () => {
-                        const token = localStorage.getItem('token');
-                        const res = await fetch(`https://threatready-db.onrender.com/api/b2b/assessments/${a.id}/duplicate`, {
-                          method: 'POST', headers: { 'Authorization': `Bearer ${token}` }
-                        });
-                        const data = await res.json();
-                        if (data.assessment) { loadB2bData(); showToast('Assessment duplicated!', 'success'); }
-                      }}>Duplicate</button>
-                    <button className="btn bp" style={{ fontSize: 9, padding: "4px 8px" }}
-                      onClick={() => { setInviteRole(a.role_id); setInviteDiff(a.difficulty); }}>
-                      Use for Invite ↑
-                    </button>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </>)}
-
-          {/* ── B7: SETTINGS ── */}
-          {b2bTab === "settings" && (<>
             {/* Integrations */}
-            <div className="card fadeUp" style={{ padding: 18, marginBottom: 14 }}>
+            <div className="card fadeUp" style={{ padding: 20, marginBottom: 14 }}>
               <div className="lbl" style={{ marginBottom: 12 }}>INTEGRATIONS</div>
               {integrationMsg && (
                 <div style={{ padding: 9, borderRadius: 8, marginBottom: 10, fontSize: 11, background: integrationMsg.includes("✅") ? "rgba(0,224,150,.1)" : "rgba(255,82,82,.1)", color: integrationMsg.includes("✅") ? "var(--ok)" : "var(--dn)" }}>
                   {integrationMsg}
                 </div>
               )}
-              <div style={{ paddingBottom: 14, marginBottom: 14, borderBottom: "1px solid var(--bd)" }}>
+              <div style={{ paddingBottom: 16, marginBottom: 16, borderBottom: "1px solid var(--bd)" }}>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
                   <div>
                     <div style={{ fontSize: 12, fontWeight: 700 }}>💬 Slack Notifications</div>
                     <div style={{ fontSize: 10, color: "var(--tx3)", marginTop: 2 }}>Get notified when candidates complete assessments</div>
                   </div>
-                  <span style={{ fontSize: 10, color: slackWebhook ? "var(--ok)" : "var(--tx3)", fontWeight: 600 }}>{slackWebhook ? "✅ Connected" : "Not connected"}</span>
+                  <span style={{ fontSize: 10, fontWeight: 600, color: slackWebhook ? "var(--ok)" : "var(--tx3)" }}>{slackWebhook ? "✅ Connected" : "Not connected"}</span>
                 </div>
                 <input className="input" placeholder="Slack Webhook URL (https://hooks.slack.com/...)" value={slackWebhook} onChange={e => setSlackWebhook(e.target.value)} style={{ marginBottom: 8, fontSize: 11 }} />
                 <button className="btn bs" style={{ fontSize: 11, padding: "6px 16px" }}
@@ -4089,13 +4095,13 @@ export default function ThreatReady() {
                     } catch (e) { setIntegrationMsg('❌ ' + e.message); }
                   }}>Save Webhook</button>
               </div>
-              <div style={{ paddingBottom: 14, marginBottom: 14, borderBottom: "1px solid var(--bd)" }}>
+              <div style={{ paddingBottom: 16, marginBottom: 16, borderBottom: "1px solid var(--bd)" }}>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
                   <div>
                     <div style={{ fontSize: 12, fontWeight: 700 }}>⚡ ATS Integration (Zapier)</div>
                     <div style={{ fontSize: 10, color: "var(--tx3)", marginTop: 2 }}>Push candidate results to your ATS automatically</div>
                   </div>
-                  <span style={{ fontSize: 10, color: zapierWebhook ? "var(--ok)" : "var(--tx3)", fontWeight: 600 }}>{zapierWebhook ? "✅ Connected" : "Not connected"}</span>
+                  <span style={{ fontSize: 10, fontWeight: 600, color: zapierWebhook ? "var(--ok)" : "var(--tx3)" }}>{zapierWebhook ? "✅ Connected" : "Not connected"}</span>
                 </div>
                 <input className="input" placeholder="Zapier Webhook URL (https://hooks.zapier.com/...)" value={zapierWebhook} onChange={e => setZapierWebhook(e.target.value)} style={{ marginBottom: 8, fontSize: 11 }} />
                 <button className="btn bs" style={{ fontSize: 11, padding: "6px 16px" }}
@@ -4115,12 +4121,12 @@ export default function ThreatReady() {
                   <div style={{ fontSize: 12, fontWeight: 700 }}>🔐 Google Workspace SSO</div>
                   <div style={{ fontSize: 10, color: "var(--tx3)", marginTop: 2 }}>Let your team sign in with Google Workspace</div>
                 </div>
-                <span style={{ fontSize: 10, color: "var(--ok)", fontWeight: 600 }}>✅ Available via Google Login</span>
+                <span style={{ fontSize: 10, fontWeight: 600, color: "var(--ok)" }}>✅ Available via Google Login</span>
               </div>
             </div>
 
             {/* Team Permissions */}
-            <div className="card fadeUp" style={{ padding: 18 }}>
+            <div className="card fadeUp" style={{ padding: 20 }}>
               <div className="lbl" style={{ marginBottom: 12 }}>TEAM PERMISSIONS</div>
               {[
                 ["👑 Admin", "Full access — manage everything", "#f59e0b"],
@@ -4133,59 +4139,18 @@ export default function ThreatReady() {
                     <div style={{ fontSize: 12, fontWeight: 700, color }}>{role}</div>
                     <div style={{ fontSize: 10, color: "var(--tx3)", marginTop: 2 }}>{desc}</div>
                   </div>
-                  <span style={{ fontSize: 9, color: "var(--tx3)", background: "var(--s2)", padding: "3px 10px", borderRadius: 20 }}>{i === 0 ? "You" : "Invite via email"}</span>
+                  <span style={{ fontSize: 9, color: "var(--tx3)", background: "var(--s2)", padding: "3px 10px", borderRadius: 20 }}>
+                    {i === 0 ? "You" : "Invite via email"}
+                  </span>
                 </div>
               ))}
               <div style={{ marginTop: 14, padding: 12, background: "rgba(0,229,255,.05)", borderRadius: 10, border: "1px solid rgba(0,229,255,.15)", fontSize: 11, color: "var(--tx2)" }}>
-                💡 Invite team members as candidates with their work email — they'll appear after completing their assessment.
+                💡 To add team members, invite them as candidates with their work email — they'll appear in your dashboard after completing their assessment.
               </div>
             </div>
+
             <div style={{ marginTop: 16 }}>
               <button className="btn bs" style={{ fontSize: 11 }} onClick={() => { setUserType("b2c"); setView("dashboard"); }}>👤 Switch to Candidate Dashboard</button>
-            </div>
-          </>)}
-
-          {/* ── B8: HELP ── */}
-          {b2bTab === "help" && (<>
-            <div className="lbl" style={{ marginBottom: 12 }}>FREQUENTLY ASKED QUESTIONS</div>
-            {[
-              ["How are candidates assessed?", "Each candidate gets 5 adaptive AI questions for their role and difficulty. Scores are based on technical depth, communication quality, and decision-making."],
-              ["Can I customise assessments?", "Yes — upload a job description and AI will tailor the scenario context. You can also set role, difficulty, and assessment type."],
-              ["Are scores objective?", "AI evaluation is calibrated against industry benchmarks. Scores above 7/10 typically indicate strong candidates. All scores include a transparent breakdown."],
-              ["How do I share results with my team?", "Download CSV reports from the Badges tab, or connect Slack/Zapier in Settings to push results automatically."],
-              ["Can candidates retake assessments?", "By default, each invite is single-use. You can send new invites with different roles or difficulties for re-assessment."]
-            ].map(([q, a], i) => (
-              <div key={i} className="card fadeUp" style={{ padding: 14, marginBottom: 8, animationDelay: `${i * .05}s` }}>
-                <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 4 }}>{q}</div>
-                <div style={{ fontSize: 11, color: "var(--tx2)", lineHeight: 1.6 }}>{a}</div>
-              </div>
-            ))}
-            <div className="card fadeUp" style={{ padding: 16, marginTop: 8 }}>
-              <div className="lbl" style={{ marginBottom: 8 }}>CONTACT SUPPORT</div>
-              {feedbackSent ? (
-                <div style={{ color: "var(--ok)", fontSize: 13, padding: "10px 0" }}>✅ Message sent! We'll respond within 24 hours.</div>
-              ) : (
-                <>
-                  <textarea className="input" placeholder="Describe your issue or question..." style={{ minHeight: 60, marginBottom: 10 }}
-                    value={feedbackText} onChange={e => setFeedbackText(e.target.value)} />
-                  <button className="btn bp" style={{ fontSize: 11 }} disabled={!feedbackText.trim()}
-                    onClick={async () => {
-                      try {
-                        const token = localStorage.getItem('token');
-                        await fetch('https://threatready-db.onrender.com/api/feedback', {
-                          method: 'POST',
-                          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-                          body: JSON.stringify({ message: feedbackText })
-                        });
-                        setFeedbackSent(true);
-                        setFeedbackText("");
-                        setTimeout(() => setFeedbackSent(false), 4000);
-                      } catch (e) { showToast('Failed to submit. Please try again.', 'error'); }
-                    }}>
-                    Submit Message
-                  </button>
-                </>
-              )}
             </div>
           </>)}
 
@@ -4193,8 +4158,6 @@ export default function ThreatReady() {
       </div>
     );
   }
-
-
   // ═══ LOADING FALLBACK ═══
   return (
     <div className="app"><style>{CSS}</style><div className="scanbar" /><div className="gridbg" />
