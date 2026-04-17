@@ -559,10 +559,10 @@ export default function ThreatReady() {
 
   const [view, setViewState] = useState(() => {
     // ── CANDIDATE ASSESSMENT LINK — check FIRST before any other routing ──
+    // assess_token is unique — never conflicts with OAuth (which uses token+name+email)
     const params = new URLSearchParams(window.location.search);
-    const assessToken = params.get("token");
-    const isOAuth = params.get("code") || params.get("error") || params.get("name");
-    if (assessToken && !isOAuth) return 'candidate-assess';
+    const assessToken = params.get("assess_token");
+    if (assessToken) return 'candidate-assess';
 
     const token = localStorage.getItem('token');
     const savedUser = localStorage.getItem('cyberprep_user');
@@ -679,7 +679,7 @@ export default function ThreatReady() {
 
   // ── DASHBOARD TABS ──
   const [dashTab, setDashTab] = useState(() => localStorage.getItem('cyberprep_tab') || "home");
-  const [b2bTab, setB2bTab] = useState(() => localStorage.getItem('cyberprep_b2btab') || "overview");
+  const [b2bTab, setB2bTab] = useState(() => localStorage.getItem('cyberprep_b2btab') || "home");
   const [settingsName, setSettingsName] = useState("");
   const [profilePublic, setProfilePublic] = useState(true);
   const [inLeaderboard, setInLeaderboard] = useState(true);
@@ -700,7 +700,7 @@ export default function ThreatReady() {
   const [newAssessType, setNewAssessType] = useState('standard');
   const [assessMsg, setAssessMsg] = useState('');
   // ── CANDIDATE ASSESSMENT STATE ──
-  const [candidateToken] = useState(() => new URLSearchParams(window.location.search).get("token") || "");
+  const [candidateToken] = useState(() => new URLSearchParams(window.location.search).get("assess_token") || "");
   const [candidateAssessState, setCandidateAssessState] = useState('loading');
   const [candidateAssessData, setCandidateAssessData] = useState(null);
   const [candidateAssessError, setCandidateAssessError] = useState('');
@@ -3452,13 +3452,15 @@ export default function ThreatReady() {
   // ═══════════════════════════════════════════════════════════
   if (view === "b2b-dashboard") {
     const b2bTabs = [
-      { id: "overview",   label: "📊 Overview" },
-      { id: "create",     label: "📝 Create Assessment" },
-      { id: "candidates", label: "👥 Candidates" },
-      { id: "teamskills", label: "🏢 Team Skills" },
-      { id: "reports",    label: "📄 Reports" },
-      { id: "library",    label: "📚 Library" },
-      { id: "settings",   label: "⚙️ Settings" }
+      { id: "home", label: "🏠 Overview" },
+      { id: "interview", label: "📝 Create Assessment" },
+      { id: "scores", label: "👥 Candidates" },
+      { id: "badges", label: "📋 Reports" },
+
+      { id: "profile", label: "📊 Team Skills" },
+
+      { id: "billing", label: "📚 Library" },
+      { id: "settings", label: "⚙️ Settings" }
     ];
 
     return (
@@ -3493,7 +3495,7 @@ export default function ThreatReady() {
           </div>
 
           {/* ── B1: HOME ── */}
-          {b2bTab === "overview" && (<>
+          {b2bTab === "home" && (<>
             {/* Stats */}
             <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 10, marginBottom: 20 }}>
               {[
@@ -3512,13 +3514,13 @@ export default function ThreatReady() {
             </div>
 
             <div style={{ display: "grid", gridTemplateColumns: "repeat(2,1fr)", gap: 10, marginTop: 16 }}>
-              <button className="btn bp" onClick={() => { setB2bTab("interview"); localStorage.setItem('cyberprep_b2btab', 'create'); }}>+ Create Assessment</button>
-              <button className="btn bs" onClick={() => { setB2bTab("scores"); localStorage.setItem('cyberprep_b2btab', 'candidates'); }}>View All Scores →</button>
+              <button className="btn bp" onClick={() => { setB2bTab("interview"); localStorage.setItem('cyberprep_b2btab', 'interview'); }}>+ Create Assessment</button>
+              <button className="btn bs" onClick={() => { setB2bTab("scores"); localStorage.setItem('cyberprep_b2btab', 'scores'); }}>View All Scores →</button>
             </div>
           </>)}
 
           {/* ── B2: SCORES (Candidate skill scores — empty state guard) ── */}
-          {b2bTab === "candidates" && (<>
+          {b2bTab === "scores" && (<>
             {candidates.filter(c => c.status === "completed" && c.overall_score).length === 0 ? (
               <div className="card fadeUp" style={{ padding: 48, textAlign: "center" }}>
                 <div style={{ fontSize: 56, marginBottom: 16 }}>📊</div>
@@ -3526,7 +3528,7 @@ export default function ThreatReady() {
                 <p style={{ fontSize: 12, color: "var(--tx2)", marginBottom: 20, lineHeight: 1.7 }}>
                   Invite candidates and have them complete assessments to see their scores and skill benchmarks here.
                 </p>
-                <button className="btn bp" style={{ padding: "10px 28px" }} onClick={() => { setB2bTab("interview"); localStorage.setItem('cyberprep_b2btab', 'create'); }}>
+                <button className="btn bp" style={{ padding: "10px 28px" }} onClick={() => { setB2bTab("interview"); localStorage.setItem('cyberprep_b2btab', 'interview'); }}>
                   Invite Candidates →
                 </button>
               </div>
@@ -3593,7 +3595,7 @@ export default function ThreatReady() {
             {candidates.length === 0 && !b2bLoading && (
               <div className="card fadeUp" style={{ padding: 24, textAlign: "center" }}>
                 <div style={{ fontSize: 11, color: "var(--tx3)", marginBottom: 10 }}>No candidates yet</div>
-                <button className="btn bp" style={{ fontSize: 11 }} onClick={() => { setB2bTab("interview"); localStorage.setItem('cyberprep_b2btab', 'create'); }}>
+                <button className="btn bp" style={{ fontSize: 11 }} onClick={() => { setB2bTab("interview"); localStorage.setItem('cyberprep_b2btab', 'interview'); }}>
                   Invite Candidates →
                 </button>
               </div>
@@ -3615,7 +3617,7 @@ export default function ThreatReady() {
             ))}
             
           {/* ── B3: BADGES (Reports) ── */}
-          {b2bTab === "reports" && (<>
+          {b2bTab === "badges" && (<>
             <div className="lbl" style={{ marginBottom: 12 }}>ASSESSMENT REPORTS</div>
 
             {/* Hiring Report */}
@@ -3749,7 +3751,7 @@ export default function ThreatReady() {
           </>)}
 
           {/* ── B4: PROFILE ── */}
-          {b2bTab === "teamskills" && (<>
+          {b2bTab === "profile" && (<>
             <div className="lbl" style={{ marginBottom: 10 }}>COMPANY PROFILE</div>
             <div className="card fadeUp" style={{ padding: 16, marginBottom: 16 }}>
               {companySettingsMsg && (
@@ -3810,7 +3812,7 @@ export default function ThreatReady() {
                         if (data.assessment) loadB2bData();
                       }}>Duplicate</button>
                     <button className="btn bp" style={{ fontSize: 9, padding: "4px 8px" }}
-                      onClick={() => { setInviteRole(a.role_id); setInviteDiff(a.difficulty); setB2bTab('create'); localStorage.setItem('cyberprep_b2btab', 'create'); }}>
+                      onClick={() => { setInviteRole(a.role_id); setInviteDiff(a.difficulty); setB2bTab('interview'); localStorage.setItem('cyberprep_b2btab', 'interview'); }}>
                       Invite →
                     </button>
                   </div>
@@ -3820,7 +3822,7 @@ export default function ThreatReady() {
           </>)}
 
           {/* ── B5: INTERVIEW (Create Assessment + Invite Candidates) ── */}
-          {b2bTab === "create" && (<>
+          {b2bTab === "interview" && (<>
             {/* Subscription gate */}
             
 
@@ -3974,7 +3976,7 @@ export default function ThreatReady() {
           </>)}
 
           {/* ── B6: LIBRARY (Saved Assessments + Invite Candidate) ── */}
-          {b2bTab === "library" && (<>
+          {b2bTab === "billing" && (<>
             
             {/* Invite Candidate */}
             <div className="card fadeUp" style={{ padding: 20, marginBottom: 14 }}>
@@ -4059,7 +4061,7 @@ export default function ThreatReady() {
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 24, marginBottom: 10 }}>
               <div className="lbl">SAVED ASSESSMENTS ({assessments.length})</div>
               <button className="btn bp" style={{ fontSize: 11, padding: "6px 14px" }}
-                onClick={() => { setB2bTab("interview"); localStorage.setItem('cyberprep_b2btab', 'create'); }}>
+                onClick={() => { setB2bTab("interview"); localStorage.setItem('cyberprep_b2btab', 'interview'); }}>
                 + New Assessment
               </button>
             </div>
