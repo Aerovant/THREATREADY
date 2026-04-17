@@ -3590,31 +3590,7 @@ export default function ThreatReady() {
           </>)}
 
 
-            {/* Recent Candidates */}
-            <div className="lbl" style={{ marginBottom: 10 }}>RECENT CANDIDATES</div>
-            {candidates.length === 0 && !b2bLoading && (
-              <div className="card fadeUp" style={{ padding: 24, textAlign: "center" }}>
-                <div style={{ fontSize: 11, color: "var(--tx3)", marginBottom: 10 }}>No candidates yet</div>
-                <button className="btn bp" style={{ fontSize: 11 }} onClick={() => { setB2bTab("interview"); localStorage.setItem('cyberprep_b2btab', 'interview'); }}>
-                  Invite Candidates →
-                </button>
-              </div>
-            )}
-            {candidates.slice(0, 5).map((c, i) => (
-              <div key={c.id} className="card card-glow fadeUp" style={{ padding: 14, marginBottom: 8, animationDelay: `${i * .04}s` }}>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                  <div>
-                    <div style={{ fontSize: 13, fontWeight: 700 }}>{c.candidate_name || c.name}</div>
-                    <div style={{ fontSize: 10, color: "var(--tx3)" }}>{c.candidate_email || c.email}</div>
-                  </div>
-                  <div style={{ textAlign: "right" }}>
-                    {c.status === "completed" && <span className="mono" style={{ fontSize: 16, fontWeight: 700, color: (c.overall_score || 0) >= 7 ? "var(--ok)" : (c.overall_score || 0) >= 5 ? "var(--wn)" : "var(--dn)" }}>{c.overall_score}/10</span>}
-                    {c.status === "in_progress" && <span className="tag" style={{ background: "rgba(255,171,64,.1)", color: "var(--wn)", borderColor: "rgba(255,171,64,.2)" }}>In Progress</span>}
-                    {c.status === "not_started" && <span className="tag" style={{ background: "rgba(90,99,128,.1)", color: "var(--tx3)" }}>Not Started</span>}
-                  </div>
-                </div>
-              </div>
-            ))}
+           
             
           {/* ── B3: BADGES (Reports) ── */}
           {b2bTab === "badges" && (<>
