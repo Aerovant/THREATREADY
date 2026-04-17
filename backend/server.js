@@ -1587,7 +1587,7 @@ app.post('/api/b2b/invite', auth, async (req, res) => {
         [req.user.id, assessment_id || null, email, candidate_name || name, role_id, difficulty, token]
       );
 
-      const inviteLink = (process.env.FRONTEND_URL || 'http://localhost:5173') + '/?assess_token=' + token;
+      const inviteLink = (process.env.FRONTEND_URL || 'http://localhost:5173') + '/assess?token=' + token;
 
       // Send invite email
       resendClient.emails.send({
