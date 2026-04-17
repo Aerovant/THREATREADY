@@ -559,12 +559,24 @@ export default function ThreatReady() {
 
   const [view, setViewState] = useState(() => {
     // ── CANDIDATE ASSESSMENT LINK — check FIRST before any other routing ──
-    // Accept any of these URL formats:
-    //   /?assess_token=xxx
-    //   /?token=xxx  (when on /assess path)
-    //   /assess?token=xxx
+    // Handles all these URL formats:
+    //   /?assess_token=xxx              (current server format)
+    //   /?token=xxx                     (on /assess path)
+    //   /assess?token=xxx               (old format)
+    //   /?redirect=/assess?token=xxx    (GitHub Pages 404 fallback)
     const params = new URLSearchParams(window.location.search);
     const path = window.location.pathname;
+
+    // Check redirect param from GitHub Pages 404 fallback
+    const redirect = params.get('redirect');
+    if (redirect) {
+      const redirectParams = new URLSearchParams(redirect.split('?')[1] || '');
+      const tokenFromRedirect = redirectParams.get("assess_token") || redirectParams.get("token");
+      if (tokenFromRedirect && (redirect.includes('/assess') || redirectParams.get("assess_token"))) {
+        return 'candidate-assess';
+      }
+    }
+
     const assessToken = params.get("assess_token") || (path.includes('/assess') ? params.get("token") : null);
     if (assessToken) return 'candidate-assess';
 
@@ -707,6 +719,15 @@ export default function ThreatReady() {
   const [candidateToken] = useState(() => {
     const params = new URLSearchParams(window.location.search);
     const path = window.location.pathname;
+
+    // Check redirect param (GitHub Pages 404 fallback)
+    const redirect = params.get('redirect');
+    if (redirect) {
+      const redirectParams = new URLSearchParams(redirect.split('?')[1] || '');
+      const t = redirectParams.get("assess_token") || redirectParams.get("token");
+      if (t) return t;
+    }
+
     return params.get("assess_token") || (path.includes('/assess') ? params.get("token") : "") || "";
   });
   const [candidateAssessState, setCandidateAssessState] = useState('loading');
@@ -934,6 +955,9 @@ export default function ThreatReady() {
     const email = params.get("email");
     const error = params.get("error");
     const provider = params.get("provider") || "google";
+
+    // Skip if this is a candidate assessment link, not OAuth
+    if (params.get("assess_token")) return;
 
     // Only run if URL has OAuth params - ignore on normal refresh
     if (!token && !error) return;
