@@ -3457,7 +3457,7 @@ export default function ThreatReady() {
       { id: "reports", label: "📄 Reports" },
       { id: "teamskills", label: "🏢 Team Skills" },
 
-      { id: "billing", label: "📚 Library" },
+      { id: "library", label: "📚 Library" },
       { id: "settings", label: "⚙️ Settings" }
     ];
 
