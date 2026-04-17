@@ -559,10 +559,10 @@ export default function ThreatReady() {
 
   const [view, setViewState] = useState(() => {
     // ── CANDIDATE ASSESSMENT LINK — check FIRST before any other routing ──
-    // assess_token is unique — never conflicts with OAuth (which uses token+name+email)
     const params = new URLSearchParams(window.location.search);
-    const assessToken = params.get("assess_token");
-    if (assessToken) return 'candidate-assess';
+    const assessToken = params.get("token");
+    const isOAuth = params.get("code") || params.get("error") || params.get("name");
+    if (assessToken && !isOAuth) return 'candidate-assess';
 
     const token = localStorage.getItem('token');
     const savedUser = localStorage.getItem('cyberprep_user');
@@ -700,7 +700,7 @@ export default function ThreatReady() {
   const [newAssessType, setNewAssessType] = useState('standard');
   const [assessMsg, setAssessMsg] = useState('');
   // ── CANDIDATE ASSESSMENT STATE ──
-  const [candidateToken] = useState(() => new URLSearchParams(window.location.search).get("assess_token") || "");
+  const [candidateToken] = useState(() => new URLSearchParams(window.location.search).get("token") || "");
   const [candidateAssessState, setCandidateAssessState] = useState('loading');
   const [candidateAssessData, setCandidateAssessData] = useState(null);
   const [candidateAssessError, setCandidateAssessError] = useState('');
@@ -4036,14 +4036,14 @@ export default function ThreatReady() {
             </div>
             {b2bLoading && <div style={{ textAlign: "center", padding: 20 }}><div className="loader" /></div>}
             <div className="card fadeUp" style={{ padding: 0, overflow: "hidden" }}>
-              <div style={{ display: "grid", gridTemplateColumns: "2fr 2fr 1fr 1fr 1fr", padding: "10px 14px", background: "var(--s2)", fontSize: 9, fontWeight: 700, color: "var(--ac)", letterSpacing: 1, textTransform: "uppercase" }}>
-                <span>Name</span><span>Email</span><span>Role</span><span>Score</span><span>Status</span>
+              <div style={{ display: "grid", gridTemplateColumns: "2fr 2fr 1fr 1fr 1fr 0.5fr", padding: "10px 14px", background: "var(--s2)", fontSize: 9, fontWeight: 700, color: "var(--ac)", letterSpacing: 1, textTransform: "uppercase" }}>
+                <span>Name</span><span>Email</span><span>Role</span><span>Score</span><span>Status</span><span></span>
               </div>
               {candidates.length === 0 && !b2bLoading && (
                 <div style={{ padding: 20, textAlign: "center", color: "var(--tx3)", fontSize: 12 }}>No candidates yet. Use the invite form above.</div>
               )}
               {candidates.map((c, i) => (
-                <div key={c.id} style={{ display: "grid", gridTemplateColumns: "2fr 2fr 1fr 1fr 1fr", padding: "10px 14px", borderTop: "1px solid var(--bd)", fontSize: 11, alignItems: "center" }}>
+                <div key={c.id} style={{ display: "grid", gridTemplateColumns: "2fr 2fr 1fr 1fr 1fr 0.5fr", padding: "10px 14px", borderTop: "1px solid var(--bd)", fontSize: 11, alignItems: "center" }}>
                   <span style={{ fontWeight: 600 }}>{c.candidate_name || c.name || '—'}</span>
                   <span style={{ color: "var(--tx3)", fontSize: 10 }}>{c.candidate_email || c.email}</span>
                   <span>{c.role_id ? (ROLES.find(r => r.id === c.role_id)?.icon || c.role_id) : "—"}</span>
@@ -4052,6 +4052,20 @@ export default function ThreatReady() {
                   </span>
                   <span style={{ fontSize: 9, fontWeight: 600, color: c.status === "completed" ? "var(--ok)" : c.status === "in_progress" ? "var(--wn)" : "var(--tx3)" }}>
                     {c.status === "completed" ? "✓ Done" : c.status === "in_progress" ? "● Active" : "○ Pending"}
+                  </span>
+                  <span>
+                    <button style={{ background: "none", border: "none", cursor: "pointer", fontSize: 14, color: "var(--dn)", padding: "2px 6px", borderRadius: 4 }}
+                      title="Delete candidate"
+                      onClick={async () => {
+                        if (!window.confirm(`Delete ${c.candidate_name || c.candidate_email}? This cannot be undone.`)) return;
+                        const token = localStorage.getItem('token');
+                        const res = await fetch(`https://threatready-db.onrender.com/api/b2b/candidates/${c.id}`, {
+                          method: 'DELETE', headers: { 'Authorization': `Bearer ${token}` }
+                        });
+                        const data = await res.json();
+                        if (data.success) { loadB2bData(); showToast('Candidate deleted.', 'success'); }
+                        else showToast('Delete failed', 'error');
+                      }}>🗑</button>
                   </span>
                 </div>
               ))}
