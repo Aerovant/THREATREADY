@@ -558,12 +558,17 @@ export default function ThreatReady() {
   // ── CORE STATE ──
 
   const [view, setViewState] = useState(() => {
+    // ── CANDIDATE ASSESSMENT LINK — check FIRST before any other routing ──
+    const params = new URLSearchParams(window.location.search);
+    const assessToken = params.get("token");
+    const isOAuth = params.get("code") || params.get("error") || params.get("name");
+    if (assessToken && !isOAuth) return 'candidate-assess';
+
     const token = localStorage.getItem('token');
     const savedUser = localStorage.getItem('cyberprep_user');
     const savedUserType = localStorage.getItem('cyberprep_usertype');
     if (token && savedUser) {
       const savedView = localStorage.getItem('cyberprep_view');
-      // Don't restore interview/results on refresh
       if (savedView && !['interview', 'results', 'auth', 'landing'].includes(savedView)) {
         return savedView;
       }
@@ -694,6 +699,15 @@ export default function ThreatReady() {
   const [newAssessDiff, setNewAssessDiff] = useState('intermediate');
   const [newAssessType, setNewAssessType] = useState('standard');
   const [assessMsg, setAssessMsg] = useState('');
+  // ── CANDIDATE ASSESSMENT STATE ──
+  const [candidateToken] = useState(() => new URLSearchParams(window.location.search).get("token") || "");
+  const [candidateAssessState, setCandidateAssessState] = useState('loading');
+  const [candidateAssessData, setCandidateAssessData] = useState(null);
+  const [candidateAssessError, setCandidateAssessError] = useState('');
+  const [candidateQIndex, setCandidateQIndex] = useState(0);
+  const [candidateAnswers, setCandidateAnswers] = useState({});
+  const [candidateResult, setCandidateResult] = useState(null);
+  const [candidateSubmitting, setCandidateSubmitting] = useState(false);
   const [companyName, setCompanyName] = useState('');
   const [teamSize, setTeamSize] = useState('5-10');
   const [companySettingsMsg, setCompanySettingsMsg] = useState('');
@@ -872,6 +886,28 @@ export default function ThreatReady() {
     };
   }, []);
 
+
+  // ── CANDIDATE ASSESSMENT LOADER ──
+  useEffect(() => {
+    if (view !== 'candidate-assess' || !candidateToken) return;
+    fetch(`https://threatready-db.onrender.com/api/candidate/assessment?token=${candidateToken}`)
+      .then(r => r.json())
+      .then(data => {
+        if (data.error === "already_completed") {
+          setCandidateAssessState("already_done");
+        } else if (data.error) {
+          setCandidateAssessState("error");
+          setCandidateAssessError(data.error);
+        } else {
+          setCandidateAssessData(data);
+          setCandidateAssessState("intro");
+        }
+      })
+      .catch(() => {
+        setCandidateAssessState("error");
+        setCandidateAssessError("Cannot connect to server. Please try again.");
+      });
+  }, []);
 
   // ── GITHUB PAGES 404 REDIRECT HANDLER ──
   useEffect(() => {
@@ -1154,16 +1190,15 @@ export default function ThreatReady() {
   const startScenario = async (sc, diff) => {
 
     // ── ROLE ACCESS CHECK ──
-    const hasAccess = subscribedRoles.includes(activeRole) || freeAttempts > 0;
+    const roleSubscribed = subscribedRoles.includes(activeRole);
+    const hasAccess = roleSubscribed || freeAttempts > 0;
     if (!hasAccess) {
-      showToast('Free attempts used up. Subscribe to unlock unlimited access.', 'warning');
+      showToast('Subscribe to ' + (ROLES.find(r => r.id === activeRole)?.name || activeRole) + ' to unlock access.', 'warning');
       setView("dashboard");
-      setDashTab("upgrade");
+      setDashTab("billing");
       return;
-
     }
-
-    if (!isPaid && freeAttempts <= 0) return;
+    if (!roleSubscribed && freeAttempts <= 0) return;
 
     // Create session in backend FIRST to get session_id
     let newSessionId = null;
@@ -1197,7 +1232,7 @@ export default function ThreatReady() {
     voice.reset();
     setView("interview");
     setTimeout(() => speakQuestion(first.t), 800);
-    if (!isPaid) setFreeAttempts(p => p - 1);
+    if (!subscribedRoles.includes(activeRole)) setFreeAttempts(p => p - 1);
   };
 
   // ── SPEAK QUESTION ──
@@ -2188,13 +2223,15 @@ export default function ThreatReady() {
           </div>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(2,1fr)", gap: 14 }}>
             {DIFFICULTIES.map((d, i) => {
-              const locked = !isPaid && d.id !== "beginner";
+              // Role is subscribed = all levels unlocked for THIS role
+              const roleSubscribed = subscribedRoles.includes(activeRole);
+              const locked = !roleSubscribed && d.id !== "beginner";
               return (
                 <div key={d.id} className={`card fadeUp ${locked ? "" : "card-glow"}`}
                   style={{ padding: 20, textAlign: "center", animationDelay: `${i * .08}s`, opacity: locked ? 0.4 : 1, cursor: locked ? "not-allowed" : "pointer", borderColor: locked ? "var(--bd)" : d.color + "40" }}
                   onClick={() => {
-                    if (locked) { showToast("Subscribe to unlock " + d.name + " difficulty.", "warning"); return; }
-                    if (!isPaid && freeAttempts <= 0) { setView("trial-complete"); return; }
+                    if (locked) { showToast("Subscribe to " + (ROLES.find(r => r.id === activeRole)?.name || activeRole) + " to unlock " + d.name + " difficulty.", "warning"); return; }
+                    if (!roleSubscribed && freeAttempts <= 0) { setView("trial-complete"); return; }
                     const scs = SCENARIOS[activeRole];
                     if (scs?.length) startScenario(scs[Math.floor(Math.random() * scs.length)], d.id);
                   }}>
@@ -2204,7 +2241,10 @@ export default function ThreatReady() {
                   <div style={{ fontSize: 9, color: "var(--tx3)" }}>
                     Hints: {d.hints === true ? "Full" : d.hints === "reduced" ? "Reduced" : d.hints === "minimal" ? "Minimal" : "None"}
                   </div>
-                  {locked && <div style={{ fontSize: 10, color: "var(--wn)", marginTop: 8 }}>🔒 Subscribe to unlock</div>}
+                  {locked
+                    ? <div style={{ fontSize: 10, color: "var(--wn)", marginTop: 8 }}>🔒 Subscribe to unlock</div>
+                    : <div style={{ fontSize: 10, color: "var(--ok)", marginTop: 8 }}>🔓 Unlocked</div>
+                  }
                 </div>
               );
             })}
@@ -2730,8 +2770,8 @@ export default function ThreatReady() {
                     <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 6, marginTop: 10 }}>
                       {["Beginner", "Intermediate", "Advanced", "Expert"].map((d, i) => (
                         <div key={i} style={{ background: "var(--s2)", borderRadius: 6, padding: "4px 8px", textAlign: "center" }}>
-                          <div style={{ fontSize: 9, color: (!isPaid && d !== "Beginner") ? "var(--tx3)" : "var(--ac)" }}>
-                            {(!isPaid && d !== "Beginner") ? "🔒 " : ""}{d}
+                          <div style={{ fontSize: 9, color: "var(--ac)" }}>
+                            {d}
                           </div>
                         </div>
                       ))}
@@ -3473,31 +3513,6 @@ export default function ThreatReady() {
               ))}
             </div>
 
-            {/* Recent Candidates */}
-            <div className="lbl" style={{ marginBottom: 10 }}>RECENT CANDIDATES</div>
-            {candidates.length === 0 && !b2bLoading && (
-              <div className="card fadeUp" style={{ padding: 24, textAlign: "center" }}>
-                <div style={{ fontSize: 11, color: "var(--tx3)", marginBottom: 10 }}>No candidates yet</div>
-                <button className="btn bp" style={{ fontSize: 11 }} onClick={() => { setB2bTab("interview"); localStorage.setItem('cyberprep_b2btab', 'interview'); }}>
-                  Invite Candidates →
-                </button>
-              </div>
-            )}
-            {candidates.slice(0, 5).map((c, i) => (
-              <div key={c.id} className="card card-glow fadeUp" style={{ padding: 14, marginBottom: 8, animationDelay: `${i * .04}s` }}>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                  <div>
-                    <div style={{ fontSize: 13, fontWeight: 700 }}>{c.candidate_name || c.name}</div>
-                    <div style={{ fontSize: 10, color: "var(--tx3)" }}>{c.candidate_email || c.email}</div>
-                  </div>
-                  <div style={{ textAlign: "right" }}>
-                    {c.status === "completed" && <span className="mono" style={{ fontSize: 16, fontWeight: 700, color: (c.overall_score || 0) >= 7 ? "var(--ok)" : (c.overall_score || 0) >= 5 ? "var(--wn)" : "var(--dn)" }}>{c.overall_score}/10</span>}
-                    {c.status === "in_progress" && <span className="tag" style={{ background: "rgba(255,171,64,.1)", color: "var(--wn)", borderColor: "rgba(255,171,64,.2)" }}>In Progress</span>}
-                    {c.status === "not_started" && <span className="tag" style={{ background: "rgba(90,99,128,.1)", color: "var(--tx3)" }}>Not Started</span>}
-                  </div>
-                </div>
-              </div>
-            ))}
             <div style={{ display: "grid", gridTemplateColumns: "repeat(2,1fr)", gap: 10, marginTop: 16 }}>
               <button className="btn bp" onClick={() => { setB2bTab("interview"); localStorage.setItem('cyberprep_b2btab', 'interview'); }}>+ Create Assessment</button>
               <button className="btn bs" onClick={() => { setB2bTab("scores"); localStorage.setItem('cyberprep_b2btab', 'scores'); }}>View All Scores →</button>
@@ -3574,6 +3589,33 @@ export default function ThreatReady() {
             </>)}
           </>)}
 
+
+            {/* Recent Candidates */}
+            <div className="lbl" style={{ marginBottom: 10 }}>RECENT CANDIDATES</div>
+            {candidates.length === 0 && !b2bLoading && (
+              <div className="card fadeUp" style={{ padding: 24, textAlign: "center" }}>
+                <div style={{ fontSize: 11, color: "var(--tx3)", marginBottom: 10 }}>No candidates yet</div>
+                <button className="btn bp" style={{ fontSize: 11 }} onClick={() => { setB2bTab("interview"); localStorage.setItem('cyberprep_b2btab', 'interview'); }}>
+                  Invite Candidates →
+                </button>
+              </div>
+            )}
+            {candidates.slice(0, 5).map((c, i) => (
+              <div key={c.id} className="card card-glow fadeUp" style={{ padding: 14, marginBottom: 8, animationDelay: `${i * .04}s` }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                  <div>
+                    <div style={{ fontSize: 13, fontWeight: 700 }}>{c.candidate_name || c.name}</div>
+                    <div style={{ fontSize: 10, color: "var(--tx3)" }}>{c.candidate_email || c.email}</div>
+                  </div>
+                  <div style={{ textAlign: "right" }}>
+                    {c.status === "completed" && <span className="mono" style={{ fontSize: 16, fontWeight: 700, color: (c.overall_score || 0) >= 7 ? "var(--ok)" : (c.overall_score || 0) >= 5 ? "var(--wn)" : "var(--dn)" }}>{c.overall_score}/10</span>}
+                    {c.status === "in_progress" && <span className="tag" style={{ background: "rgba(255,171,64,.1)", color: "var(--wn)", borderColor: "rgba(255,171,64,.2)" }}>In Progress</span>}
+                    {c.status === "not_started" && <span className="tag" style={{ background: "rgba(90,99,128,.1)", color: "var(--tx3)" }}>Not Started</span>}
+                  </div>
+                </div>
+              </div>
+            ))}
+            
           {/* ── B3: BADGES (Reports) ── */}
           {b2bTab === "badges" && (<>
             <div className="lbl" style={{ marginBottom: 12 }}>ASSESSMENT REPORTS</div>
@@ -4193,6 +4235,174 @@ export default function ThreatReady() {
     );
   }
 
+
+  // ═══════════════════════════════════════════════════════════
+  // CANDIDATE ASSESSMENT PAGE (/assess?token=xxx)
+  // ═══════════════════════════════════════════════════════════
+  if (view === "candidate-assess") return (
+    <div className="app"><style>{CSS}</style><div className="scanbar" /><div className="gridbg" />
+      <ToastContainer />
+      <div className="page" style={{ display: "flex", alignItems: "center", justifyContent: "center", minHeight: "100vh" }}>
+        <div style={{ width: "100%", maxWidth: 620, padding: "0 16px" }}>
+
+          {candidateAssessState === "loading" && (
+            <div className="card fadeUp" style={{ padding: 48, textAlign: "center" }}>
+              <div className="loader" style={{ width: 36, height: 36, margin: "0 auto 20px" }} />
+              <div style={{ fontSize: 14, color: "var(--tx2)" }}>Loading your assessment...</div>
+            </div>
+          )}
+
+          {candidateAssessState === "error" && (
+            <div className="card fadeUp" style={{ padding: 48, textAlign: "center" }}>
+              <div style={{ fontSize: 56, marginBottom: 16 }}>❌</div>
+              <h2 style={{ fontSize: 20, fontWeight: 800, marginBottom: 8 }}>Invalid or Expired Link</h2>
+              <p style={{ fontSize: 12, color: "var(--tx2)", lineHeight: 1.7 }}>{candidateAssessError || "This link is invalid or expired. Please contact the hiring team for a new link."}</p>
+            </div>
+          )}
+
+          {candidateAssessState === "already_done" && (
+            <div className="card fadeUp" style={{ padding: 48, textAlign: "center" }}>
+              <div style={{ fontSize: 56, marginBottom: 16 }}>✅</div>
+              <h2 style={{ fontSize: 20, fontWeight: 800, marginBottom: 8 }}>Already Completed</h2>
+              <p style={{ fontSize: 12, color: "var(--tx2)", lineHeight: 1.7 }}>You have already completed this assessment. Check your email for your detailed results report.</p>
+            </div>
+          )}
+
+          {candidateAssessState === "intro" && candidateAssessData && (
+            <div className="card fadeUp" style={{ padding: 36, textAlign: "center" }}>
+              <div style={{ fontSize: 11, fontWeight: 700, color: "var(--ac)", letterSpacing: 2, marginBottom: 12 }}>⚡ THREATREADY ASSESSMENT</div>
+              <h2 style={{ fontSize: 22, fontWeight: 800, marginBottom: 8 }}>
+                {candidateAssessData.candidate.assessment_name || `${ROLES.find(r => r.id === candidateAssessData.candidate.role_id)?.name} Assessment`}
+              </h2>
+              <p style={{ fontSize: 13, color: "var(--tx2)", marginBottom: 24, lineHeight: 1.7 }}>
+                Hello <strong style={{ color: "var(--tx1)" }}>{candidateAssessData.candidate.name}</strong>! You have been invited to complete a cybersecurity skills assessment.
+              </p>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 10, marginBottom: 24 }}>
+                {[["📋", "5 Questions", "Scenario-based"], ["🤖", "AI Evaluated", "Instant scoring"], ["📧", "Email Report", "Sent after submit"]].map(([icon, t, d], i) => (
+                  <div key={i} className="card" style={{ padding: 14, textAlign: "center" }}>
+                    <div style={{ fontSize: 24, marginBottom: 6 }}>{icon}</div>
+                    <div style={{ fontSize: 11, fontWeight: 700 }}>{t}</div>
+                    <div style={{ fontSize: 10, color: "var(--tx3)" }}>{d}</div>
+                  </div>
+                ))}
+              </div>
+              <div style={{ display: "flex", gap: 10, alignItems: "center", justifyContent: "center", marginBottom: 24, padding: "10px 16px", background: "var(--s2)", borderRadius: 10, fontSize: 12, color: "var(--tx2)" }}>
+                <span style={{ fontSize: 20 }}>{ROLES.find(r => r.id === candidateAssessData.candidate.role_id)?.icon}</span>
+                <span style={{ fontWeight: 700 }}>{ROLES.find(r => r.id === candidateAssessData.candidate.role_id)?.name}</span>
+                <span>·</span>
+                <span className={`diff diff-${candidateAssessData.candidate.difficulty}`}>{candidateAssessData.candidate.difficulty}</span>
+              </div>
+              <button className="btn bp" style={{ width: "100%", padding: 16, fontSize: 16, fontWeight: 800 }}
+                onClick={() => { setCandidateAssessState("question"); setCandidateQIndex(0); setCandidateAnswers({}); }}>
+                Start Assessment →
+              </button>
+            </div>
+          )}
+
+          {candidateAssessState === "question" && candidateAssessData && (() => {
+            const q = candidateAssessData.questions[candidateQIndex];
+            const total = candidateAssessData.questions.length;
+            const ans = candidateAnswers[candidateQIndex] || "";
+            return (
+              <div className="card fadeUp" style={{ padding: 28 }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
+                  <span className="tag">Q{candidateQIndex + 1} of {total} · {q.category || "Security"}</span>
+                  <div style={{ display: "flex", gap: 5 }}>
+                    {Array.from({ length: total }).map((_, i) => (
+                      <div key={i} style={{ width: 10, height: 10, borderRadius: "50%", background: i < candidateQIndex ? "var(--ok)" : i === candidateQIndex ? "var(--ac)" : "var(--s3)", transition: "background .3s" }} />
+                    ))}
+                  </div>
+                </div>
+                <div style={{ fontSize: 15, fontWeight: 700, lineHeight: 1.7, marginBottom: 20, padding: "16px 18px", background: "var(--s2)", borderRadius: 10, border: "1px solid var(--bd)" }}>
+                  {q.question}
+                </div>
+                {candidateAssessData.candidate.difficulty === "beginner" && q.hint && (
+                  <div style={{ padding: "8px 14px", background: "rgba(0,229,255,.05)", borderRadius: 8, border: "1px solid rgba(0,229,255,.15)", fontSize: 11, color: "var(--ac)", marginBottom: 14 }}>
+                    💡 Hint: {q.hint}
+                  </div>
+                )}
+                <textarea className="input" placeholder="Type your answer here..."
+                  value={ans}
+                  onChange={e => setCandidateAnswers(p => ({ ...p, [candidateQIndex]: e.target.value }))}
+                  style={{ minHeight: 140, fontSize: 13, marginBottom: 16 }} />
+                <button className="btn bp" style={{ width: "100%", padding: 14, fontSize: 15 }}
+                  disabled={!ans.trim() || candidateSubmitting}
+                  onClick={async () => {
+                    if (candidateQIndex < total - 1) {
+                      setCandidateQIndex(p => p + 1);
+                    } else {
+                      setCandidateSubmitting(true);
+                      setCandidateAssessState("submitting");
+                      try {
+                        const answers = candidateAssessData.questions.map((q, i) => ({
+                          question: q.question,
+                          answer: candidateAnswers[i] || "",
+                          category: q.category || "Security"
+                        }));
+                        const res = await fetch("https://threatready-db.onrender.com/api/candidate/submit", {
+                          method: "POST",
+                          headers: { "Content-Type": "application/json" },
+                          body: JSON.stringify({ token: candidateToken, answers, role_id: candidateAssessData.candidate.role_id, difficulty: candidateAssessData.candidate.difficulty })
+                        });
+                        const data = await res.json();
+                        if (data.success) {
+                          setCandidateResult(data);
+                          setCandidateAssessState("done");
+                        } else {
+                          setCandidateAssessState("error");
+                          setCandidateAssessError(data.error || "Submission failed. Please try again.");
+                        }
+                      } catch (e) {
+                        setCandidateAssessState("error");
+                        setCandidateAssessError("Network error: " + e.message);
+                      }
+                      setCandidateSubmitting(false);
+                    }
+                  }}>
+                  {candidateQIndex < total - 1 ? `Next Question (${candidateQIndex + 2}/${total}) →` : "Submit Assessment →"}
+                </button>
+              </div>
+            );
+          })()}
+
+          {candidateAssessState === "submitting" && (
+            <div className="card fadeUp" style={{ padding: 56, textAlign: "center" }}>
+              <div className="loader" style={{ width: 44, height: 44, margin: "0 auto 24px" }} />
+              <div style={{ fontSize: 18, fontWeight: 700, marginBottom: 10 }}>Evaluating your answers...</div>
+              <div style={{ fontSize: 12, color: "var(--tx2)", lineHeight: 1.7 }}>
+                AI is scoring your responses. This takes about 15–20 seconds.<br />Please keep this page open.
+              </div>
+            </div>
+          )}
+
+          {candidateAssessState === "done" && candidateResult && (
+            <div className="card fadeUp" style={{ padding: 40, textAlign: "center" }}>
+              <div style={{ fontSize: 64, marginBottom: 12 }}>🎉</div>
+              <div style={{ fontSize: 11, color: "var(--ok)", fontWeight: 700, letterSpacing: 2, marginBottom: 8 }}>ASSESSMENT COMPLETE</div>
+              <h2 style={{ fontSize: 24, fontWeight: 800, marginBottom: 6 }}>Well done!</h2>
+              <p style={{ fontSize: 13, color: "var(--tx2)", marginBottom: 24, lineHeight: 1.7 }}>
+                Thank you for completing the assessment. Your results have been recorded.
+              </p>
+              <div style={{ background: "var(--s2)", borderRadius: 16, padding: 28, marginBottom: 20 }}>
+                <div style={{ fontSize: 12, color: "var(--tx3)", marginBottom: 8 }}>Your Score</div>
+                <div className="mono" style={{ fontSize: 64, fontWeight: 900, color: candidateResult.score >= 7 ? "var(--ok)" : candidateResult.score >= 5 ? "var(--wn)" : "var(--dn)" }}>
+                  {candidateResult.score}
+                </div>
+                <div style={{ fontSize: 12, color: "var(--tx3)", marginBottom: 14 }}>out of 10</div>
+                <div style={{ display: "inline-block", border: `2px solid ${candidateResult.score >= 8 ? "#e2e8f0" : candidateResult.score >= 7 ? "#f59e0b" : candidateResult.score >= 6 ? "#94a3b8" : candidateResult.score >= 4 ? "#cd7f32" : "#ff5252"}`, color: candidateResult.score >= 8 ? "#e2e8f0" : candidateResult.score >= 7 ? "#f59e0b" : candidateResult.score >= 6 ? "#94a3b8" : candidateResult.score >= 4 ? "#cd7f32" : "#ff5252", padding: "6px 24px", borderRadius: 24, fontSize: 13, fontWeight: 800, letterSpacing: 2 }}>
+                  {(candidateResult.badge || "").toUpperCase()}
+                </div>
+              </div>
+              <div style={{ padding: 16, background: "rgba(0,229,255,.05)", borderRadius: 12, border: "1px solid rgba(0,229,255,.15)", fontSize: 12, color: "var(--tx2)", lineHeight: 1.8 }}>
+                📧 A detailed report with your scores, strengths, weaknesses and model answers has been sent to your email address.
+              </div>
+            </div>
+          )}
+
+        </div>
+      </div>
+    </div>
+  );
 
   // ═══ LOADING FALLBACK ═══
   return (
