@@ -560,9 +560,8 @@ export default function ThreatReady() {
   const [view, setViewState] = useState(() => {
     // ── CANDIDATE ASSESSMENT LINK — check FIRST before any other routing ──
     const params = new URLSearchParams(window.location.search);
-    const assessToken = params.get("token");
-    const isOAuth = params.get("code") || params.get("error") || params.get("name");
-    if (assessToken && !isOAuth) return 'candidate-assess';
+    const assessToken = params.get("assess_token");
+    if (assessToken) return 'candidate-assess';
 
     const token = localStorage.getItem('token');
     const savedUser = localStorage.getItem('cyberprep_user');
@@ -679,7 +678,7 @@ export default function ThreatReady() {
 
   // ── DASHBOARD TABS ──
   const [dashTab, setDashTab] = useState(() => localStorage.getItem('cyberprep_tab') || "home");
-  const [b2bTab, setB2bTab] = useState(() => localStorage.getItem('cyberprep_b2btab') || "home");
+  const [b2bTab, setB2bTab] = useState(() => localStorage.getItem('cyberprep_b2btab') || "overview");
   const [settingsName, setSettingsName] = useState("");
   const [profilePublic, setProfilePublic] = useState(true);
   const [inLeaderboard, setInLeaderboard] = useState(true);
@@ -700,7 +699,7 @@ export default function ThreatReady() {
   const [newAssessType, setNewAssessType] = useState('standard');
   const [assessMsg, setAssessMsg] = useState('');
   // ── CANDIDATE ASSESSMENT STATE ──
-  const [candidateToken] = useState(() => new URLSearchParams(window.location.search).get("token") || "");
+  const [candidateToken] = useState(() => new URLSearchParams(window.location.search).get("assess_token") || "");
   const [candidateAssessState, setCandidateAssessState] = useState('loading');
   const [candidateAssessData, setCandidateAssessData] = useState(null);
   const [candidateAssessError, setCandidateAssessError] = useState('');
@@ -3452,12 +3451,11 @@ export default function ThreatReady() {
   // ═══════════════════════════════════════════════════════════
   if (view === "b2b-dashboard") {
     const b2bTabs = [
-      { id: "home", label: "🏠 Overview" },
-      { id: "interview", label: "📝 Create Assessment" },
-      { id: "scores", label: "👥 Candidates" },
-      { id: "badges", label: "📋 Reports" },
-
-      { id: "profile", label: "📊 Team Skills" },
+      { id: "overview", label: "📊 Overview" },
+      { id: "create", label: "📝 Create Assessment" },
+      { id: "candidates", label: "👥 Candidates" },
+      { id: "reports", label: "📄 Reports" },
+      { id: "teamskills", label: "🏢 Team Skills" },
 
       { id: "billing", label: "📚 Library" },
       { id: "settings", label: "⚙️ Settings" }
@@ -3495,7 +3493,7 @@ export default function ThreatReady() {
           </div>
 
           {/* ── B1: HOME ── */}
-          {b2bTab === "home" && (<>
+          {b2bTab === "overview" && (<>
             {/* Stats */}
             <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 10, marginBottom: 20 }}>
               {[
@@ -3514,13 +3512,13 @@ export default function ThreatReady() {
             </div>
 
             <div style={{ display: "grid", gridTemplateColumns: "repeat(2,1fr)", gap: 10, marginTop: 16 }}>
-              <button className="btn bp" onClick={() => { setB2bTab("interview"); localStorage.setItem('cyberprep_b2btab', 'interview'); }}>+ Create Assessment</button>
-              <button className="btn bs" onClick={() => { setB2bTab("scores"); localStorage.setItem('cyberprep_b2btab', 'scores'); }}>View All Scores →</button>
+              <button className="btn bp" onClick={() => { setB2bTab("interview"); localStorage.setItem('cyberprep_b2btab', 'create'); }}>+ Create Assessment</button>
+              <button className="btn bs" onClick={() => { setB2bTab("scores"); localStorage.setItem('cyberprep_b2btab', 'candidates'); }}>View All Scores →</button>
             </div>
           </>)}
 
           {/* ── B2: SCORES (Candidate skill scores — empty state guard) ── */}
-          {b2bTab === "scores" && (<>
+          {b2bTab === "candidates" && (<>
             {candidates.filter(c => c.status === "completed" && c.overall_score).length === 0 ? (
               <div className="card fadeUp" style={{ padding: 48, textAlign: "center" }}>
                 <div style={{ fontSize: 56, marginBottom: 16 }}>📊</div>
@@ -3528,7 +3526,7 @@ export default function ThreatReady() {
                 <p style={{ fontSize: 12, color: "var(--tx2)", marginBottom: 20, lineHeight: 1.7 }}>
                   Invite candidates and have them complete assessments to see their scores and skill benchmarks here.
                 </p>
-                <button className="btn bp" style={{ padding: "10px 28px" }} onClick={() => { setB2bTab("interview"); localStorage.setItem('cyberprep_b2btab', 'interview'); }}>
+                <button className="btn bp" style={{ padding: "10px 28px" }} onClick={() => { setB2bTab("interview"); localStorage.setItem('cyberprep_b2btab', 'create'); }}>
                   Invite Candidates →
                 </button>
               </div>
@@ -3593,7 +3591,7 @@ export default function ThreatReady() {
            
             
           {/* ── B3: BADGES (Reports) ── */}
-          {b2bTab === "badges" && (<>
+          {b2bTab === "reports" && (<>
             <div className="lbl" style={{ marginBottom: 12 }}>ASSESSMENT REPORTS</div>
 
             {/* Hiring Report */}
@@ -3727,7 +3725,7 @@ export default function ThreatReady() {
           </>)}
 
           {/* ── B4: PROFILE ── */}
-          {b2bTab === "profile" && (<>
+          {b2bTab === "teamskills" && (<>
             <div className="lbl" style={{ marginBottom: 10 }}>COMPANY PROFILE</div>
             <div className="card fadeUp" style={{ padding: 16, marginBottom: 16 }}>
               {companySettingsMsg && (
@@ -3788,7 +3786,7 @@ export default function ThreatReady() {
                         if (data.assessment) loadB2bData();
                       }}>Duplicate</button>
                     <button className="btn bp" style={{ fontSize: 9, padding: "4px 8px" }}
-                      onClick={() => { setInviteRole(a.role_id); setInviteDiff(a.difficulty); setB2bTab('interview'); localStorage.setItem('cyberprep_b2btab', 'interview'); }}>
+                      onClick={() => { setInviteRole(a.role_id); setInviteDiff(a.difficulty); setB2bTab('create'); localStorage.setItem('cyberprep_b2btab', 'create'); }}>
                       Invite →
                     </button>
                   </div>
@@ -3798,7 +3796,7 @@ export default function ThreatReady() {
           </>)}
 
           {/* ── B5: INTERVIEW (Create Assessment + Invite Candidates) ── */}
-          {b2bTab === "interview" && (<>
+          {b2bTab === "create" && (<>
             {/* Subscription gate */}
             
 
@@ -3952,112 +3950,24 @@ export default function ThreatReady() {
           </>)}
 
           {/* ── B6: LIBRARY (Saved Assessments + Invite Candidate) ── */}
-          {b2bTab === "billing" && (<>
-            
-            {/* Invite Candidate */}
-            <div className="card fadeUp" style={{ padding: 20, marginBottom: 14 }}>
-              <div className="lbl" style={{ marginBottom: 12 }}>INVITE CANDIDATE</div>
-              <input id="invite-email-input" className="input" type="email" placeholder="Candidate email address"
-                value={inviteEmail} onChange={e => setInviteEmail(e.target.value)} style={{ marginBottom: 10 }} />
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 12 }}>
-                <select className="input" value={inviteRole} onChange={e => setInviteRole(e.target.value)}>
-                  {ROLES.map(r => <option key={r.id} value={r.id}>{r.icon} {r.name}</option>)}
-                </select>
-                <select className="input" value={inviteDiff} onChange={e => setInviteDiff(e.target.value)}>
-                  {DIFFICULTIES.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
-                </select>
-              </div>
-              {inviteMsg && (
-                <div style={{ padding: 8, borderRadius: 8, marginBottom: 10, fontSize: 11, background: inviteMsg.includes("✅") ? "rgba(0,224,150,.1)" : "rgba(255,82,82,.1)", color: inviteMsg.includes("✅") ? "var(--ok)" : "var(--dn)" }}>{inviteMsg}</div>
-              )}
-              <button className="btn bp" style={{ width: "100%", padding: 10 }}
-                disabled={!inviteEmail.trim()}
-                onClick={async () => {
-                  if (!inviteEmail.trim()) return;
-                  setInviteMsg('Sending...');
-                  try {
-                    const token = localStorage.getItem('token');
-                    const res = await fetch('https://threatready-db.onrender.com/api/b2b/invite', {
-                      method: 'POST',
-                      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-                      body: JSON.stringify({ candidate_email: inviteEmail, role_id: inviteRole, difficulty: inviteDiff })
-                    });
-                    const data = await res.json();
-                    if (data.candidate) {
-                      setInviteMsg('✅ Invite sent to ' + inviteEmail);
-                      setInviteEmail('');
-                      loadB2bData();
-                      setTimeout(() => setInviteMsg(''), 3000);
-                    } else {
-                      setInviteMsg('❌ ' + (data.error || 'Failed'));
-                    }
-                  } catch (e) { setInviteMsg('❌ ' + e.message); }
-                }}>
-                📧 Send Invite Email
-              </button>
-            </div>
-
-            {/* Candidates Table */}
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
-              <div className="lbl">ALL CANDIDATES ({candidates.length})</div>
-              <button className="btn bs" style={{ fontSize: 10, padding: "4px 10px" }}
-                onClick={() => {
-                  const csv = ['Name,Email,Role,Difficulty,Score,Status,Invited']
-                    .concat(candidates.map(c => `${c.candidate_name || ''},${c.candidate_email || ''},${c.role_id || ''},${c.difficulty || ''},${c.overall_score || ''},${c.status || ''},${c.invited_at?.substring(0, 10) || ''}`))
-                    .join('\n');
-                  const a = document.createElement('a');
-                  a.href = 'data:text/csv,' + encodeURIComponent(csv);
-                  a.download = 'candidates.csv'; a.click();
-                }}>📥 Export CSV</button>
-            </div>
-            {b2bLoading && <div style={{ textAlign: "center", padding: 20 }}><div className="loader" /></div>}
-            <div className="card fadeUp" style={{ padding: 0, overflow: "hidden" }}>
-              <div style={{ display: "grid", gridTemplateColumns: "2fr 2fr 1fr 1fr 1fr 0.5fr", padding: "10px 14px", background: "var(--s2)", fontSize: 9, fontWeight: 700, color: "var(--ac)", letterSpacing: 1, textTransform: "uppercase" }}>
-                <span>Name</span><span>Email</span><span>Role</span><span>Score</span><span>Status</span><span></span>
-              </div>
-              {candidates.length === 0 && !b2bLoading && (
-                <div style={{ padding: 20, textAlign: "center", color: "var(--tx3)", fontSize: 12 }}>No candidates yet. Use the invite form above.</div>
-              )}
-              {candidates.map((c, i) => (
-                <div key={c.id} style={{ display: "grid", gridTemplateColumns: "2fr 2fr 1fr 1fr 1fr 0.5fr", padding: "10px 14px", borderTop: "1px solid var(--bd)", fontSize: 11, alignItems: "center" }}>
-                  <span style={{ fontWeight: 600 }}>{c.candidate_name || c.name || '—'}</span>
-                  <span style={{ color: "var(--tx3)", fontSize: 10 }}>{c.candidate_email || c.email}</span>
-                  <span>{c.role_id ? (ROLES.find(r => r.id === c.role_id)?.icon || c.role_id) : "—"}</span>
-                  <span className="mono" style={{ fontWeight: 700, color: c.overall_score ? (c.overall_score >= 7 ? "var(--ok)" : c.overall_score >= 5 ? "var(--wn)" : "var(--dn)") : "var(--tx3)" }}>
-                    {c.overall_score ? `${c.overall_score}/10` : "—"}
-                  </span>
-                  <span style={{ fontSize: 9, fontWeight: 600, color: c.status === "completed" ? "var(--ok)" : c.status === "in_progress" ? "var(--wn)" : "var(--tx3)" }}>
-                    {c.status === "completed" ? "✓ Done" : c.status === "in_progress" ? "● Active" : "○ Pending"}
-                  </span>
-                  <span>
-                    <button style={{ background: "none", border: "none", cursor: "pointer", fontSize: 14, color: "var(--dn)", padding: "2px 6px", borderRadius: 4 }}
-                      title="Delete candidate"
-                      onClick={async () => {
-                        if (!window.confirm(`Delete ${c.candidate_name || c.candidate_email}? This cannot be undone.`)) return;
-                        const token = localStorage.getItem('token');
-                        const res = await fetch(`https://threatready-db.onrender.com/api/b2b/candidates/${c.id}`, {
-                          method: 'DELETE', headers: { 'Authorization': `Bearer ${token}` }
-                        });
-                        const data = await res.json();
-                        if (data.success) { loadB2bData(); showToast('Candidate deleted.', 'success'); }
-                        else showToast('Delete failed', 'error');
-                      }}>🗑</button>
-                  </span>
-                </div>
-              ))}
-            </div>
-
-            {/* Saved Assessments */}
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 24, marginBottom: 10 }}>
+          {b2bTab === "library" && (<>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
               <div className="lbl">SAVED ASSESSMENTS ({assessments.length})</div>
               <button className="btn bp" style={{ fontSize: 11, padding: "6px 14px" }}
-                onClick={() => { setB2bTab("interview"); localStorage.setItem('cyberprep_b2btab', 'interview'); }}>
+                onClick={() => { setB2bTab("create"); localStorage.setItem('cyberprep_b2btab', 'create'); }}>
                 + New Assessment
               </button>
             </div>
+            {b2bLoading && <div style={{ textAlign: "center", padding: 20 }}><div className="loader" /></div>}
             {assessments.length === 0 && !b2bLoading && (
-              <div style={{ padding: 16, textAlign: "center", color: "var(--tx3)", fontSize: 12 }}>
-                No assessments yet. Create one from the Create Assessment tab.
+              <div className="card fadeUp" style={{ padding: 40, textAlign: "center" }}>
+                <div style={{ fontSize: 40, marginBottom: 12 }}>📚</div>
+                <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 6 }}>No saved assessments yet</div>
+                <div style={{ fontSize: 12, color: "var(--tx3)", marginBottom: 16 }}>Create an assessment and it will appear here.</div>
+                <button className="btn bp" style={{ fontSize: 12, padding: "10px 24px" }}
+                  onClick={() => { setB2bTab("create"); localStorage.setItem('cyberprep_b2btab', 'create'); }}>
+                  Create First Assessment →
+                </button>
               </div>
             )}
             {assessments.map((a, i) => (
@@ -4068,6 +3978,9 @@ export default function ThreatReady() {
                     <div style={{ fontSize: 10, color: "var(--tx3)", marginTop: 3 }}>
                       {ROLES.find(r => r.id === a.role_id)?.name || a.role_id} · {a.difficulty} · {a.total_candidates || 0} candidates · {a.created_at?.substring(0, 10)}
                     </div>
+                    {a.questions?.length > 0 && (
+                      <div style={{ fontSize: 9, color: "var(--ok)", marginTop: 4 }}>✅ {a.questions.length} questions generated</div>
+                    )}
                   </div>
                   <div style={{ display: "flex", gap: 6 }}>
                     <button className="btn bs" style={{ fontSize: 9, padding: "4px 8px" }}
@@ -4078,11 +3991,26 @@ export default function ThreatReady() {
                         });
                         const data = await res.json();
                         if (data.assessment) { loadB2bData(); showToast('Assessment duplicated!', 'success'); }
+                        else showToast('Duplicate failed', 'error');
                       }}>Duplicate</button>
                     <button className="btn bp" style={{ fontSize: 9, padding: "4px 8px" }}
-                      onClick={() => { setInviteRole(a.role_id); setInviteDiff(a.difficulty); }}>
-                      Use for Invite ↑
-                    </button>
+                      onClick={() => {
+                        setInviteRole(a.role_id); setInviteDiff(a.difficulty);
+                        setB2bTab("candidates"); localStorage.setItem('cyberprep_b2btab', 'candidates');
+                        setTimeout(() => document.getElementById('invite-email-input')?.focus(), 300);
+                        showToast(`Role set to ${ROLES.find(r => r.id === a.role_id)?.name}. Enter email to invite.`, 'info');
+                      }}>Invite →</button>
+                    <button className="btn bs" style={{ fontSize: 9, padding: "4px 8px", color: "var(--dn)", borderColor: "var(--dn)" }}
+                      onClick={async () => {
+                        if (!window.confirm(`Delete "${a.name}"? This cannot be undone.`)) return;
+                        const token = localStorage.getItem('token');
+                        const res = await fetch(`https://threatready-db.onrender.com/api/b2b/assessments/${a.id}`, {
+                          method: 'DELETE', headers: { 'Authorization': `Bearer ${token}` }
+                        });
+                        const data = await res.json();
+                        if (data.success) { loadB2bData(); showToast('Assessment deleted.', 'success'); }
+                        else showToast('Delete failed: ' + (data.error || 'Error'), 'error');
+                      }}>🗑 Delete</button>
                   </div>
                 </div>
               </div>
