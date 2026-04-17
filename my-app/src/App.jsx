@@ -697,6 +697,9 @@ export default function ThreatReady() {
   const [newAssessName, setNewAssessName] = useState('');
   const [newAssessRole, setNewAssessRole] = useState('cloud');
   const [newAssessDiff, setNewAssessDiff] = useState('intermediate');
+  const [newAssessQuestionCount, setNewAssessQuestionCount] = useState(5);
+  const [hiringDecisions, setHiringDecisions] = useState({}); // { candidateId: 'selected'|'rejected' }
+  const [decisionMsg, setDecisionMsg] = useState('');
   const [newAssessType, setNewAssessType] = useState('standard');
   const [assessMsg, setAssessMsg] = useState('');
   // ── CANDIDATE ASSESSMENT STATE ──
@@ -723,10 +726,12 @@ export default function ThreatReady() {
     .map(c => ({
       id: c.id,
       name: c.candidate_name || c.candidate_email,
+      email: c.candidate_email,
       role: c.role_id,
       score: parseFloat(c.overall_score) || 0,
       difficulty: c.difficulty,
-      completed_at: c.completed_at
+      completed_at: c.completed_at,
+      hiring_decision: c.hiring_decision || null
     }));
 
   // ── SCORE HISTORY (mock) ──
@@ -3538,27 +3543,36 @@ export default function ThreatReady() {
                 <button className="btn bs" style={{ fontSize: 10, padding: "4px 10px" }} onClick={loadB2bData}>🔄 Refresh</button>
               </div>
               {b2bLoading && <div style={{ textAlign: "center", padding: 20 }}><div className="loader" /></div>}
-              <div className="card fadeUp" style={{ padding: 0, overflow: "hidden", marginBottom: 16 }}>
-                <div style={{ display: "grid", gridTemplateColumns: "1.5fr 1fr 1fr 1fr 1fr", padding: "10px 14px", background: "var(--s2)", fontSize: 9, fontWeight: 700, color: "var(--ac)", letterSpacing: 1, textTransform: "uppercase" }}>
-                  <span>Candidate</span><span style={{ textAlign: "center" }}>Role</span><span style={{ textAlign: "center" }}>Difficulty</span><span style={{ textAlign: "center" }}>Score</span><span style={{ textAlign: "center" }}>Badge</span>
+
+              {decisionMsg && (
+                <div style={{ padding: 10, borderRadius: 8, marginBottom: 12, fontSize: 12, background: decisionMsg.includes("✅") ? "rgba(0,224,150,.1)" : "rgba(255,82,82,.1)", color: decisionMsg.includes("✅") ? "var(--ok)" : "var(--dn)" }}>
+                  {decisionMsg}
                 </div>
-                {teamMembers.map((m, i) => {
+              )}
+
+              <div className="card fadeUp" style={{ padding: 0, overflow: "hidden", marginBottom: 16 }}>
+                <div style={{ display: "grid", gridTemplateColumns: "1.8fr 1fr 1fr 1fr 1.8fr", padding: "10px 14px", background: "var(--s2)", fontSize: 9, fontWeight: 700, color: "var(--ac)", letterSpacing: 1, textTransform: "uppercase" }}>
+                  <span>Candidate</span>
+                  <span style={{ textAlign: "center" }}>Role</span>
+                  <span style={{ textAlign: "center" }}>Score</span>
+                  <span style={{ textAlign: "center" }}>Badge</span>
+                  <span style={{ textAlign: "center" }}>Decision</span>
+                </div>
+                {teamMembers.sort((a, b) => b.score - a.score).map((m, i) => {
                   const score = m.score;
                   const badge = score >= 8 ? "Platinum" : score >= 7 ? "Gold" : score >= 6 ? "Silver" : score >= 4 ? "Bronze" : "Not Ready";
                   const badgeColor = score >= 8 ? "#e2e8f0" : score >= 7 ? "#f59e0b" : score >= 6 ? "#94a3b8" : score >= 4 ? "#b45309" : "var(--dn)";
                   const role = ROLES.find(r => r.id === m.role);
+                  const decision = hiringDecisions[m.id] || m.hiring_decision;
                   return (
-                    <div key={m.id} style={{ display: "grid", gridTemplateColumns: "1.5fr 1fr 1fr 1fr 1fr", padding: "12px 14px", borderTop: "1px solid var(--bd)", fontSize: 11, alignItems: "center" }}>
+                    <div key={m.id} style={{ display: "grid", gridTemplateColumns: "1.8fr 1fr 1fr 1fr 1.8fr", padding: "12px 14px", borderTop: "1px solid var(--bd)", fontSize: 11, alignItems: "center" }}>
                       <div>
                         <div style={{ fontWeight: 600 }}>{m.name}</div>
                         <div style={{ fontSize: 9, color: "var(--tx3)", marginTop: 2 }}>{m.completed_at?.substring(0, 10)}</div>
                       </div>
                       <div style={{ textAlign: "center" }}>
-                        <span style={{ fontSize: 16 }}>{role?.icon || "🔒"}</span>
+                        <span style={{ fontSize: 16 }}>{role?.icon || "?"}</span>
                         <div style={{ fontSize: 9, color: "var(--tx3)" }}>{role?.name || m.role}</div>
-                      </div>
-                      <div style={{ textAlign: "center" }}>
-                        <span className={`diff diff-${m.difficulty}`} style={{ fontSize: 8 }}>{m.difficulty}</span>
                       </div>
                       <div style={{ textAlign: "center" }}>
                         <span className="mono" style={{ fontSize: 18, fontWeight: 800, color: score >= 7 ? "var(--ok)" : score >= 5 ? "var(--wn)" : "var(--dn)" }}>
@@ -3567,7 +3581,57 @@ export default function ThreatReady() {
                         <div style={{ fontSize: 9, color: "var(--tx3)" }}>/10</div>
                       </div>
                       <div style={{ textAlign: "center" }}>
-                        <span style={{ fontSize: 9, fontWeight: 700, color: badgeColor }}>{badge}</span>
+                        <span style={{ fontSize: 10, fontWeight: 700, color: badgeColor }}>{badge}</span>
+                      </div>
+                      <div style={{ textAlign: "center" }}>
+                        {decision === "selected" ? (
+                          <span style={{ fontSize: 10, fontWeight: 700, color: "var(--ok)", background: "rgba(0,224,150,.1)", padding: "4px 10px", borderRadius: 20, border: "1px solid rgba(0,224,150,.3)" }}>✅ Selected</span>
+                        ) : decision === "rejected" ? (
+                          <span style={{ fontSize: 10, fontWeight: 700, color: "var(--dn)", background: "rgba(255,82,82,.1)", padding: "4px 10px", borderRadius: 20, border: "1px solid rgba(255,82,82,.3)" }}>❌ Not Selected</span>
+                        ) : (
+                          <div style={{ display: "flex", gap: 4, justifyContent: "center" }}>
+                            <button className="btn bok" style={{ fontSize: 9, padding: "4px 8px" }}
+                              onClick={async () => {
+                                setDecisionMsg('Sending decision email...');
+                                try {
+                                  const token = localStorage.getItem('token');
+                                  const res = await fetch('https://threatready-db.onrender.com/api/b2b/candidate/decision', {
+                                    method: 'POST',
+                                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                                    body: JSON.stringify({ candidate_id: m.id, decision: 'selected', candidate_email: m.email, candidate_name: m.name, role_id: m.role, score: m.score })
+                                  });
+                                  const data = await res.json();
+                                  if (data.success) {
+                                    setHiringDecisions(p => ({ ...p, [m.id]: 'selected' }));
+                                    setDecisionMsg(`✅ Selection email sent to ${m.name}!`);
+                                    setTimeout(() => setDecisionMsg(''), 4000);
+                                  } else {
+                                    setDecisionMsg('❌ ' + (data.error || 'Failed'));
+                                  }
+                                } catch (e) { setDecisionMsg('❌ ' + e.message); }
+                              }}>✅ Select</button>
+                            <button className="btn bdn" style={{ fontSize: 9, padding: "4px 8px" }}
+                              onClick={async () => {
+                                setDecisionMsg('Sending decision email...');
+                                try {
+                                  const token = localStorage.getItem('token');
+                                  const res = await fetch('https://threatready-db.onrender.com/api/b2b/candidate/decision', {
+                                    method: 'POST',
+                                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                                    body: JSON.stringify({ candidate_id: m.id, decision: 'rejected', candidate_email: m.email, candidate_name: m.name, role_id: m.role, score: m.score })
+                                  });
+                                  const data = await res.json();
+                                  if (data.success) {
+                                    setHiringDecisions(p => ({ ...p, [m.id]: 'rejected' }));
+                                    setDecisionMsg(`📧 Not selected email sent to ${m.name}.`);
+                                    setTimeout(() => setDecisionMsg(''), 4000);
+                                  } else {
+                                    setDecisionMsg('❌ ' + (data.error || 'Failed'));
+                                  }
+                                } catch (e) { setDecisionMsg('❌ ' + e.message); }
+                              }}>❌ Reject</button>
+                          </div>
+                        )}
                       </div>
                     </div>
                   );
@@ -3927,7 +3991,7 @@ export default function ThreatReady() {
                   </select>
                 </div>
               </div>
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 14 }}>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 12 }}>
                 <div>
                   <div style={{ fontSize: 10, color: "var(--tx3)", marginBottom: 4 }}>DIFFICULTY</div>
                   <select className="input" value={newAssessDiff} onChange={e => setNewAssessDiff(e.target.value)} style={{ fontSize: 12 }}>
@@ -3944,32 +4008,51 @@ export default function ThreatReady() {
                 </div>
               </div>
 
+              {/* Question Count */}
+              <div style={{ marginBottom: 14 }}>
+                <div style={{ fontSize: 10, color: "var(--tx3)", marginBottom: 8 }}>NUMBER OF QUESTIONS</div>
+                <div style={{ display: "flex", gap: 8 }}>
+                  {[3, 5, 7, 10].map(n => (
+                    <button key={n} className={`btn ${newAssessQuestionCount === n ? "bp" : "bs"}`}
+                      style={{ flex: 1, padding: "8px 0", fontSize: 14, fontWeight: 700 }}
+                      onClick={() => setNewAssessQuestionCount(n)}>
+                      {n}
+                    </button>
+                  ))}
+                </div>
+                <div style={{ fontSize: 10, color: "var(--tx3)", marginTop: 6 }}>
+                  AI will generate {newAssessQuestionCount} questions · Candidate must answer all
+                </div>
+              </div>
+
               {assessMsg && (
                 <div style={{ padding: 9, borderRadius: 8, marginBottom: 10, fontSize: 11, background: assessMsg.includes("✅") ? "rgba(0,224,150,.1)" : "rgba(255,82,82,.1)", color: assessMsg.includes("✅") ? "var(--ok)" : "var(--dn)" }}>{assessMsg}</div>
               )}
               <button className="btn bp" style={{ width: "100%", padding: 12, fontSize: 13 }}
                 disabled={!newAssessName.trim()}
                 onClick={async () => {
-                  setAssessMsg('Creating assessment...');
+                  setAssessMsg(`⏳ Creating assessment and generating ${newAssessQuestionCount} questions...`);
                   try {
                     const token = localStorage.getItem('token');
                     const res = await fetch('https://threatready-db.onrender.com/api/b2b/assessments', {
                       method: 'POST',
                       headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-                      body: JSON.stringify({ name: newAssessName, role_id: newAssessRole, difficulty: newAssessDiff, type: newAssessType, jd_context: newAssessJD })
+                      body: JSON.stringify({ name: newAssessName, role_id: newAssessRole, difficulty: newAssessDiff, type: newAssessType, jd_context: newAssessJD, question_count: newAssessQuestionCount })
                     });
                     const data = await res.json();
                     if (data.assessment) {
-                      setAssessMsg('✅ Assessment created! Now invite candidates below.');
+                      const qCount = data.assessment.questions?.length || newAssessQuestionCount;
+                      setAssessMsg(`✅ Assessment created with ${qCount} AI-generated questions!`);
                       setNewAssessName(''); setNewAssessJD(''); setJdAnalysis(null);
                       loadB2bData();
-                      setTimeout(() => setAssessMsg(''), 3000);
+                      setTimeout(() => { setAssessMsg(''); setB2bTab("candidates"); localStorage.setItem('cyberprep_b2btab', 'candidates'); }, 2000);
                     } else {
                       setAssessMsg('❌ ' + (data.error || 'Failed to create assessment'));
                     }
                   } catch (e) { setAssessMsg('❌ ' + e.message); }
                 }}>
-                Create Assessment →
+                {assessMsg.includes("Creat") ? <><span className="loader" style={{ width: 12, height: 12 }} /> &nbsp;Generating Questions...</> : `Create Assessment (${newAssessQuestionCount} Questions) →`}
+              </button>
               </button>
             </div>
 

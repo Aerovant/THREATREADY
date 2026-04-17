@@ -1478,26 +1478,31 @@ app.get('/api/b2b/assessments', auth, async (req, res) => {
 app.post('/api/b2b/assessments', auth, async (req, res) => {
   console.log('--- CREATE B2B ASSESSMENT ---');
   try {
-    const { name, role_id, difficulty, assessment_type, jd_text } = req.body;
+    const { name, role_id, difficulty, assessment_type, jd_text, question_count = 5 } = req.body;
     if (!name || !role_id || !difficulty) {
       return res.status(400).json({ error: 'Name, role and difficulty required' });
     }
 
-    // Step 1: Save assessment first
     const result = await pool.query(
       `INSERT INTO b2b_assessments
-        (company_user_id, name, role_id, difficulty, assessment_type, jd_text, created_at)
-       VALUES ($1, $2, $3, $4, $5, $6, NOW())
+        (company_user_id, name, role_id, difficulty, assessment_type, jd_text, question_count, created_at)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, NOW())
        RETURNING *`,
-      [req.user.id, name, role_id, difficulty, assessment_type || 'standard', jd_text || '']
-    );
+      [req.user.id, name, role_id, difficulty, assessment_type || 'standard', jd_text || '', question_count]
+    ).catch(async () => {
+      // question_count column may not exist yet — add it and retry
+      await pool.query(`ALTER TABLE b2b_assessments ADD COLUMN IF NOT EXISTS question_count INTEGER DEFAULT 5`).catch(()=>{});
+      return pool.query(
+        `INSERT INTO b2b_assessments (company_user_id, name, role_id, difficulty, assessment_type, jd_text, created_at) VALUES ($1,$2,$3,$4,$5,$6,NOW()) RETURNING *`,
+        [req.user.id, name, role_id, difficulty, assessment_type || 'standard', jd_text || '']
+      );
+    });
     const assessment = result.rows[0];
 
-    // Step 2: Auto-generate 5 questions using AI
+    // Step 2: Auto-generate questions using AI
     try {
       const Anthropic = require('@anthropic-ai/sdk');
       const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
-
       const roleNames = {
         cloud: 'Cloud Security', devsecops: 'DevSecOps', appsec: 'Application Security',
         netsec: 'Network Security', prodsec: 'Product Security', secarch: 'Security Architect',
@@ -1505,48 +1510,28 @@ app.post('/api/b2b/assessments', auth, async (req, res) => {
         threat: 'Threat Hunter', red: 'Red Team', blue: 'Blue Team'
       };
       const roleName = roleNames[role_id] || role_id;
+      const qCount = parseInt(question_count) || 5;
 
-      const prompt = `You are a senior cybersecurity hiring manager. Generate exactly 5 interview questions for a ${difficulty} level ${roleName} candidate.
+      const prompt = `You are a senior cybersecurity hiring manager. Generate exactly ${qCount} interview questions for a ${difficulty} level ${roleName} candidate.
 ${jd_text ? `Job Description context:\n${jd_text.substring(0, 800)}` : ''}
-
-Rules:
-- Questions must be practical, scenario-based, not theory
-- Difficulty: ${difficulty} (${difficulty === 'beginner' ? 'basic concepts, simple scenarios' : difficulty === 'intermediate' ? 'real attack scenarios, decision making' : difficulty === 'advanced' ? 'complex multi-vector scenarios, architecture decisions' : 'expert-level threat modeling, adversarial thinking'})
-- Each question should test a different skill area
-
-Respond ONLY with valid JSON, no markdown:
-{"questions":[
-  {"id":1,"question":"Full question text here","category":"skill category","hint":"short hint for beginner only"},
-  {"id":2,"question":"...","category":"...","hint":"..."},
-  {"id":3,"question":"...","category":"...","hint":"..."},
-  {"id":4,"question":"...","category":"...","hint":"..."},
-  {"id":5,"question":"...","category":"...","hint":"..."}
-]}`;
+Rules: practical scenario-based questions, each testing a different skill area, difficulty: ${difficulty}.
+Respond ONLY valid JSON no markdown:
+{"questions":[${Array.from({length: qCount}, (_, i) => `{"id":${i+1},"question":"...","category":"skill area","hint":"short hint"}`).join(',')}]}`;
 
       const msg = await anthropic.messages.create({
         model: MODEL_QUESTIONS,
-        max_tokens: 1500,
+        max_tokens: 200 * qCount,
         messages: [{ role: 'user', content: prompt }]
       });
-
       const raw = msg.content[0].text.replace(/```json|```/g, '').trim();
       const parsed = JSON.parse(raw);
 
-      // Store questions in assessment
-      await pool.query(
-        `UPDATE b2b_assessments SET questions = $1 WHERE id = $2`,
-        [JSON.stringify(parsed.questions), assessment.id]
-      ).catch(async () => {
-        // Add column if missing
-        await pool.query(`ALTER TABLE b2b_assessments ADD COLUMN IF NOT EXISTS questions JSONB`);
-        await pool.query(`UPDATE b2b_assessments SET questions = $1 WHERE id = $2`, [JSON.stringify(parsed.questions), assessment.id]);
-      });
-
+      await pool.query(`ALTER TABLE b2b_assessments ADD COLUMN IF NOT EXISTS questions JSONB`).catch(()=>{});
+      await pool.query(`UPDATE b2b_assessments SET questions = $1 WHERE id = $2`, [JSON.stringify(parsed.questions), assessment.id]);
       assessment.questions = parsed.questions;
-      console.log(`Generated ${parsed.questions.length} questions for assessment: ${name}`);
+      console.log(`Generated ${parsed.questions.length} questions for: ${name}`);
     } catch (aiErr) {
       console.error('Question generation failed:', aiErr.message);
-      // Still return assessment even if AI fails
     }
 
     res.json({ assessment });
@@ -1602,7 +1587,7 @@ app.post('/api/b2b/invite', auth, async (req, res) => {
         [req.user.id, assessment_id || null, email, candidate_name || name, role_id, difficulty, token]
       );
 
-      const inviteLink = (process.env.FRONTEND_URL || 'http://localhost:5173') + '/?token=' + token;
+      const inviteLink = (process.env.FRONTEND_URL || 'http://localhost:5173') + '/assess?token=' + token;
 
       // Send invite email
       resendClient.emails.send({
@@ -1649,12 +1634,6 @@ app.get('/api/candidate/assessment', async (req, res) => {
   try {
     const { token } = req.query;
     if (!token) return res.status(400).json({ error: 'Token required' });
-
-    // Safe migration — add missing columns if they don't exist
-    await pool.query(`ALTER TABLE candidate_assessments ADD COLUMN IF NOT EXISTS overall_score NUMERIC(4,2)`).catch(()=>{});
-    await pool.query(`ALTER TABLE candidate_assessments ADD COLUMN IF NOT EXISTS completed_at TIMESTAMP`).catch(()=>{});
-    await pool.query(`ALTER TABLE candidate_assessments ADD COLUMN IF NOT EXISTS status VARCHAR(20) DEFAULT 'not_started'`).catch(()=>{});
-    await pool.query(`ALTER TABLE b2b_assessments ADD COLUMN IF NOT EXISTS questions JSONB`).catch(()=>{});
 
     const ca = await pool.query(
       `SELECT ca.*, ba.questions, ba.name as assessment_name, ba.jd_text
@@ -1714,10 +1693,6 @@ app.post('/api/candidate/submit', async (req, res) => {
   try {
     const { token, answers, candidate_name, role_id, difficulty } = req.body;
     if (!token || !answers) return res.status(400).json({ error: 'Token and answers required' });
-
-    // Safe migration
-    await pool.query(`ALTER TABLE candidate_assessments ADD COLUMN IF NOT EXISTS overall_score NUMERIC(4,2)`).catch(()=>{});
-    await pool.query(`ALTER TABLE candidate_assessments ADD COLUMN IF NOT EXISTS completed_at TIMESTAMP`).catch(()=>{});
 
     const ca = await pool.query(
       `SELECT ca.*, ba.name as assessment_name
@@ -1785,31 +1760,78 @@ app.post('/api/candidate/submit', async (req, res) => {
           <div style="font-size:10px;color:#5a6380;margin-top:8px;padding:8px;background:#111827;border-radius:6px"><strong style="color:#00e5ff">Model answer:</strong> ${e.improved_answer}</div>
         </div>`).join('');
 
+      // Build enhanced email report
+      const topStrength = evaluations.reduce((best, e) => e.score > best.score ? e : best, evaluations[0]);
+      const topWeakness = evaluations.reduce((worst, e) => e.score < worst.score ? e : worst, evaluations[0]);
+      const verdict = finalScore >= 7 ? 'Strong performer — ready for industry roles' : finalScore >= 5 ? 'Developing — needs more hands-on practice' : 'Needs significant improvement — focus on fundamentals';
+      const nextSteps = finalScore >= 7
+        ? ['Apply to senior security roles', 'Consider OSCP or CISSP certification', 'Contribute to open source security projects', 'Build a portfolio of CTF writeups', 'Explore bug bounty programs']
+        : finalScore >= 5
+        ? ['Practice on ThreatReady at harder difficulty', 'Complete TryHackMe or HackTheBox labs', 'Study OWASP Top 10 and MITRE ATT&CK', 'Get CompTIA Security+ or CEH certification', 'Work on real-world security projects']
+        : ['Start with CompTIA Security+ fundamentals', 'Complete beginner labs on TryHackMe', 'Study networking and OS security basics', 'Read NIST Cybersecurity Framework', 'Retry this assessment in 30 days'];
+
       await resendClient.emails.send({
         from: 'ThreatReady <noreply@threatready.io>',
         to: candEmail,
         subject: `Your ${roleName} Assessment Results — ThreatReady`,
         html: `
-          <div style="font-family:sans-serif;max-width:560px;margin:0 auto;background:#0a0e1a;color:#e8eaf6;padding:36px;border-radius:14px">
+          <div style="font-family:sans-serif;max-width:600px;margin:0 auto;background:#0a0e1a;color:#e8eaf6;padding:36px;border-radius:14px">
+
+            <!-- Header -->
             <div style="text-align:center;margin-bottom:28px">
               <div style="font-size:28px;font-weight:900;color:#00e5ff;letter-spacing:2px">⚡ THREATREADY</div>
-              <div style="font-size:12px;color:#8890b0;margin-top:4px">Your Assessment Results</div>
+              <div style="font-size:12px;color:#8890b0;margin-top:4px">Cybersecurity Assessment Report</div>
             </div>
-            <div style="text-align:center;background:#111827;border-radius:14px;padding:28px;margin-bottom:24px">
-              <div style="font-size:14px;color:#8890b0;margin-bottom:8px">Hello ${candName},</div>
-              <div style="font-size:56px;font-weight:900;color:${finalScore >= 7 ? '#00e096' : finalScore >= 5 ? '#ffab40' : '#ff5252'}">${finalScore}</div>
-              <div style="font-size:13px;color:#8890b0;margin-bottom:12px">out of 10 · ${roleName} · ${diff}</div>
+
+            <!-- Score Card -->
+            <div style="text-align:center;background:#111827;border-radius:14px;padding:28px;margin-bottom:20px">
+              <div style="font-size:13px;color:#8890b0;margin-bottom:8px">Hello <strong style="color:#e8eaf6">${candName}</strong>,</div>
+              <div style="font-size:64px;font-weight:900;color:${finalScore >= 7 ? '#00e096' : finalScore >= 5 ? '#ffab40' : '#ff5252'};line-height:1">${finalScore}</div>
+              <div style="font-size:13px;color:#8890b0;margin:8px 0 14px">out of 10 · ${roleName} · ${diff}</div>
               <div style="display:inline-block;border:2px solid ${badgeColor};color:${badgeColor};padding:6px 20px;border-radius:20px;font-size:12px;font-weight:800;letter-spacing:2px">${badge.toUpperCase()}</div>
             </div>
-            <div style="font-size:13px;font-weight:700;color:#00e5ff;margin-bottom:12px;letter-spacing:1px;text-transform:uppercase">Question Breakdown</div>
-            ${evalRows}
-            <div style="margin-top:20px;padding:14px;background:#111827;border-radius:10px;font-size:11px;color:#5a6380;text-align:center">
-              Assessment completed on ${new Date().toLocaleDateString()} · ThreatReady Cybersecurity Platform
+
+            <!-- 1. Overall Verdict -->
+            <div style="background:#1a1f2e;border-radius:12px;padding:18px;margin-bottom:16px;border-left:4px solid ${finalScore >= 7 ? '#00e096' : finalScore >= 5 ? '#ffab40' : '#ff5252'}">
+              <div style="font-size:11px;color:#00e5ff;font-weight:700;letter-spacing:1px;margin-bottom:6px">1. OVERALL VERDICT</div>
+              <div style="font-size:14px;font-weight:700;color:#e8eaf6">${verdict}</div>
+            </div>
+
+            <!-- 2. Top Strength -->
+            <div style="background:#1a1f2e;border-radius:12px;padding:18px;margin-bottom:16px;border-left:4px solid #00e096">
+              <div style="font-size:11px;color:#00e5ff;font-weight:700;letter-spacing:1px;margin-bottom:6px">2. YOUR TOP STRENGTH</div>
+              <div style="font-size:12px;color:#8890b0;margin-bottom:4px">${topStrength.category} — Q${evaluations.indexOf(topStrength)+1} (${topStrength.score}/10)</div>
+              <div style="font-size:13px;color:#e8eaf6">${topStrength.strengths}</div>
+            </div>
+
+            <!-- 3. Key Weakness -->
+            <div style="background:#1a1f2e;border-radius:12px;padding:18px;margin-bottom:16px;border-left:4px solid #ff5252">
+              <div style="font-size:11px;color:#00e5ff;font-weight:700;letter-spacing:1px;margin-bottom:6px">3. KEY AREA TO IMPROVE</div>
+              <div style="font-size:12px;color:#8890b0;margin-bottom:4px">${topWeakness.category} — Q${evaluations.indexOf(topWeakness)+1} (${topWeakness.score}/10)</div>
+              <div style="font-size:13px;color:#e8eaf6">${topWeakness.weaknesses}</div>
+            </div>
+
+            <!-- 4. Next Steps -->
+            <div style="background:#1a1f2e;border-radius:12px;padding:18px;margin-bottom:16px;border-left:4px solid #ffab40">
+              <div style="font-size:11px;color:#00e5ff;font-weight:700;letter-spacing:1px;margin-bottom:10px">4. RECOMMENDED NEXT STEPS</div>
+              ${nextSteps.map((s, i) => `<div style="display:flex;gap:10px;margin-bottom:8px"><span style="color:#00e5ff;font-weight:700;min-width:18px">${i+1}.</span><span style="font-size:13px;color:#e8eaf6">${s}</span></div>`).join('')}
+            </div>
+
+            <!-- 5. Question Breakdown -->
+            <div style="background:#1a1f2e;border-radius:12px;padding:18px;margin-bottom:16px;border-left:4px solid #8b5cf6">
+              <div style="font-size:11px;color:#00e5ff;font-weight:700;letter-spacing:1px;margin-bottom:12px">5. QUESTION-BY-QUESTION BREAKDOWN</div>
+              ${evalRows}
+            </div>
+
+            <!-- Footer -->
+            <div style="text-align:center;padding-top:16px;border-top:1px solid #1e2536;font-size:11px;color:#5a6380">
+              Assessment completed on ${new Date().toLocaleDateString()} · ThreatReady Cybersecurity Platform<br/>
+              <span style="color:#8890b0">Keep practicing to improve your score and unlock better opportunities.</span>
             </div>
           </div>
         `
       });
-      console.log('Email report sent to:', candEmail);
+      console.log('Enhanced email report sent to:', candEmail);
     } catch (emailErr) {
       console.error('Email report failed:', emailErr.message);
     }
@@ -1817,6 +1839,121 @@ app.post('/api/candidate/submit', async (req, res) => {
     res.json({ success: true, score: finalScore, badge, evaluations });
   } catch (e) {
     console.error('Candidate submit error:', e.message);
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// ─────────────────────────────────────────────────────
+// HIRING DECISION: Selected / Not Selected
+// ─────────────────────────────────────────────────────
+app.post('/api/b2b/candidate/decision', auth, async (req, res) => {
+  console.log('--- HIRING DECISION ---');
+  try {
+    const { candidate_id, decision, candidate_email, candidate_name, role_id, score } = req.body;
+    if (!candidate_id || !decision) return res.status(400).json({ error: 'candidate_id and decision required' });
+
+    // Add column if missing
+    await pool.query(`ALTER TABLE candidate_assessments ADD COLUMN IF NOT EXISTS hiring_decision VARCHAR(20)`).catch(()=>{});
+
+    // Save decision to DB
+    await pool.query(
+      `UPDATE candidate_assessments SET hiring_decision = $1 WHERE id = $2`,
+      [decision, candidate_id]
+    );
+
+    const roleNames = {
+      cloud: 'Cloud Security', devsecops: 'DevSecOps', appsec: 'Application Security',
+      netsec: 'Network Security', prodsec: 'Product Security', secarch: 'Security Architect',
+      dfir: 'DFIR & Incident Response', grc: 'GRC & Compliance', soc: 'SOC Analyst',
+      threat: 'Threat Hunter', red: 'Red Team', blue: 'Blue Team'
+    };
+    const roleName = roleNames[role_id] || role_id;
+    const isSelected = decision === 'selected';
+
+    // Send decision email to candidate
+    try {
+      const { Resend } = require('resend');
+      const resendClient = new Resend(process.env.RESEND_API_KEY);
+      await resendClient.emails.send({
+        from: 'ThreatReady <noreply@threatready.io>',
+        to: candidate_email,
+        subject: isSelected
+          ? `🎉 Congratulations! You've been selected — ${roleName} — ThreatReady`
+          : `Your ${roleName} Assessment Result — ThreatReady`,
+        html: isSelected ? `
+          <div style="font-family:sans-serif;max-width:560px;margin:0 auto;background:#0a0e1a;color:#e8eaf6;padding:36px;border-radius:14px">
+            <div style="text-align:center;margin-bottom:28px">
+              <div style="font-size:28px;font-weight:900;color:#00e5ff;letter-spacing:2px">⚡ THREATREADY</div>
+            </div>
+            <div style="text-align:center;background:#111827;border-radius:14px;padding:32px;margin-bottom:24px">
+              <div style="font-size:56px;margin-bottom:12px">🎉</div>
+              <h2 style="color:#00e096;font-size:24px;font-weight:900;margin-bottom:8px">Congratulations!</h2>
+              <p style="color:#8890b0;font-size:14px;margin-bottom:0">You have been <strong style="color:#00e096">SELECTED</strong> for the ${roleName} role.</p>
+            </div>
+            <div style="background:#1a1f2e;border-radius:12px;padding:20px;margin-bottom:20px">
+              <table style="width:100%">
+                <tr><td style="color:#8890b0;font-size:12px;padding:6px 0">Candidate</td><td style="color:#e8eaf6;font-size:12px;text-align:right;font-weight:700">${candidate_name}</td></tr>
+                <tr><td style="color:#8890b0;font-size:12px;padding:6px 0">Role Applied</td><td style="color:#00e5ff;font-size:12px;text-align:right;font-weight:700">${roleName}</td></tr>
+                <tr><td style="color:#8890b0;font-size:12px;padding:6px 0">Assessment Score</td><td style="color:#00e096;font-size:14px;text-align:right;font-weight:900">${score}/10</td></tr>
+                <tr><td style="color:#8890b0;font-size:12px;padding:6px 0">Decision</td><td style="color:#00e096;font-size:12px;text-align:right;font-weight:700">✅ Selected</td></tr>
+              </table>
+            </div>
+            <div style="background:#0d2137;border:1px solid rgba(0,229,255,.2);border-radius:12px;padding:20px;margin-bottom:20px">
+              <p style="color:#8890b0;font-size:13px;line-height:1.8;margin:0">
+                Dear <strong style="color:#e8eaf6">${candidate_name}</strong>,<br><br>
+                We are pleased to inform you that based on your cybersecurity assessment performance, you have been <strong style="color:#00e096">selected</strong> to move forward in the hiring process.<br><br>
+                Our team will be in touch shortly with the next steps. Please keep an eye on your inbox.
+              </p>
+            </div>
+            <p style="color:#5a6380;font-size:11px;text-align:center;margin:0">ThreatReady Cybersecurity Assessment Platform · ${new Date().toLocaleDateString()}</p>
+          </div>
+        ` : `
+          <div style="font-family:sans-serif;max-width:560px;margin:0 auto;background:#0a0e1a;color:#e8eaf6;padding:36px;border-radius:14px">
+            <div style="text-align:center;margin-bottom:28px">
+              <div style="font-size:28px;font-weight:900;color:#00e5ff;letter-spacing:2px">⚡ THREATREADY</div>
+            </div>
+            <div style="text-align:center;background:#111827;border-radius:14px;padding:32px;margin-bottom:24px">
+              <div style="font-size:56px;margin-bottom:12px">📋</div>
+              <h2 style="color:#e8eaf6;font-size:22px;font-weight:900;margin-bottom:8px">Assessment Update</h2>
+              <p style="color:#8890b0;font-size:14px;margin-bottom:0">${roleName} · Assessment Complete</p>
+            </div>
+            <div style="background:#1a1f2e;border-radius:12px;padding:20px;margin-bottom:20px">
+              <table style="width:100%">
+                <tr><td style="color:#8890b0;font-size:12px;padding:6px 0">Candidate</td><td style="color:#e8eaf6;font-size:12px;text-align:right;font-weight:700">${candidate_name}</td></tr>
+                <tr><td style="color:#8890b0;font-size:12px;padding:6px 0">Role</td><td style="color:#00e5ff;font-size:12px;text-align:right;font-weight:700">${roleName}</td></tr>
+                <tr><td style="color:#8890b0;font-size:12px;padding:6px 0">Assessment Score</td><td style="color:#ffab40;font-size:14px;text-align:right;font-weight:900">${score}/10</td></tr>
+                <tr><td style="color:#8890b0;font-size:12px;padding:6px 0">Decision</td><td style="color:#ff5252;font-size:12px;text-align:right;font-weight:700">Not Selected</td></tr>
+              </table>
+            </div>
+            <div style="background:#1a1f2e;border-radius:12px;padding:20px;margin-bottom:20px">
+              <p style="color:#8890b0;font-size:13px;line-height:1.8;margin:0">
+                Dear <strong style="color:#e8eaf6">${candidate_name}</strong>,<br><br>
+                Thank you for completing the ${roleName} assessment on ThreatReady. After careful review, we regret to inform you that you have <strong style="color:#ff5252">not been selected</strong> for this position at this time.<br><br>
+                We encourage you to continue building your skills and apply again in the future. Your score of <strong style="color:#ffab40">${score}/10</strong> shows you have foundational knowledge — keep practicing!
+              </p>
+            </div>
+            <div style="background:#0d2a1a;border:1px solid rgba(0,224,150,.2);border-radius:12px;padding:16px;margin-bottom:20px">
+              <p style="color:#00e096;font-size:12px;font-weight:700;margin:0 0 6px">💡 Tips to improve:</p>
+              <ul style="color:#8890b0;font-size:12px;margin:0;padding-left:16px;line-height:1.8">
+                <li>Practice more scenario-based questions on ThreatReady</li>
+                <li>Focus on hands-on labs and CTF challenges</li>
+                <li>Review OWASP, MITRE ATT&CK, and NIST frameworks</li>
+                <li>Consider certifications like CompTIA Security+, CEH, or OSCP</li>
+                <li>Reapply after 3 months of continued practice</li>
+              </ul>
+            </div>
+            <p style="color:#5a6380;font-size:11px;text-align:center;margin:0">ThreatReady Cybersecurity Assessment Platform · ${new Date().toLocaleDateString()}</p>
+          </div>
+        `
+      });
+      console.log(`Decision email (${decision}) sent to:`, candidate_email);
+    } catch (emailErr) {
+      console.error('Decision email failed:', emailErr.message);
+    }
+
+    res.json({ success: true, decision });
+  } catch (e) {
+    console.error('Decision error:', e.message);
     res.status(500).json({ error: e.message });
   }
 });
