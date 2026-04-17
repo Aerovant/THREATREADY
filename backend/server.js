@@ -1587,7 +1587,7 @@ app.post('/api/b2b/invite', auth, async (req, res) => {
         [req.user.id, assessment_id || null, email, candidate_name || name, role_id, difficulty, token]
       );
 
-      const inviteLink = (process.env.FRONTEND_URL || 'http://localhost:5173') + '/assess?token=' + token;
+      const inviteLink = (process.env.FRONTEND_URL || 'http://localhost:5173') + '/?assess_token=' + token;
 
       // Send invite email
       resendClient.emails.send({
@@ -1743,6 +1743,31 @@ app.post('/api/candidate/submit', async (req, res) => {
       `UPDATE candidate_assessments SET status = 'completed', overall_score = $1, completed_at = NOW() WHERE invite_token = $2`,
       [finalScore, token]
     );
+
+    // Send HR notification
+    try {
+      const companyUserId = ca.rows[0].company_user_id;
+      if (companyUserId) {
+        await pool.query(
+          `INSERT INTO notifications (user_id, type, title, message, is_read, created_at)
+           VALUES ($1, 'candidate_completed', $2, $3, false, NOW())`,
+          [
+            companyUserId,
+            `${candName} completed ${roleName} assessment`,
+            `Score: ${finalScore}/10 (${badge}) · ${diff} difficulty`
+          ]
+        ).catch(async () => {
+          await pool.query(`CREATE TABLE IF NOT EXISTS notifications (id SERIAL PRIMARY KEY, user_id INTEGER, type VARCHAR(50), title TEXT, message TEXT, is_read BOOLEAN DEFAULT false, created_at TIMESTAMP DEFAULT NOW())`);
+          await pool.query(
+            `INSERT INTO notifications (user_id, type, title, message, is_read, created_at) VALUES ($1, 'candidate_completed', $2, $3, false, NOW())`,
+            [companyUserId, `${candName} completed ${roleName} assessment`, `Score: ${finalScore}/10 (${badge}) · ${diff} difficulty`]
+          );
+        });
+        console.log('HR notification created for user:', companyUserId);
+      }
+    } catch (notifErr) {
+      console.error('Notification failed:', notifErr.message);
+    }
 
     // Send email report to candidate
     try {
