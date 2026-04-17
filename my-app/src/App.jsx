@@ -3511,22 +3511,171 @@ export default function ThreatReady() {
               ))}
             </div>
 
+            {/* HR NOTIFICATIONS */}
+            <div className="lbl" style={{ marginBottom: 10 }}>🔔 NOTIFICATIONS</div>
+            {(() => {
+              const completed = candidates.filter(c => c.status === "completed");
+              const inProgress = candidates.filter(c => c.status === "in_progress");
+              const pending = candidates.filter(c => c.status === "not_started" || !c.status);
+              if (completed.length === 0 && inProgress.length === 0 && pending.length === 0) {
+                return (
+                  <div className="card fadeUp" style={{ padding: 20, textAlign: "center", fontSize: 12, color: "var(--tx3)" }}>
+                    No notifications yet. Invite candidates to get started.
+                  </div>
+                );
+              }
+              return (
+                <div style={{ marginBottom: 20 }}>
+                  {completed.slice(0, 3).map((c, i) => (
+                    <div key={c.id} className="card fadeUp" style={{ padding: 14, marginBottom: 8, borderLeft: "3px solid var(--ok)", animationDelay: `${i * .04}s` }}>
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                        <div>
+                          <div style={{ fontSize: 12, fontWeight: 700, color: "var(--ok)" }}>✅ {c.candidate_name || c.candidate_email?.split("@")[0]} completed assessment</div>
+                          <div style={{ fontSize: 10, color: "var(--tx3)", marginTop: 3 }}>
+                            {ROLES.find(r => r.id === c.role_id)?.name || c.role_id} · Score: <strong style={{ color: c.overall_score >= 7 ? "var(--ok)" : c.overall_score >= 5 ? "var(--wn)" : "var(--dn)" }}>{c.overall_score}/10</strong>
+                          </div>
+                        </div>
+                        <button className="btn bs" style={{ fontSize: 9, padding: "4px 10px" }}
+                          onClick={() => { setB2bTab("teamskills"); localStorage.setItem('cyberprep_b2btab', 'teamskills'); }}>
+                          View →
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                  {inProgress.slice(0, 2).map((c, i) => (
+                    <div key={c.id} className="card fadeUp" style={{ padding: 14, marginBottom: 8, borderLeft: "3px solid var(--wn)", animationDelay: `${i * .04}s` }}>
+                      <div style={{ fontSize: 12, fontWeight: 700, color: "var(--wn)" }}>● {c.candidate_name || c.candidate_email?.split("@")[0]} is taking the assessment now</div>
+                      <div style={{ fontSize: 10, color: "var(--tx3)", marginTop: 3 }}>{ROLES.find(r => r.id === c.role_id)?.name || c.role_id}</div>
+                    </div>
+                  ))}
+                  {pending.length > 0 && (
+                    <div className="card fadeUp" style={{ padding: 14, borderLeft: "3px solid var(--tx3)" }}>
+                      <div style={{ fontSize: 12, color: "var(--tx2)" }}>⏳ <strong>{pending.length}</strong> candidate(s) haven't started yet</div>
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
+
             <div style={{ display: "grid", gridTemplateColumns: "repeat(2,1fr)", gap: 10, marginTop: 16 }}>
-              <button className="btn bp" onClick={() => { setB2bTab("interview"); localStorage.setItem('cyberprep_b2btab', 'create'); }}>+ Create Assessment</button>
-              <button className="btn bs" onClick={() => { setB2bTab("scores"); localStorage.setItem('cyberprep_b2btab', 'candidates'); }}>View All Scores →</button>
+              <button className="btn bp" onClick={() => { setB2bTab("create"); localStorage.setItem('cyberprep_b2btab', 'create'); }}>+ Create Assessment</button>
+              <button className="btn bs" onClick={() => { setB2bTab("candidates"); localStorage.setItem('cyberprep_b2btab', 'candidates'); }}>Invite Candidates →</button>
             </div>
           </>)}
 
           {/* ── B2: SCORES (Candidate skill scores — empty state guard) ── */}
           {b2bTab === "candidates" && (<>
+            {/* ── INVITE CANDIDATE FORM ── */}
+            <div className="card fadeUp" style={{ padding: 22, marginBottom: 16, borderColor: "var(--ac)", background: "rgba(0,229,255,.02)" }}>
+              <div className="lbl" style={{ marginBottom: 12 }}>📧 INVITE CANDIDATE</div>
+              <input id="invite-email-input" className="input" type="email" placeholder="candidate@company.com"
+                value={inviteEmail} onChange={e => setInviteEmail(e.target.value)} style={{ marginBottom: 10 }} />
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 12 }}>
+                <div>
+                  <div style={{ fontSize: 10, color: "var(--tx3)", marginBottom: 4 }}>ROLE</div>
+                  <select className="input" value={inviteRole} onChange={e => setInviteRole(e.target.value)}>
+                    {ROLES.map(r => <option key={r.id} value={r.id}>{r.icon} {r.name}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <div style={{ fontSize: 10, color: "var(--tx3)", marginBottom: 4 }}>DIFFICULTY</div>
+                  <select className="input" value={inviteDiff} onChange={e => setInviteDiff(e.target.value)}>
+                    {DIFFICULTIES.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
+                  </select>
+                </div>
+              </div>
+              {inviteMsg && (
+                <div style={{ padding: 9, borderRadius: 8, marginBottom: 10, fontSize: 11, background: inviteMsg.includes("✅") ? "rgba(0,224,150,.1)" : "rgba(255,82,82,.1)", color: inviteMsg.includes("✅") ? "var(--ok)" : "var(--dn)" }}>
+                  {inviteMsg}
+                </div>
+              )}
+              <button className="btn bp" style={{ width: "100%", padding: 12, fontSize: 14 }}
+                disabled={!inviteEmail.trim()}
+                onClick={async () => {
+                  if (!inviteEmail.trim()) return;
+                  setInviteMsg('Sending invite...');
+                  try {
+                    const token = localStorage.getItem('token');
+                    const res = await fetch('https://threatready-db.onrender.com/api/b2b/invite', {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                      body: JSON.stringify({ candidate_email: inviteEmail, role_id: inviteRole, difficulty: inviteDiff })
+                    });
+                    const data = await res.json();
+                    if (data.candidate || data.candidates) {
+                      setInviteMsg('✅ Invite sent to ' + inviteEmail);
+                      setInviteEmail('');
+                      loadB2bData();
+                      setTimeout(() => setInviteMsg(''), 3000);
+                    } else {
+                      setInviteMsg('❌ ' + (data.error || 'Failed'));
+                    }
+                  } catch (e) { setInviteMsg('❌ ' + e.message); }
+                }}>
+                📧 Send Assessment Invite
+              </button>
+            </div>
+
+            {/* ── ALL CANDIDATES TABLE ── */}
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
+              <div className="lbl">ALL CANDIDATES ({candidates.length})</div>
+              <button className="btn bs" style={{ fontSize: 10, padding: "4px 10px" }}
+                onClick={() => {
+                  const csv = ['Name,Email,Role,Difficulty,Score,Status,Invited']
+                    .concat(candidates.map(c => `${c.candidate_name || ''},${c.candidate_email || ''},${c.role_id || ''},${c.difficulty || ''},${c.overall_score || ''},${c.status || ''},${c.invited_at?.substring(0, 10) || ''}`))
+                    .join('\n');
+                  const a = document.createElement('a');
+                  a.href = 'data:text/csv,' + encodeURIComponent(csv);
+                  a.download = 'candidates.csv'; a.click();
+                }}>📥 Export CSV</button>
+            </div>
+            {b2bLoading && <div style={{ textAlign: "center", padding: 20 }}><div className="loader" /></div>}
+            <div className="card fadeUp" style={{ padding: 0, overflow: "hidden" }}>
+              <div style={{ display: "grid", gridTemplateColumns: "2fr 2fr 1fr 1fr 1fr 0.5fr", padding: "10px 14px", background: "var(--s2)", fontSize: 9, fontWeight: 700, color: "var(--ac)", letterSpacing: 1, textTransform: "uppercase" }}>
+                <span>Name</span><span>Email</span><span>Role</span><span>Score</span><span>Status</span><span></span>
+              </div>
+              {candidates.length === 0 && !b2bLoading && (
+                <div style={{ padding: 20, textAlign: "center", color: "var(--tx3)", fontSize: 12 }}>No candidates yet. Use the invite form above.</div>
+              )}
+              {candidates.map((c, i) => (
+                <div key={c.id} style={{ display: "grid", gridTemplateColumns: "2fr 2fr 1fr 1fr 1fr 0.5fr", padding: "10px 14px", borderTop: "1px solid var(--bd)", fontSize: 11, alignItems: "center" }}>
+                  <span style={{ fontWeight: 600 }}>{c.candidate_name || c.candidate_email?.split("@")[0] || '—'}</span>
+                  <span style={{ color: "var(--tx3)", fontSize: 10 }}>{c.candidate_email}</span>
+                  <span>{c.role_id ? (ROLES.find(r => r.id === c.role_id)?.icon || c.role_id) : "—"}</span>
+                  <span className="mono" style={{ fontWeight: 700, color: c.overall_score ? (c.overall_score >= 7 ? "var(--ok)" : c.overall_score >= 5 ? "var(--wn)" : "var(--dn)") : "var(--tx3)" }}>
+                    {c.overall_score ? `${c.overall_score}/10` : "—"}
+                  </span>
+                  <span style={{ fontSize: 9, fontWeight: 600, color: c.status === "completed" ? "var(--ok)" : c.status === "in_progress" ? "var(--wn)" : "var(--tx3)" }}>
+                    {c.status === "completed" ? "✓ Done" : c.status === "in_progress" ? "● Active" : "○ Pending"}
+                  </span>
+                  <span>
+                    <button style={{ background: "none", border: "none", cursor: "pointer", fontSize: 14, color: "var(--dn)", padding: "2px 6px" }}
+                      title="Delete"
+                      onClick={async () => {
+                        if (!window.confirm(`Delete ${c.candidate_name || c.candidate_email}?`)) return;
+                        const token = localStorage.getItem('token');
+                        const res = await fetch(`https://threatready-db.onrender.com/api/b2b/candidates/${c.id}`, {
+                          method: 'DELETE', headers: { 'Authorization': `Bearer ${token}` }
+                        });
+                        const data = await res.json();
+                        if (data.success) { loadB2bData(); showToast('Deleted.', 'success'); }
+                      }}>🗑</button>
+                  </span>
+                </div>
+              ))}
+            </div>
+          </>)}
+
+          {/* ── TEAM SKILLS TAB ── */}
+          {b2bTab === "teamskills" && (<>
             {candidates.filter(c => c.status === "completed" && c.overall_score).length === 0 ? (
               <div className="card fadeUp" style={{ padding: 48, textAlign: "center" }}>
                 <div style={{ fontSize: 56, marginBottom: 16 }}>📊</div>
                 <h3 style={{ fontSize: 18, fontWeight: 800, marginBottom: 8 }}>No Scores Yet</h3>
                 <p style={{ fontSize: 12, color: "var(--tx2)", marginBottom: 20, lineHeight: 1.7 }}>
-                  Invite candidates and have them complete assessments to see their scores and skill benchmarks here.
+                  Invite candidates and have them complete assessments to see scores here.
                 </p>
-                <button className="btn bp" style={{ padding: "10px 28px" }} onClick={() => { setB2bTab("interview"); localStorage.setItem('cyberprep_b2btab', 'create'); }}>
+                <button className="btn bp" style={{ padding: "10px 28px" }} onClick={() => { setB2bTab("candidates"); localStorage.setItem('cyberprep_b2btab', 'candidates'); }}>
                   Invite Candidates →
                 </button>
               </div>
@@ -3571,7 +3720,6 @@ export default function ThreatReady() {
                   );
                 })}
               </div>
-              {/* Summary insights */}
               <div className="card fadeUp" style={{ padding: 14, fontSize: 11, lineHeight: 1.8, color: "var(--tx2)" }}>
                 <div className="lbl" style={{ marginBottom: 8 }}>INSIGHTS</div>
                 {teamMembers.filter(m => m.score >= 7).length > 0 && (
