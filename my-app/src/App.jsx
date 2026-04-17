@@ -559,8 +559,13 @@ export default function ThreatReady() {
 
   const [view, setViewState] = useState(() => {
     // ── CANDIDATE ASSESSMENT LINK — check FIRST before any other routing ──
+    // Accept any of these URL formats:
+    //   /?assess_token=xxx
+    //   /?token=xxx  (when on /assess path)
+    //   /assess?token=xxx
     const params = new URLSearchParams(window.location.search);
-    const assessToken = params.get("assess_token");
+    const path = window.location.pathname;
+    const assessToken = params.get("assess_token") || (path.includes('/assess') ? params.get("token") : null);
     if (assessToken) return 'candidate-assess';
 
     const token = localStorage.getItem('token');
@@ -699,7 +704,11 @@ export default function ThreatReady() {
   const [newAssessType, setNewAssessType] = useState('standard');
   const [assessMsg, setAssessMsg] = useState('');
   // ── CANDIDATE ASSESSMENT STATE ──
-  const [candidateToken] = useState(() => new URLSearchParams(window.location.search).get("assess_token") || "");
+  const [candidateToken] = useState(() => {
+    const params = new URLSearchParams(window.location.search);
+    const path = window.location.pathname;
+    return params.get("assess_token") || (path.includes('/assess') ? params.get("token") : "") || "";
+  });
   const [candidateAssessState, setCandidateAssessState] = useState('loading');
   const [candidateAssessData, setCandidateAssessData] = useState(null);
   const [candidateAssessError, setCandidateAssessError] = useState('');
@@ -3475,8 +3484,39 @@ export default function ThreatReady() {
                 {" · "}{candidates.length} candidates · {assessments.length} assessments
               </div>
             </div>
-            <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+            <div style={{ display: "flex", gap: 6, alignItems: "center", position: "relative" }}>
               <span className="tag" style={{ padding: "5px 12px" }}>⚡ {xp} XP</span>
+
+              {/* Notification Bell */}
+              <div style={{ position: "relative" }}>
+                <button className="btn bs" style={{ padding: "5px 10px", fontSize: 14, position: "relative" }}
+                  onClick={async () => {
+                    setShowNotifs(p => !p);
+                    if (unreadCount > 0) {
+                      const token = localStorage.getItem('token');
+                      await fetch('https://threatready-db.onrender.com/api/notifications/read', { method: 'POST', headers: { 'Authorization': `Bearer ${token}` } });
+                      setUnreadCount(0);
+                    }
+                  }}>
+                  🔔{unreadCount > 0 && <span style={{ background: "var(--dn)", color: "#fff", fontSize: 8, fontWeight: 700, borderRadius: "50%", padding: "1px 4px", marginLeft: 3 }}>{unreadCount}</span>}
+                </button>
+                {showNotifs && (
+                  <div style={{ position: "absolute", top: "100%", right: 0, marginTop: 6, width: 320, maxHeight: 400, overflow: "auto", background: "var(--s1)", border: "1px solid var(--bd)", borderRadius: 10, boxShadow: "0 10px 30px rgba(0,0,0,.5)", zIndex: 1000 }}>
+                    <div style={{ padding: "10px 14px", borderBottom: "1px solid #1e2536", fontSize: 11, fontWeight: 700, color: "var(--ac)", letterSpacing: 1 }}>NOTIFICATIONS</div>
+                    {notifications.length === 0
+                      ? <div style={{ padding: 16, fontSize: 11, color: "var(--tx3)", textAlign: "center" }}>No notifications yet</div>
+                      : notifications.map((n, i) => (
+                        <div key={n.id || i} style={{ padding: "10px 14px", borderBottom: i < notifications.length - 1 ? "1px solid #1e2536" : "none", background: n.is_read ? "transparent" : "rgba(0,229,255,.04)" }}>
+                          <div style={{ fontSize: 12, fontWeight: 600, color: "var(--tx1)" }}>{n.title || n.type}</div>
+                          <div style={{ fontSize: 10, color: "var(--tx2)", marginTop: 2 }}>{n.message}</div>
+                          <div style={{ fontSize: 9, color: "var(--tx3)", marginTop: 3 }}>{n.created_at?.substring(0, 16).replace('T', ' ')}</div>
+                        </div>
+                      ))
+                    }
+                  </div>
+                )}
+              </div>
+
               <button className="btn bs" style={{ padding: "5px 10px", fontSize: 10 }} onClick={() => { setUserType("b2c"); setView("dashboard"); }}>B2C View</button>
               <button className="btn bs" style={{ padding: "5px 10px", fontSize: 10 }} onClick={logout}>Logout</button>
             </div>
