@@ -2013,25 +2013,44 @@ app.delete('/api/b2b/assessments/:id', auth, async (req, res) => {
 
 // B2B Duplicate Assessment
 app.post('/api/b2b/assessments/:id/duplicate', auth, async (req, res) => {
+  console.log('--- DUPLICATE ASSESSMENT ---', req.params.id);
   try {
     const orig = await pool.query(
       `SELECT * FROM b2b_assessments WHERE id = $1 AND company_user_id = $2`,
       [req.params.id, req.user.id]
     );
-    if (!orig.rows[0]) return res.status(404).json({ error: 'Not found' });
+    if (!orig.rows[0]) {
+      console.log('Duplicate: assessment not found');
+      return res.status(404).json({ error: 'Assessment not found' });
+    }
     const a = orig.rows[0];
 
-    // Ensure questions column exists
+    // Ensure columns exist
     await pool.query(`ALTER TABLE b2b_assessments ADD COLUMN IF NOT EXISTS questions JSONB`).catch(()=>{});
+    await pool.query(`ALTER TABLE b2b_assessments ADD COLUMN IF NOT EXISTS question_count INTEGER DEFAULT 5`).catch(()=>{});
+
+    // Stringify questions if they're an object (PostgreSQL JSONB parameter)
+    const questionsParam = a.questions ? JSON.stringify(a.questions) : null;
 
     const result = await pool.query(
       `INSERT INTO b2b_assessments
-        (company_user_id, name, role_id, difficulty, assessment_type, jd_text, questions, created_at)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, NOW()) RETURNING *`,
-      [req.user.id, a.name + ' (Copy)', a.role_id, a.difficulty, a.assessment_type, a.jd_text, a.questions || null]
+        (company_user_id, name, role_id, difficulty, assessment_type, jd_text, questions, question_count, created_at)
+       VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb, $8, NOW()) RETURNING *`,
+      [
+        req.user.id,
+        (a.name || 'Assessment') + ' (Copy)',
+        a.role_id,
+        a.difficulty,
+        a.assessment_type || 'standard',
+        a.jd_text || '',
+        questionsParam,
+        a.question_count || 5
+      ]
     );
+    console.log('Duplicate created: id', result.rows[0].id);
     res.json({ assessment: result.rows[0] });
   } catch (e) {
+    console.error('Duplicate error:', e.message);
     res.status(500).json({ error: e.message });
   }
 });
