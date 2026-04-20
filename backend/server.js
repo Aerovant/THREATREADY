@@ -1437,9 +1437,17 @@ app.get('/api/b2b/candidates', auth, async (req, res) => {
       `SELECT ca.id, ca.candidate_email, ca.candidate_name,
         ca.role_id, ca.difficulty, ca.status,
         ca.invited_at, ca.completed_at,
-        s.overall_score, s.badge
+        ca.overall_score,
+        CASE
+          WHEN ca.overall_score >= 8 THEN 'Platinum'
+          WHEN ca.overall_score >= 7 THEN 'Gold'
+          WHEN ca.overall_score >= 6 THEN 'Silver'
+          WHEN ca.overall_score >= 4 THEN 'Bronze'
+          WHEN ca.overall_score IS NOT NULL THEN 'Not Ready'
+          ELSE NULL
+        END as badge,
+        ca.hiring_decision
        FROM candidate_assessments ca
-       LEFT JOIN sessions s ON s.id = ca.session_id
        WHERE ca.company_user_id = $1
        ORDER BY ca.invited_at DESC`,
       [req.user.id]
@@ -1458,10 +1466,9 @@ app.get('/api/b2b/assessments', auth, async (req, res) => {
       `SELECT ba.*,
         COUNT(ca.id) as total_candidates,
         SUM(CASE WHEN ca.status = 'completed' THEN 1 ELSE 0 END) as completed_count,
-        ROUND(AVG(CASE WHEN ca.status = 'completed' THEN s.overall_score END)::numeric, 1) as avg_score
+        ROUND(AVG(CASE WHEN ca.status = 'completed' THEN ca.overall_score END)::numeric, 1) as avg_score
        FROM b2b_assessments ba
        LEFT JOIN candidate_assessments ca ON ca.assessment_id = ba.id
-       LEFT JOIN sessions s ON s.id = ca.session_id
        WHERE ba.company_user_id = $1
        GROUP BY ba.id
        ORDER BY ba.created_at DESC`,
@@ -1726,22 +1733,30 @@ app.post('/api/candidate/submit', async (req, res) => {
     const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
     const evaluations = [];
-    for (const ans of answers) {
+    for (let i = 0; i < answers.length; i++) {
+      const ans = answers[i];
       try {
         const msg = await anthropic.messages.create({
           model: MODEL_EVALUATION, max_tokens: 800,
           messages: [{ role: 'user', content: `You are an expert cybersecurity evaluator. Score this ${diff} level ${roleName} answer strictly.\nQuestion: ${ans.question}\nAnswer: ${ans.answer}\nRespond ONLY valid JSON: {"score":7,"strengths":"what was good in 1 sentence","weaknesses":"what was missing in 1 sentence","improved_answer":"ideal answer in 2-3 sentences"}` }]
         });
-        const ev = JSON.parse(msg.content[0].text.replace(/```json|```/g,'').trim());
+        const rawText = msg.content[0].text.replace(/```json|```/g,'').trim();
+        const ev = JSON.parse(rawText);
+        // Ensure score is a valid number between 0-10
+        const rawScore = parseFloat(ev.score);
+        ev.score = (!isNaN(rawScore) && rawScore >= 0 && rawScore <= 10) ? rawScore : 5;
+        console.log(`Q${i+1} evaluated: score=${ev.score}`);
         evaluations.push({ question: ans.question, answer: ans.answer, category: ans.category || 'General', ...ev });
       } catch (e) {
+        console.error(`Q${i+1} eval failed:`, e.message);
         evaluations.push({ question: ans.question, answer: ans.answer, category: ans.category || 'General', score: 5, strengths: 'Answer received', weaknesses: 'Evaluation unavailable', improved_answer: '-' });
       }
     }
 
-    const avgScore = evaluations.reduce((s, e) => s + (e.score || 5), 0) / evaluations.length;
-    const finalScore = Math.round(avgScore * 10) / 10;
+    const avgScore = evaluations.reduce((s, e) => s + (parseFloat(e.score) || 5), 0) / evaluations.length;
+    const finalScore = Math.max(0, Math.min(10, Math.round(avgScore * 10) / 10));
     const badge = finalScore >= 8 ? 'Platinum' : finalScore >= 7 ? 'Gold' : finalScore >= 6 ? 'Silver' : finalScore >= 4 ? 'Bronze' : 'Not Ready';
+    console.log('Final score:', finalScore, '| Badge:', badge, '| Evaluations count:', evaluations.length);
 
     // Ensure required columns exist before UPDATE
     await pool.query(`ALTER TABLE candidate_assessments ADD COLUMN IF NOT EXISTS overall_score NUMERIC(4,2)`).catch(()=>{});
