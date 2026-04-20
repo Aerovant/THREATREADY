@@ -446,14 +446,28 @@ function PasswordStrength({ password }) {
 // ── TIME FORMAT ──
 const fmt = s => `${Math.floor(s / 60)}:${(s % 60).toString().padStart(2, "0")}`;
 
-// ── AI AVATAR COMPONENT — Real Online Photos ──
+// ── AI AVATAR COMPONENT — Video Avatars ──
 function AIAvatar({ isSpeaking, isMuted, qIndex }) {
   const isFemale = qIndex % 2 === 0;
+  const videoRef = useRef(null);
+
+  // Play/pause video based on speaking state
+  useEffect(() => {
+    if (videoRef.current) {
+      if (isSpeaking && !isMuted) {
+        videoRef.current.play().catch(() => {});
+      } else {
+        videoRef.current.pause();
+        videoRef.current.currentTime = 0;
+      }
+    }
+  }, [isSpeaking, isMuted]);
+
   return (
-    <div style={{ display: "flex", flexDirection: "column", alignItems: "center", marginBottom: 0 }}>
+    <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-start", marginBottom: 0 }}> 
       <div style={{ position: "relative", width: 48, height: 48 }}>
 
-        {/* Outer pulse ring when speaking */}
+        {/* Outer pulse ring when speaking
         {isSpeaking && (
           <>
             <div style={{
@@ -469,11 +483,11 @@ function AIAvatar({ isSpeaking, isMuted, qIndex }) {
               opacity: 0.3
             }} />
           </>
-        )}
+        )} */}
 
-        {/* Hacker image */}
+        {/* Video Avatar */}
         <div style={{
-          width: 48, height: 48, borderRadius: 8,
+          width: 100, height: 100, borderRadius: 5,
           overflow: "hidden", position: "relative",
           border: `2px solid ${isSpeaking ? (isFemale ? "#ff6b9d" : "#00e5ff") : "#1e2536"}`,
           transition: "border-color 0.3s",
@@ -481,9 +495,13 @@ function AIAvatar({ isSpeaking, isMuted, qIndex }) {
             ? `0 0 30px ${isFemale ? "rgba(255,107,157,0.4)" : "rgba(0,229,255,0.4)"}`
             : "0 4px 20px rgba(0,0,0,0.5)"
         }}>
-          <img
-            src="/avatar-hacker.jpeg"
-            alt="AI Interviewer"
+          <video
+            ref={videoRef}
+            key={isFemale ? "female" : "male"}
+            src={isFemale ? "/women.mp4" : "/men.mp4"}
+            muted
+            loop
+            playsInline
             style={{ width: "100%", height: "100%", objectFit: "cover", objectPosition: "center top" }}
           />
 
@@ -624,6 +642,22 @@ export default function ThreatReady() {
   const [selectedRoles, setSelectedRoles] = useState([]);
   const [isPaid, setIsPaid] = useState(false);
   const [freeAttempts, setFreeAttempts] = useState(2);
+  // Per-role attempts tracking for free trial (2 attempts per role)
+  const [roleAttempts, setRoleAttempts] = useState(() => {
+    const saved = localStorage.getItem('roleAttempts');
+    return saved ? JSON.parse(saved) : {};
+  });
+  useEffect(() => {
+    localStorage.setItem('roleAttempts', JSON.stringify(roleAttempts));
+  }, [roleAttempts]);
+  const getRemainingAttempts = (roleId) => {
+    const used = roleAttempts[roleId] || 0;
+    return Math.max(0, 2 - used);
+  };
+  const isTrialExhausted = () => {
+    if (isPaid || subscribedRoles.length === 0) return false;
+    return subscribedRoles.every(rid => getRemainingAttempts(rid) === 0);
+  };
   const [billingPeriod, setBillingPeriod] = useState('monthly'); // 'monthly' | 'yearly'
   const [trialRoles, setTrialRoles] = useState([]); // exactly 2 roles for free trial
 
@@ -714,6 +748,7 @@ export default function ThreatReady() {
   const [newAssessRole, setNewAssessRole] = useState('cloud');
   const [newAssessDiff, setNewAssessDiff] = useState('intermediate');
   const [newAssessType, setNewAssessType] = useState('standard');
+  const [newAssessQuestionCount, setNewAssessQuestionCount] = useState(5);
   const [assessMsg, setAssessMsg] = useState('');
   // ── CANDIDATE ASSESSMENT STATE ──
   const [candidateToken] = useState(() => {
@@ -1220,17 +1255,20 @@ export default function ThreatReady() {
   // ── SCENARIO LOGIC ──
 
   const startScenario = async (sc, diff) => {
-
     // ── ROLE ACCESS CHECK ──
-    const roleSubscribed = subscribedRoles.includes(activeRole);
-    const hasAccess = roleSubscribed || freeAttempts > 0;
+    const roleInTrial = subscribedRoles.includes(activeRole);
+    const remaining = getRemainingAttempts(activeRole);
+    const hasAccess = isPaid || (roleInTrial && remaining > 0);
     if (!hasAccess) {
+      if (roleInTrial && remaining === 0) {
+        setView("trial-complete");
+        return;
+      }
       showToast('Subscribe to ' + (ROLES.find(r => r.id === activeRole)?.name || activeRole) + ' to unlock access.', 'warning');
       setView("dashboard");
       setDashTab("billing");
       return;
     }
-    if (!roleSubscribed && freeAttempts <= 0) return;
 
     // Create session in backend FIRST to get session_id
     let newSessionId = null;
@@ -1248,7 +1286,7 @@ export default function ThreatReady() {
         const data = await res.json();
         newSessionId = data.session_id;
         setSessionId(data.session_id);
-        window.__sessionId = data.session_id; // store globally for stale closure fix
+        window.__sessionId = data.session_id;
       }
     } catch (e) {
       console.log('Session start error:', e);
@@ -1263,8 +1301,12 @@ export default function ThreatReady() {
     setCurrentQ(first); setAskedQs([first.id]);
     voice.reset();
     setView("interview");
-    setTimeout(() => speakQuestion(first.t), 800);
-    if (!subscribedRoles.includes(activeRole)) setFreeAttempts(p => p - 1);
+    setTimeout(() => speakQuestion(first.t, 0), 800);
+
+    // Decrement per-role attempt (only for trial users)
+    if (!isPaid) {
+      setRoleAttempts(prev => ({ ...prev, [activeRole]: (prev[activeRole] || 0) + 1 }));
+    }
   };
 
   // ── SPEAK QUESTION ──
@@ -1440,7 +1482,7 @@ export default function ThreatReady() {
       setCurrentQ(nextQ); setAskedQs(p => [...p, nextQ.id]); setQIndex(p => p + 1);
       setShowHint(false); voice.reset(); setAnswers(p => ({ ...p, [currentQ.id]: ans }));
       setLoading(false);
-      setTimeout(() => speakQuestion(nextQ.t), 300);
+      setTimeout(() => speakQuestion(nextQ.t, qIndex + 1), 300);
     } else {
       // Complete - calculate scores
       const avg = (arr, k) => arr.reduce((s, e) => s + (e[k] || 5), 0) / arr.length;
@@ -1464,7 +1506,7 @@ export default function ThreatReady() {
       setStreak(p => p + 1);
       setLoading(false);
       // Route: trial exhausted → trial-complete, otherwise → results
-      if (!isPaid && freeAttempts <= 0) {
+      if (!isPaid && isTrialExhausted()) {
         setView("trial-complete");
       } else {
         setView("results");
@@ -1579,7 +1621,12 @@ export default function ThreatReady() {
             showToast('Payment verification failed. Contact support.', 'error');
           }
         },
-        prefill: { name: user?.name || '', email: user?.email || '' },
+        prefill: {
+          name: user?.name || '',
+          email: user?.email || '',
+          contact: ''  // Leave empty so user enters their own number
+        },
+        remember_customer: false,  // Don't save number for next visit
         theme: { color: '#00e5ff' }
       };
       const rzp = new window.Razorpay(options);
@@ -1617,10 +1664,11 @@ export default function ThreatReady() {
     localStorage.removeItem('cyberprep_b2btab');
     localStorage.removeItem('subscribedRoles');
     localStorage.removeItem('freeAttempts');
+    localStorage.removeItem('roleAttempts');
     setUser(null); setUserType('b2c'); setSettingsName('');
     setResumeText(''); setTargetRole(''); setExperienceLevel('');
     setXp(0); setStreak(0); setCompletedScenarios([]);
-    setIsPaid(false); setFreeAttempts(2);
+    setIsPaid(false); setFreeAttempts(2); setRoleAttempts({});
     setView("landing");
   };
   const logout = () => showConfirm('Are you sure you want to logout?', doLogout);
@@ -1830,16 +1878,20 @@ export default function ThreatReady() {
                 })}
               </div>
               <div style={{ fontSize: 11, color: "var(--tx3)", marginBottom: 16 }}>
-                2 roles selected · Beginner difficulty · 2 total attempts
+                2 roles selected · Beginner difficulty · 2 attempts per role (4 total)
               </div>
               <button className="btn bp" style={{ width: "100%", padding: "14px 0", fontSize: 15 }}
                 onClick={() => {
+                  const init = {};
+                  trialRoles.forEach(rid => { init[rid] = 0; });
+                  setRoleAttempts(init);
                   setSubscribedRoles(trialRoles);
-                  setFreeAttempts(2);
                   setIsPaid(false);
+                  localStorage.setItem('subscribedRoles', JSON.stringify(trialRoles));
+                  localStorage.setItem('roleAttempts', JSON.stringify(init));
                   setView("dashboard");
                   setDashTab("home");
-                  showToast("Free trial started! Select a role from the Interview tab to begin.", "success");
+                  showToast("Free trial started! 2 attempts per role on Beginner only.", "success");
                 }}>
                 Start Free Trial →
               </button>
@@ -1860,7 +1912,10 @@ export default function ThreatReady() {
         <div className="card fadeUp" style={{ maxWidth: 520, width: "90%", padding: 40, textAlign: "center", borderColor: "var(--ac)" }}>
           <div style={{ fontSize: 64, marginBottom: 12 }}>🎉</div>
           <div className="lbl" style={{ marginBottom: 8, color: "var(--ok)" }}>FREE TRIAL COMPLETE</div>
-          <h2 style={{ fontSize: 24, fontWeight: 800, marginBottom: 10 }}>You've Used Both Free Attempts</h2>
+          <h2 style={{ fontSize: 24, fontWeight: 800, marginBottom: 10 }}>You've Used All Your Free Attempts</h2>
+          <p style={{ fontSize: 12, color: "var(--tx2)", marginBottom: 16 }}>
+            Sign up and subscribe to any roles you want — pick as many as you need.
+          </p>
 
           {results && (
             <div style={{ background: "var(--s2)", borderRadius: 12, padding: 16, marginBottom: 20 }}>
@@ -2251,19 +2306,24 @@ export default function ThreatReady() {
             <span style={{ fontSize: 48 }}>{role?.icon}</span>
             <h2 style={{ fontSize: 24, fontWeight: 800, marginTop: 8 }}>{role?.name}</h2>
             <p style={{ fontSize: 12, color: "var(--tx2)", marginTop: 4 }}>Select difficulty level</p>
-            {!isPaid && <div style={{ fontSize: 11, color: "var(--wn)", marginTop: 8 }}>⚠️ Free trial: {freeAttempts} attempt{freeAttempts !== 1 ? "s" : ""} remaining (Beginner only)</div>}
+            {!isPaid && (
+              <div style={{ fontSize: 11, color: "var(--wn)", marginTop: 8 }}>
+                ⚠️ Free trial: {getRemainingAttempts(activeRole)} attempt{getRemainingAttempts(activeRole) !== 1 ? "s" : ""} remaining for {ROLES.find(r => r.id === activeRole)?.name} (Beginner only)
+              </div>
+            )}
           </div>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(2,1fr)", gap: 14 }}>
             {DIFFICULTIES.map((d, i) => {
-              // Role is subscribed = all levels unlocked for THIS role
-              const roleSubscribed = subscribedRoles.includes(activeRole);
-              const locked = !roleSubscribed && d.id !== "beginner";
+              // In free trial: ONLY beginner unlocked. Paid: all levels unlocked
+              const locked = !isPaid && d.id !== "beginner";
+              const trialExhausted = !isPaid && d.id === "beginner" && getRemainingAttempts(activeRole) === 0;
+              const disabled = locked || trialExhausted;
               return (
-                <div key={d.id} className={`card fadeUp ${locked ? "" : "card-glow"}`}
-                  style={{ padding: 20, textAlign: "center", animationDelay: `${i * .08}s`, opacity: locked ? 0.4 : 1, cursor: locked ? "not-allowed" : "pointer", borderColor: locked ? "var(--bd)" : d.color + "40" }}
+                <div key={d.id} className={`card fadeUp ${disabled ? "" : "card-glow"}`}
+                  style={{ padding: 20, textAlign: "center", animationDelay: `${i * .08}s`, opacity: disabled ? 0.4 : 1, cursor: disabled ? "not-allowed" : "pointer", borderColor: disabled ? "var(--bd)" : d.color + "40" }}
                   onClick={() => {
-                    if (locked) { showToast("Subscribe to " + (ROLES.find(r => r.id === activeRole)?.name || activeRole) + " to unlock " + d.name + " difficulty.", "warning"); return; }
-                    if (!roleSubscribed && freeAttempts <= 0) { setView("trial-complete"); return; }
+                    if (locked) { showToast("Subscribe to unlock " + d.name + " difficulty.", "warning"); return; }
+                    if (trialExhausted) { setView("trial-complete"); return; }
                     const scs = SCENARIOS[activeRole];
                     if (scs?.length) startScenario(scs[Math.floor(Math.random() * scs.length)], d.id);
                   }}>
@@ -2273,10 +2333,10 @@ export default function ThreatReady() {
                   <div style={{ fontSize: 9, color: "var(--tx3)" }}>
                     Hints: {d.hints === true ? "Full" : d.hints === "reduced" ? "Reduced" : d.hints === "minimal" ? "Minimal" : "None"}
                   </div>
-                  {locked
-                    ? <div style={{ fontSize: 10, color: "var(--wn)", marginTop: 8 }}>🔒 Subscribe to unlock</div>
-                    : <div style={{ fontSize: 10, color: "var(--ok)", marginTop: 8 }}>🔓 Unlocked</div>
-                  }
+                  {locked && <div style={{ fontSize: 10, color: "var(--wn)", marginTop: 8 }}>🔒 Subscribe to unlock</div>}
+                  {trialExhausted && <div style={{ fontSize: 10, color: "var(--dn)", marginTop: 8 }}>⚠️ No attempts left — subscribe</div>}
+                  {!locked && !trialExhausted && !isPaid && <div style={{ fontSize: 10, color: "var(--ok)", marginTop: 8 }}>🆓 {getRemainingAttempts(activeRole)} free attempt{getRemainingAttempts(activeRole) !== 1 ? "s" : ""} left</div>}
+                  {!locked && !trialExhausted && isPaid && <div style={{ fontSize: 10, color: "var(--ok)", marginTop: 8 }}>🔓 Unlocked</div>}
                 </div>
               );
             })}
@@ -2307,7 +2367,7 @@ export default function ThreatReady() {
             <AIAvatar isSpeaking={isSpeaking} isMuted={isMuted} qIndex={qIndex} />
             <span className="mono" style={{ fontSize: 14, color: elapsed > 600 ? "var(--dn)" : "var(--ac)" }}>⏱ {fmt(elapsed)}</span>
             ..
-            <button className="btn bs" style={{ padding: "4px 10px", fontSize: 10, color: "var(--dn)", borderColor: "var(--dn)" }} onClick={exitScenario}>Exit</button>
+            <button className="btn bs" style={{ padding: "7px 20px", fontSize: 10, color: "var(--dn)", borderColor: "var(--dn)" }} onClick={exitScenario}>Exit</button>
           </div>
         </div>
 
@@ -2530,7 +2590,7 @@ export default function ThreatReady() {
             📤 Share Score on LinkedIn
           </button>
         </div>
-        {!isPaid && freeAttempts <= 0 && (
+        {!isPaid && isTrialExhausted() && (
           <button className="btn bp" style={{ width: "100%", marginTop: 12, padding: 14, fontSize: 14 }} onClick={() => setView("trial-complete")}>
             🔓 View Subscription Options →
           </button>
@@ -2631,7 +2691,7 @@ export default function ThreatReady() {
             <div>
               <h2 style={{ fontSize: 22, fontWeight: 800 }}>Welcome, {user?.name || "Agent"}</h2>
               <div style={{ fontSize: 12, color: "var(--tx2)", marginTop: 3 }}>
-                {isPaid ? `${subscribedRoles.length} tracks` : `Free trial · ${freeAttempts} attempts left`} · {completedScenarios.length} completed · {streak} day streak
+                {isPaid ? `${subscribedRoles.length} tracks` : `Free trial · ${subscribedRoles.reduce((s, rid) => s + getRemainingAttempts(rid), 0)} attempts left`} · {completedScenarios.length} completed · {streak} day streak
               </div>
             </div>
             <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
@@ -2673,12 +2733,33 @@ export default function ThreatReady() {
             </div>
           </div>
 
-          {/* Nav Tabs */}
+         {/* Nav Tabs */}
           <div className="nav-tabs">
-            {tabs.map(t => (
-              <div key={t.id} className={`nav-tab ${dashTab === t.id ? "active" : ""}`} onClick={() => { setDashTab(t.id); localStorage.setItem('cyberprep_tab', t.id); }}>{t.label}</div>
-            ))}
+            {tabs.map(t => {
+              // Lock tabs ONLY for non-logged-in trial users. Logged-in users can access all tabs.
+              const isLocked = !user && t.id !== "home";
+              return (
+                <div key={t.id}
+                  className={`nav-tab ${dashTab === t.id ? "active" : ""}`}
+                  style={{
+                    opacity: isLocked ? 0.35 : 1,
+                    cursor: isLocked ? "not-allowed" : "pointer",
+                    position: "relative"
+                  }}
+                  onClick={() => {
+                    if (isLocked) {
+                      showToast("🔒 Subscribe to unlock " + t.label.replace(/[^a-zA-Z ]/g, '').trim(), "warning");
+                      return;
+                    }
+                    setDashTab(t.id);
+                    localStorage.setItem('cyberprep_tab', t.id);
+                  }}>
+                  {t.label}{isLocked && <span style={{ marginLeft: 4, fontSize: 9 }}>🔒</span>}
+                </div>
+              );
+            })}
           </div>
+
 
           {/* ── C1: HOME ── */}
           {dashTab === "home" && (<>
@@ -3149,7 +3230,9 @@ export default function ThreatReady() {
                   <div style={{ fontSize: 11, color: "var(--tx2)", marginTop: 4 }}>
                     {isPaid
                       ? subscribedRoles.map(r => ROLES.find(x => x.id === r)?.name).filter(Boolean).join(", ")
-                      : `${freeAttempts} attempt${freeAttempts !== 1 ? "s" : ""} remaining · Beginner only`}
+                      : subscribedRoles.length > 0
+                        ? subscribedRoles.map(r => `${ROLES.find(x => x.id === r)?.name}: ${getRemainingAttempts(r)}`).join(" · ") + " · Beginner only"
+                        : "Select roles to start trial"}
                   </div>
                 </div>
                 {isPaid && <span style={{ fontSize: 11, color: "var(--ok)", fontWeight: 700 }}>● Active</span>}
@@ -3502,9 +3585,9 @@ export default function ThreatReady() {
           {/* ── HEADER ── */}
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }} className="fadeUp">
             <div>
-              <h2 style={{ fontSize: 22, fontWeight: 800 }}>Hiring Dashboard</h2>
+              <h2 style={{ fontSize: 22, fontWeight: 800 }}>{companyName || user?.name || 'Hiring Dashboard'}</h2>
               <div style={{ fontSize: 12, color: "var(--tx2)", marginTop: 3 }}>
-                {isPaid ? `${subscribedRoles.length} track${subscribedRoles.length !== 1 ? "s" : ""}` : `Free trial · ${freeAttempts} attempts left`}
+                {isPaid ? `${subscribedRoles.length} track${subscribedRoles.length !== 1 ? "s" : ""}` : `Free trial · ${subscribedRoles.reduce((s, rid) => s + getRemainingAttempts(rid), 0)} attempts left`}
                 {" · "}{candidates.length} candidates · {assessments.length} assessments
               </div>
             </div>
@@ -3625,6 +3708,7 @@ export default function ThreatReady() {
               <button className="btn bp" onClick={() => { setB2bTab("create"); localStorage.setItem('cyberprep_b2btab', 'create'); }}>+ Create Assessment</button>
               <button className="btn bs" onClick={() => { setB2bTab("candidates"); localStorage.setItem('cyberprep_b2btab', 'candidates'); }}>Invite Candidates →</button>
             </div>
+
           </>)}
 
           {/* ── B2: SCORES (Candidate skill scores — empty state guard) ── */}
@@ -3715,14 +3799,16 @@ export default function ThreatReady() {
                   <span>
                     <button style={{ background: "none", border: "none", cursor: "pointer", fontSize: 14, color: "var(--dn)", padding: "2px 6px" }}
                       title="Delete"
-                      onClick={async () => {
-                        if (!window.confirm(`Delete ${c.candidate_name || c.candidate_email}?`)) return;
-                        const token = localStorage.getItem('token');
-                        const res = await fetch(`https://threatready-db.onrender.com/api/b2b/candidates/${c.id}`, {
-                          method: 'DELETE', headers: { 'Authorization': `Bearer ${token}` }
+                      onClick={() => {
+                        showConfirm(`Delete ${c.candidate_name || c.candidate_email}? This cannot be undone.`, async () => {
+                          const token = localStorage.getItem('token');
+                          const res = await fetch(`https://threatready-db.onrender.com/api/b2b/candidates/${c.id}`, {
+                            method: 'DELETE', headers: { 'Authorization': `Bearer ${token}` }
+                          });
+                          const data = await res.json();
+                          if (data.success) { loadB2bData(); showToast('Deleted.', 'success'); }
+                          else showToast('Delete failed', 'error');
                         });
-                        const data = await res.json();
-                        if (data.success) { loadB2bData(); showToast('Deleted.', 'success'); }
                       }}>🗑</button>
                   </span>
                 </div>
@@ -3826,10 +3912,16 @@ export default function ThreatReady() {
                         return `${i + 1},${c.candidate_name || c.candidate_email},${c.candidate_email},${role},${c.difficulty},${score}/10,${badge},${c.completed_at?.substring(0, 10) || ''}`;
                       });
                     const csv = ['Rank,Name,Email,Role,Difficulty,Score,Badge,Completed Date', ...rows].join('\n');
+                    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+                    const url = URL.createObjectURL(blob);
                     const a = document.createElement('a');
-                    a.href = 'data:text/csv,' + encodeURIComponent(csv);
+                    a.href = url;
                     a.download = `hiring-report-${new Date().toISOString().substring(0, 10)}.csv`;
+                    document.body.appendChild(a);
                     a.click();
+                    document.body.removeChild(a);
+                    URL.revokeObjectURL(url);
+                    showToast('Hiring report downloaded!', 'success');
                   }}>
                   Download CSV
                 </button>
@@ -3875,10 +3967,16 @@ export default function ThreatReady() {
                       return `${role},${scores.length},${avg}/10,${Math.max(...scores).toFixed(1)}/10,${Math.min(...scores).toFixed(1)}/10`;
                     });
                     const csv = ['Role,Candidates,Avg Score,Best,Lowest', ...rows].join('\n');
+                    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+                    const url = URL.createObjectURL(blob);
                     const a = document.createElement('a');
-                    a.href = 'data:text/csv,' + encodeURIComponent(csv);
+                    a.href = url;
                     a.download = `team-skills-${new Date().toISOString().substring(0, 10)}.csv`;
+                    document.body.appendChild(a);
                     a.click();
+                    document.body.removeChild(a);
+                    URL.revokeObjectURL(url);
+                    showToast('Team skills report downloaded!', 'success');
                   }}>
                   Download CSV
                 </button>
@@ -3904,10 +4002,16 @@ export default function ThreatReady() {
                       return `${c.candidate_name || c.candidate_email},${role},${score}/10,${INDUSTRY_AVG}/10,${score >= INDUSTRY_AVG ? '+' + diff : diff} vs avg`;
                     });
                     const csv = ['Candidate,Role,Score,Industry Avg,Benchmark', ...rows].join('\n');
+                    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+                    const url = URL.createObjectURL(blob);
                     const a = document.createElement('a');
-                    a.href = 'data:text/csv,' + encodeURIComponent(csv);
+                    a.href = url;
                     a.download = `benchmark-${new Date().toISOString().substring(0, 10)}.csv`;
+                    document.body.appendChild(a);
                     a.click();
+                    document.body.removeChild(a);
+                    URL.revokeObjectURL(url);
+                    showToast('Benchmark report downloaded!', 'success');
                   }}>
                   Download CSV
                 </button>
@@ -3938,40 +4042,7 @@ export default function ThreatReady() {
 
           {/* ── B4: PROFILE ── */}
           {b2bTab === "teamskills" && (<>
-            <div className="lbl" style={{ marginBottom: 10 }}>COMPANY PROFILE</div>
-            <div className="card fadeUp" style={{ padding: 16, marginBottom: 16 }}>
-              {companySettingsMsg && (
-                <div style={{ padding: 9, borderRadius: 8, marginBottom: 10, fontSize: 11, background: companySettingsMsg.includes("✅") ? "rgba(0,224,150,.1)" : "rgba(255,82,82,.1)", color: companySettingsMsg.includes("✅") ? "var(--ok)" : "var(--dn)" }}>
-                  {companySettingsMsg}
-                </div>
-              )}
-              <input className="input" placeholder="Company Name" value={companyName} onChange={e => setCompanyName(e.target.value)} style={{ marginBottom: 10 }} />
-              <select className="input" value={teamSize} onChange={e => setTeamSize(e.target.value)} style={{ marginBottom: 14 }}>
-                <option value="1-5">Team size: 1–5 engineers</option>
-                <option value="5-10">Team size: 5–10 engineers</option>
-                <option value="11-50">Team size: 11–50 engineers</option>
-                <option value="50-100">Team size: 50–100 engineers</option>
-                <option value="100+">Team size: 100+ engineers</option>
-              </select>
-              <button className="btn bp" style={{ fontSize: 12, padding: "10px 24px" }}
-                onClick={async () => {
-                  setCompanySettingsMsg('Saving...');
-                  try {
-                    const token = localStorage.getItem('token');
-                    const res = await fetch('https://threatready-db.onrender.com/api/b2b/settings', {
-                      method: 'POST',
-                      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-                      body: JSON.stringify({ company_name: companyName, team_size: teamSize })
-                    });
-                    const data = await res.json();
-                    if (data.success) { setCompanySettingsMsg('✅ Saved!'); setTimeout(() => setCompanySettingsMsg(''), 3000); }
-                    else setCompanySettingsMsg('❌ ' + (data.error || 'Failed'));
-                  } catch (e) { setCompanySettingsMsg('❌ ' + e.message); }
-                }}>
-                Save Profile
-              </button>
-            </div>
-
+            
             <div className="lbl" style={{ marginBottom: 10 }}>SAVED ASSESSMENTS</div>
             {assessments.length === 0 && !b2bLoading && (
               <div style={{ padding: 16, textAlign: "center", color: "var(--tx3)", fontSize: 12 }}>
@@ -4001,6 +4072,19 @@ export default function ThreatReady() {
                       onClick={() => { setInviteRole(a.role_id); setInviteDiff(a.difficulty); setB2bTab('create'); localStorage.setItem('cyberprep_b2btab', 'create'); }}>
                       Invite →
                     </button>
+                    <button className="btn bs" style={{ fontSize: 9, padding: "4px 8px", color: "var(--dn)", borderColor: "var(--dn)" }}
+                      onClick={() => {
+                        showConfirm(`Delete "${a.name}"? This cannot be undone.`, async () => {
+                          const token = localStorage.getItem('token');
+                          const res = await fetch(`https://threatready-db.onrender.com/api/b2b/assessments/${a.id}`, {
+                            method: 'DELETE', headers: { 'Authorization': `Bearer ${token}` }
+                          });
+                          const data = await res.json();
+                          if (data.success) { loadB2bData(); showToast('Assessment deleted.', 'success'); }
+                          else showToast('Delete failed: ' + (data.error || 'Error'), 'error');
+                        });
+                      }}>🗑 Delete</button>
+
                   </div>
                 </div>
               </div>
@@ -4009,9 +4093,7 @@ export default function ThreatReady() {
 
           {/* ── B5: INTERVIEW (Create Assessment + Invite Candidates) ── */}
           {b2bTab === "create" && (<>
-            {/* Subscription gate */}
             
-
             {/* Create Assessment form */}
             <div className="card fadeUp" style={{ padding: 20, marginBottom: 14, borderColor: jdAnalysis ? "var(--ok)" : "var(--bd)" }}>
               <div className="lbl" style={{ marginBottom: 8 }}>CREATE ASSESSMENT</div>
@@ -4130,34 +4212,71 @@ export default function ThreatReady() {
                 </div>
               </div>
 
+              {/* Custom Question Count */}
+              <div style={{ marginBottom: 14 }}>
+                <div style={{ fontSize: 10, color: "var(--tx3)", marginBottom: 6 }}>NUMBER OF QUESTIONS</div>
+                <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 8 }}>
+                  {[5, 10, 15, 20, 25].map(n => (
+                    <button key={n} type="button"
+                      className={`btn ${newAssessQuestionCount === n ? 'bp' : 'bs'}`}
+                      style={{ fontSize: 11, padding: "6px 14px" }}
+                      onClick={() => setNewAssessQuestionCount(n)}>
+                      {n} Q
+                    </button>
+                  ))}
+                </div>
+                <input type="number" className="input" min="1" max="50" value={newAssessQuestionCount}
+                  onChange={e => {
+                    const v = parseInt(e.target.value) || 1;
+                    setNewAssessQuestionCount(Math.max(1, Math.min(50, v)));
+                  }}
+                  placeholder="Or enter custom number (1-50)"
+                  style={{ fontSize: 12 }} />
+                <div style={{ fontSize: 9, color: "var(--tx3)", marginTop: 4 }}>
+                  AI will generate exactly {newAssessQuestionCount} question{newAssessQuestionCount !== 1 ? 's' : ''} for this assessment
+                </div>
+              </div>
+
               {assessMsg && (
                 <div style={{ padding: 9, borderRadius: 8, marginBottom: 10, fontSize: 11, background: assessMsg.includes("✅") ? "rgba(0,224,150,.1)" : "rgba(255,82,82,.1)", color: assessMsg.includes("✅") ? "var(--ok)" : "var(--dn)" }}>{assessMsg}</div>
               )}
               <button className="btn bp" style={{ width: "100%", padding: 12, fontSize: 13 }}
                 disabled={!newAssessName.trim()}
                 onClick={async () => {
-                  setAssessMsg('Creating assessment...');
+                  setAssessMsg('Creating assessment with ' + newAssessQuestionCount + ' questions...');
                   try {
                     const token = localStorage.getItem('token');
                     const res = await fetch('https://threatready-db.onrender.com/api/b2b/assessments', {
                       method: 'POST',
                       headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-                      body: JSON.stringify({ name: newAssessName, role_id: newAssessRole, difficulty: newAssessDiff, type: newAssessType, jd_context: newAssessJD })
+                      body: JSON.stringify({
+                        name: newAssessName,
+                        role_id: newAssessRole,
+                        difficulty: newAssessDiff,
+                        assessment_type: newAssessType,
+                        jd_text: newAssessJD,
+                        question_count: newAssessQuestionCount
+                      })
                     });
                     const data = await res.json();
                     if (data.assessment) {
-                      setAssessMsg('✅ Assessment created! Now invite candidates below.');
+                      setAssessMsg('✅ Assessment created with ' + newAssessQuestionCount + ' questions! Redirecting to Library...');
                       setNewAssessName(''); setNewAssessJD(''); setJdAnalysis(null);
+                      setNewAssessQuestionCount(5);
                       loadB2bData();
-                      setTimeout(() => setAssessMsg(''), 3000);
+                      setTimeout(() => {
+                        setAssessMsg('');
+                        setB2bTab("library");
+                        localStorage.setItem('cyberprep_b2btab', 'library');
+                      }, 1500);
                     } else {
                       setAssessMsg('❌ ' + (data.error || 'Failed to create assessment'));
                     }
                   } catch (e) { setAssessMsg('❌ ' + e.message); }
                 }}>
                 Create Assessment →
-              </button>
-            </div>
+              </button>           
+               </div>
 
           </>)}
 
@@ -4213,15 +4332,16 @@ export default function ThreatReady() {
                         showToast(`Role set to ${ROLES.find(r => r.id === a.role_id)?.name}. Enter email to invite.`, 'info');
                       }}>Invite →</button>
                     <button className="btn bs" style={{ fontSize: 9, padding: "4px 8px", color: "var(--dn)", borderColor: "var(--dn)" }}
-                      onClick={async () => {
-                        if (!window.confirm(`Delete "${a.name}"? This cannot be undone.`)) return;
-                        const token = localStorage.getItem('token');
-                        const res = await fetch(`https://threatready-db.onrender.com/api/b2b/assessments/${a.id}`, {
-                          method: 'DELETE', headers: { 'Authorization': `Bearer ${token}` }
+                      onClick={() => {
+                        showConfirm(`Delete "${a.name}"? This cannot be undone.`, async () => {
+                          const token = localStorage.getItem('token');
+                          const res = await fetch(`https://threatready-db.onrender.com/api/b2b/assessments/${a.id}`, {
+                            method: 'DELETE', headers: { 'Authorization': `Bearer ${token}` }
+                          });
+                          const data = await res.json();
+                          if (data.success) { loadB2bData(); showToast('Assessment deleted.', 'success'); }
+                          else showToast('Delete failed: ' + (data.error || 'Error'), 'error');
                         });
-                        const data = await res.json();
-                        if (data.success) { loadB2bData(); showToast('Assessment deleted.', 'success'); }
-                        else showToast('Delete failed: ' + (data.error || 'Error'), 'error');
                       }}>🗑 Delete</button>
                   </div>
                 </div>
@@ -4231,6 +4351,40 @@ export default function ThreatReady() {
 
           {/* ── B7: SETTINGS ── */}
           {b2bTab === "settings" && (<>
+          <div className="lbl" style={{ marginBottom: 10 }}>COMPANY PROFILE</div>
+            <div className="card fadeUp" style={{ padding: 16, marginBottom: 16 }}>
+              {companySettingsMsg && (
+                <div style={{ padding: 9, borderRadius: 8, marginBottom: 10, fontSize: 11, background: companySettingsMsg.includes("✅") ? "rgba(0,224,150,.1)" : "rgba(255,82,82,.1)", color: companySettingsMsg.includes("✅") ? "var(--ok)" : "var(--dn)" }}>
+                  {companySettingsMsg}
+                </div>
+              )}
+              <input className="input" placeholder="Company Name" value={companyName} onChange={e => setCompanyName(e.target.value)} style={{ marginBottom: 10 }} />
+              <select className="input" value={teamSize} onChange={e => setTeamSize(e.target.value)} style={{ marginBottom: 14 }}>
+                <option value="1-5">Team size: 1–5 engineers</option>
+                <option value="5-10">Team size: 5–10 engineers</option>
+                <option value="11-50">Team size: 11–50 engineers</option>
+                <option value="50-100">Team size: 50–100 engineers</option>
+                <option value="100+">Team size: 100+ engineers</option>
+              </select>
+              <button className="btn bp" style={{ fontSize: 12, padding: "10px 24px" }}
+                onClick={async () => {
+                  setCompanySettingsMsg('Saving...');
+                  try {
+                    const token = localStorage.getItem('token');
+                    const res = await fetch('https://threatready-db.onrender.com/api/b2b/settings', {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                      body: JSON.stringify({ company_name: companyName, team_size: teamSize })
+                    });
+                    const data = await res.json();
+                    if (data.success) { setCompanySettingsMsg('✅ Saved!'); setTimeout(() => setCompanySettingsMsg(''), 3000); }
+                    else setCompanySettingsMsg('❌ ' + (data.error || 'Failed'));
+                  } catch (e) { setCompanySettingsMsg('❌ ' + e.message); }
+                }}>
+                Save Profile
+              </button>
+            </div>
+
             {/* Integrations */}
             <div className="card fadeUp" style={{ padding: 18, marginBottom: 14 }}>
               <div className="lbl" style={{ marginBottom: 12 }}>INTEGRATIONS</div>

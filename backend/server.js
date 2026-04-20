@@ -1649,7 +1649,7 @@ app.get('/api/candidate/assessment', async (req, res) => {
     // Mark as in_progress
     await pool.query(`UPDATE candidate_assessments SET status = 'in_progress' WHERE invite_token = $1`, [token]);
 
-    // Use pre-generated questions or generate now
+    // Use pre-generated questions or generate now based on assessment's question_count
     let questions = ca.rows[0].questions;
     if (!questions || !questions.length) {
       const Anthropic = require('@anthropic-ai/sdk');
@@ -1661,9 +1661,14 @@ app.get('/api/candidate/assessment', async (req, res) => {
         threat: 'Threat Hunter', red: 'Red Team', blue: 'Blue Team'
       };
       const roleName = roleNames[ca.rows[0].role_id] || ca.rows[0].role_id;
+
+      // Fetch assessment's question_count
+      const aRes = await pool.query('SELECT question_count FROM b2b_assessments WHERE id = $1', [ca.rows[0].assessment_id]).catch(() => ({ rows: [] }));
+      const qCount = (aRes.rows[0]?.question_count) || 5;
+
       const msg = await anthropic.messages.create({
-        model: MODEL_QUESTIONS, max_tokens: 1500,
-        messages: [{ role: 'user', content: `Generate 5 ${ca.rows[0].difficulty} level ${roleName} interview questions. Respond ONLY valid JSON: {"questions":[{"id":1,"question":"...","category":"...","hint":"..."},{"id":2,"question":"...","category":"...","hint":"..."},{"id":3,"question":"...","category":"...","hint":"..."},{"id":4,"question":"...","category":"...","hint":"..."},{"id":5,"question":"...","category":"...","hint":"..."}]}` }]
+        model: MODEL_QUESTIONS, max_tokens: Math.max(1500, qCount * 300),
+        messages: [{ role: 'user', content: `Generate exactly ${qCount} ${ca.rows[0].difficulty} level ${roleName} interview questions. Respond ONLY valid JSON: {"questions":[{"id":1,"question":"...","category":"...","hint":"..."}]}. Provide all ${qCount} questions in the questions array.` }]
       });
       questions = JSON.parse(msg.content[0].text.replace(/```json|```/g,'').trim()).questions;
     }
