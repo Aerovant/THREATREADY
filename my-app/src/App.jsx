@@ -743,6 +743,7 @@ export default function ThreatReady() {
   const [inviteEmail, setInviteEmail] = useState('');
   const [inviteRole, setInviteRole] = useState('cloud');
   const [inviteDiff, setInviteDiff] = useState('intermediate');
+  const [inviteAssessmentId, setInviteAssessmentId] = useState('');
   const [inviteMsg, setInviteMsg] = useState('');
   const [newAssessName, setNewAssessName] = useState('');
   const [newAssessRole, setNewAssessRole] = useState('cloud');
@@ -919,7 +920,7 @@ export default function ThreatReady() {
   };
 
   useEffect(() => {
-    if (view === 'dashboard') {
+    if (view === 'dashboard' || view === 'b2b-dashboard') {
       loadDashboardExtras();
       // Load user settings (privacy preferences)
       const token = localStorage.getItem('token');
@@ -935,6 +936,21 @@ export default function ThreatReady() {
           }
         }).catch(e => console.log('Settings load:', e.message));
       }
+
+      // Auto-refresh notifications every 30 seconds
+      const interval = setInterval(() => {
+        const t = localStorage.getItem('token');
+        if (!t) return;
+        fetch('https://threatready-db.onrender.com/api/notifications', { headers: { 'Authorization': `Bearer ${t}` } })
+          .then(r => r.json())
+          .then(data => {
+            if (data.notifications) {
+              setNotifications(data.notifications);
+              setUnreadCount(data.unread_count || 0);
+            }
+          }).catch(() => {});
+      }, 30000);
+      return () => clearInterval(interval);
     }
   }, [view]);
 
@@ -2363,11 +2379,12 @@ export default function ThreatReady() {
               <span className="tag">Q{qIndex + 1}/5</span>
             </div>
           </div>
-          <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+          <div style={{ display: "flex", flexDirection: "column", gap: 8, alignItems: "center" }}>
+            <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+              <span className="mono" style={{ fontSize: 15, fontWeight: 700, color: elapsed > 600 ? "var(--dn)" : "var(--ac)" }}>⏱ {fmt(elapsed)}</span>
+              <button className="btn bs" style={{ padding: "5px 16px", fontSize: 11, color: "var(--dn)", borderColor: "var(--dn)", fontWeight: 700 }} onClick={exitScenario}>Exit</button>
+            </div>
             <AIAvatar isSpeaking={isSpeaking} isMuted={isMuted} qIndex={qIndex} />
-            <span className="mono" style={{ fontSize: 14, color: elapsed > 600 ? "var(--dn)" : "var(--ac)" }}>⏱ {fmt(elapsed)}</span>
-            ..
-            <button className="btn bs" style={{ padding: "7px 20px", fontSize: 10, color: "var(--dn)", borderColor: "var(--dn)" }} onClick={exitScenario}>Exit</button>
           </div>
         </div>
 
@@ -3608,19 +3625,48 @@ export default function ThreatReady() {
                   🔔{unreadCount > 0 && <span style={{ background: "var(--dn)", color: "#fff", fontSize: 8, fontWeight: 700, borderRadius: "50%", padding: "1px 4px", marginLeft: 3 }}>{unreadCount}</span>}
                 </button>
                 {showNotifs && (
-                  <div style={{ position: "absolute", top: "100%", right: 0, marginTop: 6, width: 320, maxHeight: 400, overflow: "auto", background: "var(--s1)", border: "1px solid var(--bd)", borderRadius: 10, boxShadow: "0 10px 30px rgba(0,0,0,.5)", zIndex: 1000 }}>
-                    <div style={{ padding: "10px 14px", borderBottom: "1px solid #1e2536", fontSize: 11, fontWeight: 700, color: "var(--ac)", letterSpacing: 1 }}>NOTIFICATIONS</div>
-                    {notifications.length === 0
-                      ? <div style={{ padding: 16, fontSize: 11, color: "var(--tx3)", textAlign: "center" }}>No notifications yet</div>
-                      : notifications.map((n, i) => (
-                        <div key={n.id || i} style={{ padding: "10px 14px", borderBottom: i < notifications.length - 1 ? "1px solid #1e2536" : "none", background: n.is_read ? "transparent" : "rgba(0,229,255,.04)" }}>
-                          <div style={{ fontSize: 12, fontWeight: 600, color: "var(--tx1)" }}>{n.title || n.type}</div>
-                          <div style={{ fontSize: 10, color: "var(--tx2)", marginTop: 2 }}>{n.message}</div>
-                          <div style={{ fontSize: 9, color: "var(--tx3)", marginTop: 3 }}>{n.created_at?.substring(0, 16).replace('T', ' ')}</div>
-                        </div>
-                      ))
-                    }
-                  </div>
+                  <>
+                    {/* Backdrop - dim everything else + click outside to close */}
+                    <div
+                      style={{
+                        position: "fixed",
+                        inset: 0,
+                        zIndex: 9998,
+                        background: "rgba(0,0,0,0.7)",
+                        backdropFilter: "blur(2px)"
+                      }}
+                      onClick={() => setShowNotifs(false)}
+                    />
+                    {/* Dropdown panel */}
+                    <div style={{
+                      position: "absolute",
+                      top: "calc(100% + 8px)",
+                      right: 0,
+                      width: 340,
+                      maxHeight: 450,
+                      overflow: "auto",
+                      background: "#0f1420",
+                      border: "1px solid var(--bd)",
+                      borderRadius: 12,
+                      boxShadow: "0 20px 50px rgba(0,0,0,.7)",
+                      zIndex: 9999
+                    }}>
+                      <div style={{ padding: "12px 16px", borderBottom: "1px solid #1e2536", fontSize: 11, fontWeight: 700, color: "var(--ac)", letterSpacing: 1, display: "flex", justifyContent: "space-between", alignItems: "center", background: "#0a0e1a", position: "sticky", top: 0 }}>
+                        <span>NOTIFICATIONS ({notifications.length})</span>
+                        <span style={{ cursor: "pointer", fontSize: 16, color: "var(--tx3)" }} onClick={() => setShowNotifs(false)}>×</span>
+                      </div>
+                      {notifications.length === 0
+                        ? <div style={{ padding: 20, fontSize: 11, color: "var(--tx3)", textAlign: "center" }}>No notifications yet</div>
+                        : notifications.map((n, i) => (
+                          <div key={n.id || i} style={{ padding: "12px 16px", borderBottom: i < notifications.length - 1 ? "1px solid #1e2536" : "none", background: n.is_read ? "transparent" : "rgba(0,229,255,.04)" }}>
+                            <div style={{ fontSize: 12, fontWeight: 600, color: "var(--tx1)", lineHeight: 1.4 }}>{n.title || n.type}</div>
+                            <div style={{ fontSize: 10, color: "var(--tx2)", marginTop: 4, lineHeight: 1.4 }}>{n.message}</div>
+                            <div style={{ fontSize: 9, color: "var(--tx3)", marginTop: 5 }}>{n.created_at?.substring(0, 16).replace('T', ' ')}</div>
+                          </div>
+                        ))
+                      }
+                    </div>
+                  </>
                 )}
               </div>
 
@@ -3718,16 +3764,46 @@ export default function ThreatReady() {
               <div className="lbl" style={{ marginBottom: 12 }}>📧 INVITE CANDIDATE</div>
               <input id="invite-email-input" className="input" type="email" placeholder="candidate@company.com"
                 value={inviteEmail} onChange={e => setInviteEmail(e.target.value)} style={{ marginBottom: 10 }} />
+
+              {/* Assessment Selector — links to saved assessment with custom questions */}
+              <div style={{ marginBottom: 12 }}>
+                <div style={{ fontSize: 10, color: "var(--tx3)", marginBottom: 4 }}>ASSESSMENT (Optional — links to saved assessment)</div>
+                <select className="input" value={inviteAssessmentId}
+                  onChange={e => {
+                    const id = e.target.value;
+                    setInviteAssessmentId(id);
+                    if (id) {
+                      const a = assessments.find(x => String(x.id) === String(id));
+                      if (a) {
+                        setInviteRole(a.role_id);
+                        setInviteDiff(a.difficulty);
+                      }
+                    }
+                  }}>
+                  <option value="">— Generate new questions (5 default) —</option>
+                  {assessments.map(a => (
+                    <option key={a.id} value={a.id}>
+                      {a.name} · {ROLES.find(r => r.id === a.role_id)?.name} · {a.difficulty} · {a.question_count || 5} Q
+                    </option>
+                  ))}
+                </select>
+                {inviteAssessmentId && (
+                  <div style={{ fontSize: 9, color: "var(--ok)", marginTop: 4 }}>
+                    ✅ Candidate will receive the full set of questions from this assessment
+                  </div>
+                )}
+              </div>
+
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 12 }}>
                 <div>
                   <div style={{ fontSize: 10, color: "var(--tx3)", marginBottom: 4 }}>ROLE</div>
-                  <select className="input" value={inviteRole} onChange={e => setInviteRole(e.target.value)}>
+                  <select className="input" value={inviteRole} onChange={e => setInviteRole(e.target.value)} disabled={!!inviteAssessmentId}>
                     {ROLES.map(r => <option key={r.id} value={r.id}>{r.icon} {r.name}</option>)}
                   </select>
                 </div>
                 <div>
                   <div style={{ fontSize: 10, color: "var(--tx3)", marginBottom: 4 }}>DIFFICULTY</div>
-                  <select className="input" value={inviteDiff} onChange={e => setInviteDiff(e.target.value)}>
+                  <select className="input" value={inviteDiff} onChange={e => setInviteDiff(e.target.value)} disabled={!!inviteAssessmentId}>
                     {DIFFICULTIES.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
                   </select>
                 </div>
@@ -3744,10 +3820,16 @@ export default function ThreatReady() {
                   setInviteMsg('Sending invite...');
                   try {
                     const token = localStorage.getItem('token');
+                    const payload = {
+                      candidate_email: inviteEmail,
+                      role_id: inviteRole,
+                      difficulty: inviteDiff
+                    };
+                    if (inviteAssessmentId) payload.assessment_id = parseInt(inviteAssessmentId);
                     const res = await fetch('https://threatready-db.onrender.com/api/b2b/invite', {
                       method: 'POST',
                       headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-                      body: JSON.stringify({ candidate_email: inviteEmail, role_id: inviteRole, difficulty: inviteDiff })
+                      body: JSON.stringify(payload)
                     });
                     const data = await res.json();
                     if (data.candidate || data.candidates) {
@@ -4041,55 +4123,6 @@ export default function ThreatReady() {
           </>)}
 
           {/* ── B4: PROFILE ── */}
-          {b2bTab === "teamskills" && (<>
-            
-            <div className="lbl" style={{ marginBottom: 10 }}>SAVED ASSESSMENTS</div>
-            {assessments.length === 0 && !b2bLoading && (
-              <div style={{ padding: 16, textAlign: "center", color: "var(--tx3)", fontSize: 12 }}>
-                No assessments yet. Create one from the Interview tab.
-              </div>
-            )}
-            {assessments.map((a, i) => (
-              <div key={a.id} className="card card-glow fadeUp" style={{ padding: 14, marginBottom: 10, animationDelay: `${i * .04}s` }}>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                  <div>
-                    <div style={{ fontSize: 13, fontWeight: 700 }}>{a.name}</div>
-                    <div style={{ fontSize: 10, color: "var(--tx3)", marginTop: 3 }}>
-                      {a.role_id} · {a.difficulty} · {a.total_candidates || 0} candidates · {a.created_at?.substring(0, 10)}
-                    </div>
-                  </div>
-                  <div style={{ display: "flex", gap: 6 }}>
-                    <button className="btn bs" style={{ fontSize: 9, padding: "4px 8px" }}
-                      onClick={async () => {
-                        const token = localStorage.getItem('token');
-                        const res = await fetch(`https://threatready-db.onrender.com/api/b2b/assessments/${a.id}/duplicate`, {
-                          method: 'POST', headers: { 'Authorization': `Bearer ${token}` }
-                        });
-                        const data = await res.json();
-                        if (data.assessment) loadB2bData();
-                      }}>Duplicate</button>
-                    <button className="btn bp" style={{ fontSize: 9, padding: "4px 8px" }}
-                      onClick={() => { setInviteRole(a.role_id); setInviteDiff(a.difficulty); setB2bTab('create'); localStorage.setItem('cyberprep_b2btab', 'create'); }}>
-                      Invite →
-                    </button>
-                    <button className="btn bs" style={{ fontSize: 9, padding: "4px 8px", color: "var(--dn)", borderColor: "var(--dn)" }}
-                      onClick={() => {
-                        showConfirm(`Delete "${a.name}"? This cannot be undone.`, async () => {
-                          const token = localStorage.getItem('token');
-                          const res = await fetch(`https://threatready-db.onrender.com/api/b2b/assessments/${a.id}`, {
-                            method: 'DELETE', headers: { 'Authorization': `Bearer ${token}` }
-                          });
-                          const data = await res.json();
-                          if (data.success) { loadB2bData(); showToast('Assessment deleted.', 'success'); }
-                          else showToast('Delete failed: ' + (data.error || 'Error'), 'error');
-                        });
-                      }}>🗑 Delete</button>
-
-                  </div>
-                </div>
-              </div>
-            ))}
-          </>)}
 
           {/* ── B5: INTERVIEW (Create Assessment + Invite Candidates) ── */}
           {b2bTab === "create" && (<>
@@ -4327,9 +4360,10 @@ export default function ThreatReady() {
                     <button className="btn bp" style={{ fontSize: 9, padding: "4px 8px" }}
                       onClick={() => {
                         setInviteRole(a.role_id); setInviteDiff(a.difficulty);
+                        setInviteAssessmentId(String(a.id));
                         setB2bTab("candidates"); localStorage.setItem('cyberprep_b2btab', 'candidates');
                         setTimeout(() => document.getElementById('invite-email-input')?.focus(), 300);
-                        showToast(`Role set to ${ROLES.find(r => r.id === a.role_id)?.name}. Enter email to invite.`, 'info');
+                        showToast(`Linked to "${a.name}" (${a.question_count || 5} questions). Enter email to invite.`, 'info');
                       }}>Invite →</button>
                     <button className="btn bs" style={{ fontSize: 9, padding: "4px 8px", color: "var(--dn)", borderColor: "var(--dn)" }}
                       onClick={() => {
@@ -4587,6 +4621,72 @@ export default function ThreatReady() {
             const q = candidateAssessData.questions[candidateQIndex];
             const total = candidateAssessData.questions.length;
             const ans = candidateAnswers[candidateQIndex] || "";
+
+            // Auto-speak question once when index changes (tracked via window global)
+            if (q?.question && window.__lastSpokenIdx !== candidateQIndex) {
+              window.__lastSpokenIdx = candidateQIndex;
+              setTimeout(() => {
+                if (window.speechSynthesis && !isMuted) {
+                  window.speechSynthesis.cancel();
+                  const utt = new SpeechSynthesisUtterance(q.question);
+                  const voices = window.speechSynthesis.getVoices();
+                  const useFemale = candidateQIndex % 2 === 0;
+                  // Strict gender match: only names clearly indicating the gender
+                  const femaleVoice = voices.find(v => /samantha|victoria|karen|moira|tessa|zira|susan|fiona|ava|allison/i.test(v.name) && !/male/i.test(v.name.replace(/female/i,'')) && v.lang.startsWith('en'))
+                    || voices.find(v => /female/i.test(v.name) && v.lang.startsWith('en'));
+                  const maleVoice = voices.find(v => /daniel|alex|fred|david|james|tom|oliver|aaron|arthur/i.test(v.name) && !/female/i.test(v.name) && v.lang.startsWith('en'))
+                    || voices.find(v => /\bmale\b/i.test(v.name) && !/female/i.test(v.name) && v.lang.startsWith('en'));
+                  const english = voices.filter(v => v.lang.startsWith('en'));
+                  utt.voice = useFemale ? (femaleVoice || english[0]) : (maleVoice || english.find(v => v !== femaleVoice) || english[0]);
+                  // Pitch differentiation — this GUARANTEES different gender sound even if same voice
+                  utt.rate = useFemale ? 0.95 : 0.9;
+                  utt.pitch = useFemale ? 1.4 : 0.6;
+                  utt.onstart = () => setIsSpeaking(true);
+                  utt.onend = () => setIsSpeaking(false);
+                  utt.onerror = () => setIsSpeaking(false);
+                  window.speechSynthesis.speak(utt);
+                }
+              }, 500);
+            }
+
+            const replayQuestion = () => {
+              if (!window.speechSynthesis) { showToast('Voice not supported in this browser', 'error'); return; }
+              window.speechSynthesis.cancel();
+              const utt = new SpeechSynthesisUtterance(q.question);
+              const voices = window.speechSynthesis.getVoices();
+              const useFemale = candidateQIndex % 2 === 0;
+              const femaleVoice = voices.find(v => /samantha|victoria|karen|moira|tessa|zira|susan|fiona|ava|allison/i.test(v.name) && !/male/i.test(v.name.replace(/female/i,'')) && v.lang.startsWith('en'))
+                || voices.find(v => /female/i.test(v.name) && v.lang.startsWith('en'));
+              const maleVoice = voices.find(v => /daniel|alex|fred|david|james|tom|oliver|aaron|arthur/i.test(v.name) && !/female/i.test(v.name) && v.lang.startsWith('en'))
+                || voices.find(v => /\bmale\b/i.test(v.name) && !/female/i.test(v.name) && v.lang.startsWith('en'));
+              const english = voices.filter(v => v.lang.startsWith('en'));
+              utt.voice = useFemale ? (femaleVoice || english[0]) : (maleVoice || english.find(v => v !== femaleVoice) || english[0]);
+              utt.rate = useFemale ? 0.95 : 0.9;
+              utt.pitch = useFemale ? 1.4 : 0.6;
+              utt.onstart = () => setIsSpeaking(true);
+              utt.onend = () => setIsSpeaking(false);
+              utt.onerror = () => setIsSpeaking(false);
+              window.speechSynthesis.speak(utt);
+            };
+
+            const toggleDictation = () => {
+              const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+              if (!SR) { showToast('Voice input not supported. Use Chrome/Edge.', 'error'); return; }
+              if (voice.recording) {
+                voice.stop();
+                if (voice.transcript?.trim()) {
+                  setCandidateAnswers(p => ({
+                    ...p,
+                    [candidateQIndex]: (p[candidateQIndex] ? p[candidateQIndex] + ' ' : '') + voice.transcript.trim()
+                  }));
+                  voice.reset();
+                }
+              } else {
+                voice.reset();
+                voice.start();
+              }
+            };
+
             return (
               <div className="card fadeUp" style={{ padding: 28 }}>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
@@ -4597,21 +4697,69 @@ export default function ThreatReady() {
                     ))}
                   </div>
                 </div>
-                <div style={{ fontSize: 15, fontWeight: 700, lineHeight: 1.7, marginBottom: 20, padding: "16px 18px", background: "var(--s2)", borderRadius: 10, border: "1px solid var(--bd)" }}>
-                  {q.question}
+
+                {/* Avatar on top */}
+                <div style={{ display: "flex", justifyContent: "center", marginBottom: 16 }}>
+                  <AIAvatar isSpeaking={isSpeaking} isMuted={isMuted} qIndex={candidateQIndex} />
                 </div>
+
+                {/* Question box */}
+                <div style={{ padding: "18px 22px", background: "var(--s2)", borderRadius: 10, border: "1px solid var(--bd)", marginBottom: 20 }}>
+                  <div style={{ fontSize: 15, fontWeight: 700, lineHeight: 1.7 }}>{q.question}</div>
+                  <div style={{ display: "flex", gap: 6, marginTop: 12 }}>
+                    <button className="btn bs" style={{ fontSize: 10, padding: "4px 10px" }} onClick={replayQuestion}>
+                      🔊 Replay Question
+                    </button>
+                    <button className="btn bs" style={{ fontSize: 10, padding: "4px 10px" }}
+                      onClick={() => { window.speechSynthesis.cancel(); setIsSpeaking(false); setIsMuted(m => !m); }}>
+                      {isMuted ? "🔇 Unmute" : "🔈 Mute"}
+                    </button>
+                  </div>
+                </div>
+
                 {candidateAssessData.candidate.difficulty === "beginner" && q.hint && (
                   <div style={{ padding: "8px 14px", background: "rgba(0,229,255,.05)", borderRadius: 8, border: "1px solid rgba(0,229,255,.15)", fontSize: 11, color: "var(--ac)", marginBottom: 14 }}>
                     💡 Hint: {q.hint}
                   </div>
                 )}
-                <textarea className="input" placeholder="Type your answer here..."
-                  value={ans}
-                  onChange={e => setCandidateAnswers(p => ({ ...p, [candidateQIndex]: e.target.value }))}
-                  style={{ minHeight: 140, fontSize: 13, marginBottom: 16 }} />
+
+                {/* Answer section with voice + text */}
+                <div style={{ marginBottom: 16 }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+                    <span style={{ fontSize: 11, color: "var(--tx3)", fontWeight: 700, letterSpacing: 1 }}>YOUR ANSWER</span>
+                    <button className={`btn ${voice.recording ? 'bdn' : 'bs'}`}
+                      style={{ fontSize: 11, padding: "6px 14px", display: "flex", alignItems: "center", gap: 6 }}
+                      onClick={toggleDictation}>
+                      {voice.recording
+                        ? <><span style={{ width: 8, height: 8, borderRadius: "50%", background: "#ff5252", animation: "pulse 1s infinite" }} /> Stop Recording</>
+                        : <>🎤 Speak Answer</>}
+                    </button>
+                  </div>
+                  <textarea className="input" placeholder={voice.recording ? "🎤 Listening... speak your answer" : "Type your answer here, or click 🎤 to speak..."}
+                    value={ans}
+                    onChange={e => setCandidateAnswers(p => ({ ...p, [candidateQIndex]: e.target.value }))}
+                    style={{ minHeight: 140, fontSize: 13, borderColor: voice.recording ? "#ff5252" : undefined }} />
+                  {voice.recording && (
+                    <div style={{ marginTop: 8, padding: "8px 12px", background: "rgba(255,82,82,.08)", border: "1px solid rgba(255,82,82,.25)", borderRadius: 8 }}>
+                      <div style={{ fontSize: 10, color: "var(--dn)", marginBottom: 4, display: "flex", alignItems: "center", gap: 6 }}>
+                        <span style={{ width: 6, height: 6, borderRadius: "50%", background: "#ff5252", animation: "pulse 1s infinite" }} />
+                        Recording — click "Stop Recording" to add to answer
+                      </div>
+                      {voice.transcript && (
+                        <div style={{ fontSize: 12, color: "var(--tx2)", fontStyle: "italic" }}>{voice.transcript}</div>
+                      )}
+                    </div>
+                  )}
+                </div>
+
                 <button className="btn bp" style={{ width: "100%", padding: 14, fontSize: 15 }}
                   disabled={!ans.trim() || candidateSubmitting}
                   onClick={async () => {
+                    // Stop any voice
+                    if (voice.recording) voice.stop();
+                    window.speechSynthesis.cancel();
+                    setIsSpeaking(false);
+
                     if (candidateQIndex < total - 1) {
                       setCandidateQIndex(p => p + 1);
                     } else {
