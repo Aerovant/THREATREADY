@@ -1743,11 +1743,17 @@ app.post('/api/candidate/submit', async (req, res) => {
     const finalScore = Math.round(avgScore * 10) / 10;
     const badge = finalScore >= 8 ? 'Platinum' : finalScore >= 7 ? 'Gold' : finalScore >= 6 ? 'Silver' : finalScore >= 4 ? 'Bronze' : 'Not Ready';
 
+    // Ensure required columns exist before UPDATE
+    await pool.query(`ALTER TABLE candidate_assessments ADD COLUMN IF NOT EXISTS overall_score NUMERIC(4,2)`).catch(()=>{});
+    await pool.query(`ALTER TABLE candidate_assessments ADD COLUMN IF NOT EXISTS completed_at TIMESTAMP`).catch(()=>{});
+    await pool.query(`ALTER TABLE candidate_assessments ADD COLUMN IF NOT EXISTS status VARCHAR(20) DEFAULT 'not_started'`).catch(()=>{});
+
     // Update candidate_assessments
-    await pool.query(
-      `UPDATE candidate_assessments SET status = 'completed', overall_score = $1, completed_at = NOW() WHERE invite_token = $2`,
+    const updateResult = await pool.query(
+      `UPDATE candidate_assessments SET status = 'completed', overall_score = $1, completed_at = NOW() WHERE invite_token = $2 RETURNING id`,
       [finalScore, token]
     );
+    console.log('Updated candidate_assessments:', updateResult.rowCount, 'rows. Score:', finalScore, 'Badge:', badge);
 
     // Send HR notification
     try {
@@ -2649,6 +2655,11 @@ const PORT = process.env.PORT || 4000;
 async function runMigrations() {
   try {
     await pool.query(`ALTER TABLE b2b_assessments ADD COLUMN IF NOT EXISTS questions JSONB`);
+    await pool.query(`ALTER TABLE b2b_assessments ADD COLUMN IF NOT EXISTS question_count INTEGER DEFAULT 5`);
+    await pool.query(`ALTER TABLE candidate_assessments ADD COLUMN IF NOT EXISTS overall_score NUMERIC(4,2)`);
+    await pool.query(`ALTER TABLE candidate_assessments ADD COLUMN IF NOT EXISTS completed_at TIMESTAMP`);
+    await pool.query(`ALTER TABLE candidate_assessments ADD COLUMN IF NOT EXISTS status VARCHAR(20) DEFAULT 'not_started'`);
+    await pool.query(`ALTER TABLE candidate_assessments ADD COLUMN IF NOT EXISTS hiring_decision VARCHAR(20)`);
     await pool.query(`ALTER TABLE subscriptions ADD COLUMN IF NOT EXISTS billing_period VARCHAR(10) DEFAULT 'monthly'`);
     await pool.query(`ALTER TABLE payments ADD COLUMN IF NOT EXISTS billing_period VARCHAR(10) DEFAULT 'monthly'`);
     await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS profile_public BOOLEAN DEFAULT true`);
