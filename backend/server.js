@@ -1612,7 +1612,7 @@ app.post('/api/b2b/invite', auth, async (req, res) => {
             <div style="background:#1a1f2e;border:1px solid #1e2536;border-radius:12px;padding:20px;margin-bottom:24px;text-align:center">
               <div style="font-size:13px;color:#8890b0;margin-bottom:8px">Assessment Details</div>
               <div style="font-size:20px;font-weight:800;color:#00e5ff;margin-bottom:4px">${roleName}</div>
-              <div style="font-size:12px;color:#8890b0;margin-bottom:20px">Difficulty: <strong style="color:#ffab40">${diffName}</strong> · 5 questions · AI evaluated</div>
+              <div style="font-size:12px;color:#8890b0;margin-bottom:20px">Difficulty: <strong style="color:#ffab40">${diffName}</strong> · ${question_count || 5} questions · AI evaluated</div>
               <a href="${inviteLink}" style="background:#00e5ff;color:#000;padding:14px 36px;border-radius:10px;text-decoration:none;font-weight:800;font-size:15px;display:inline-block">
                 Start Assessment →
               </a>

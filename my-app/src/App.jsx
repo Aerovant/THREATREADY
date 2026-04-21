@@ -548,21 +548,7 @@ function AIAvatar({ isSpeaking, isMuted, qIndex }) {
       </div>
 
       {/* Name and sound bars */}
-      <div style={{ marginTop: 2, fontSize: 8, fontWeight: 700, color: isFemale ? "#ff6b9d" : "#00e5ff", letterSpacing: 1, fontFamily: "monospace" }}>
-        {isFemale ? "ARIA" : "NEXUS"}
-      </div>
-      <div style={{ display: "flex", gap: 3, marginTop: 6, height: 16, alignItems: "flex-end" }}>
-        {[1, 2, 3, 4, 5].map(i => (
-          <div key={i} style={{
-            width: 3, borderRadius: 3,
-            background: isFemale ? "#ff6b9d" : "#00e5ff",
-            height: isSpeaking ? 8 : 3,
-            animation: isSpeaking ? `soundBar${i % 3 + 1} ${0.3 + i * 0.08}s ease-in-out infinite alternate` : "none",
-            opacity: isSpeaking ? 1 : 0.3,
-            transition: "height 0.2s"
-          }} />
-        ))}
-      </div>
+      
     </div>
   );
 }
@@ -4649,7 +4635,7 @@ export default function ThreatReady() {
                 Hello <strong style={{ color: "var(--tx1)" }}>{candidateAssessData.candidate.name}</strong>! You have been invited to complete a cybersecurity skills assessment.
               </p>
               <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 10, marginBottom: 24 }}>
-                {[["📋", "5 Questions", "Scenario-based"], ["🤖", "AI Evaluated", "Instant scoring"], ["📧", "Email Report", "Sent after submit"]].map(([icon, t, d], i) => (
+                {[["📋", `${candidateAssessData.questions?.length || candidateAssessData.candidate?.question_count || 5} Questions`, "Scenario-based"], ["🤖", "AI Evaluated", "Instant scoring"], ["📧", "Email Report", "Sent after submit"]].map(([icon, t, d], i) => (
                   <div key={i} className="card" style={{ padding: 14, textAlign: "center" }}>
                     <div style={{ fontSize: 24, marginBottom: 6 }}>{icon}</div>
                     <div style={{ fontSize: 11, fontWeight: 700 }}>{t}</div>
