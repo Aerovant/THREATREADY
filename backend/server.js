@@ -1762,11 +1762,15 @@ app.post('/api/candidate/submit', async (req, res) => {
     await pool.query(`ALTER TABLE candidate_assessments ADD COLUMN IF NOT EXISTS overall_score NUMERIC(4,2)`).catch(()=>{});
     await pool.query(`ALTER TABLE candidate_assessments ADD COLUMN IF NOT EXISTS completed_at TIMESTAMP`).catch(()=>{});
     await pool.query(`ALTER TABLE candidate_assessments ADD COLUMN IF NOT EXISTS status VARCHAR(20) DEFAULT 'not_started'`).catch(()=>{});
+    await pool.query(`ALTER TABLE candidate_assessments ADD COLUMN IF NOT EXISTS evaluations JSONB`).catch(()=>{});
+    await pool.query(`ALTER TABLE candidate_assessments ADD COLUMN IF NOT EXISTS badge VARCHAR(20)`).catch(()=>{});
 
-    // Update candidate_assessments
+    // Update candidate_assessments with full report data
     const updateResult = await pool.query(
-      `UPDATE candidate_assessments SET status = 'completed', overall_score = $1, completed_at = NOW() WHERE invite_token = $2 RETURNING id`,
-      [finalScore, token]
+      `UPDATE candidate_assessments
+       SET status = 'completed', overall_score = $1, badge = $2, evaluations = $3::jsonb, completed_at = NOW()
+       WHERE invite_token = $4 RETURNING id`,
+      [finalScore, badge, JSON.stringify(evaluations), token]
     );
     console.log('Updated candidate_assessments:', updateResult.rowCount, 'rows. Score:', finalScore, 'Badge:', badge);
 
@@ -2101,6 +2105,42 @@ app.get('/api/b2b/candidate-report/:id', auth, async (req, res) => {
 
     res.json({ report });
   } catch(e) {
+    console.error('Report error:', e.message);
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// B2B Get Candidate Report (full report with all evaluations)
+app.get('/api/b2b/candidates/:id/report', auth, async (req, res) => {
+  try {
+    const result = await pool.query(
+      `SELECT ca.*, ba.name as assessment_name, ba.jd_text
+       FROM candidate_assessments ca
+       LEFT JOIN b2b_assessments ba ON ba.id = ca.assessment_id
+       WHERE ca.id = $1 AND ca.company_user_id = $2`,
+      [req.params.id, req.user.id]
+    );
+    if (!result.rows[0]) return res.status(404).json({ error: 'Candidate not found' });
+    const c = result.rows[0];
+    if (c.status !== 'completed') return res.status(400).json({ error: 'Candidate has not completed the assessment yet' });
+
+    res.json({
+      candidate: {
+        id: c.id,
+        name: c.candidate_name,
+        email: c.candidate_email,
+        role_id: c.role_id,
+        difficulty: c.difficulty,
+        overall_score: c.overall_score,
+        badge: c.badge,
+        status: c.status,
+        invited_at: c.invited_at,
+        completed_at: c.completed_at,
+        assessment_name: c.assessment_name,
+        evaluations: c.evaluations || []
+      }
+    });
+  } catch (e) {
     console.error('Report error:', e.message);
     res.status(500).json({ error: e.message });
   }
