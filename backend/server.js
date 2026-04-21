@@ -1570,11 +1570,13 @@ app.post('/api/b2b/invite', auth, async (req, res) => {
     const roleName = roleNames[role_id] || role_id;
     const diffName = difficulty ? difficulty.charAt(0).toUpperCase() + difficulty.slice(1) : '';
 
-    // Get assessment questions if assessment_id provided
+    // Get assessment questions and question_count if assessment_id provided
     let assessmentQuestions = null;
+    let assessmentQuestionCount = question_count || 5;
     if (assessment_id) {
-      const aq = await pool.query('SELECT questions FROM b2b_assessments WHERE id = $1', [assessment_id]);
+      const aq = await pool.query('SELECT questions, question_count FROM b2b_assessments WHERE id = $1', [assessment_id]);
       if (aq.rows[0]?.questions) assessmentQuestions = aq.rows[0].questions;
+      if (aq.rows[0]?.question_count) assessmentQuestionCount = aq.rows[0].question_count;
     }
 
     const results = [];
@@ -1612,7 +1614,7 @@ app.post('/api/b2b/invite', auth, async (req, res) => {
             <div style="background:#1a1f2e;border:1px solid #1e2536;border-radius:12px;padding:20px;margin-bottom:24px;text-align:center">
               <div style="font-size:13px;color:#8890b0;margin-bottom:8px">Assessment Details</div>
               <div style="font-size:20px;font-weight:800;color:#00e5ff;margin-bottom:4px">${roleName}</div>
-              <div style="font-size:12px;color:#8890b0;margin-bottom:20px">Difficulty: <strong style="color:#ffab40">${diffName}</strong> · 5 questions · AI evaluated</div>
+              <div style="font-size:12px;color:#8890b0;margin-bottom:20px">Difficulty: <strong style="color:#ffab40">${diffName}</strong> · ${assessmentQuestionCount} questions · AI evaluated</div>
               <a href="${inviteLink}" style="background:#00e5ff;color:#000;padding:14px 36px;border-radius:10px;text-decoration:none;font-weight:800;font-size:15px;display:inline-block">
                 Start Assessment →
               </a>
