@@ -732,6 +732,7 @@ export default function ThreatReady() {
   const [inviteAssessmentId, setInviteAssessmentId] = useState('');
   // Search states
   const [candidatesSearch, setCandidatesSearch] = useState('');
+  const [reportModal, setReportModal] = useState(null); // holds candidate report data
   const [teamSkillsSearch, setTeamSkillsSearch] = useState('');
   const [librarySearch, setLibrarySearch] = useState('');
   // Filter helper
@@ -3873,8 +3874,8 @@ export default function ThreatReady() {
             </div>
             {b2bLoading && <div style={{ textAlign: "center", padding: 20 }}><div className="loader" /></div>}
             <div className="card fadeUp" style={{ padding: 0, overflow: "hidden" }}>
-              <div style={{ display: "grid", gridTemplateColumns: "2fr 2fr 1fr 1fr 1fr 0.5fr", padding: "10px 14px", background: "var(--s2)", fontSize: 9, fontWeight: 700, color: "var(--ac)", letterSpacing: 1, textTransform: "uppercase" }}>
-                <span>Name</span><span>Email</span><span>Role</span><span>Score</span><span>Status</span><span></span>
+              <div style={{ display: "grid", gridTemplateColumns: "2fr 2fr 1fr 1fr 1fr 1fr 0.5fr", padding: "10px 14px", background: "var(--s2)", fontSize: 9, fontWeight: 700, color: "var(--ac)", letterSpacing: 1, textTransform: "uppercase" }}>
+                <span>Name</span><span>Email</span><span>Role</span><span>Score</span><span>Status</span><span>Report</span><span></span>
               </div>
               {candidates.length === 0 && !b2bLoading && (
                 <div style={{ padding: 20, textAlign: "center", color: "var(--tx3)", fontSize: 12 }}>No candidates yet. Use the invite form above.</div>
@@ -3883,7 +3884,7 @@ export default function ThreatReady() {
                 <div style={{ padding: 20, textAlign: "center", color: "var(--tx3)", fontSize: 12 }}>No candidates match "{candidatesSearch}"</div>
               )}
               {filterBySearch(candidates, candidatesSearch, c => c.candidate_name, c => c.candidate_email, c => c.invited_at).map((c, i) => (
-                <div key={c.id} style={{ display: "grid", gridTemplateColumns: "2fr 2fr 1fr 1fr 1fr 0.5fr", padding: "10px 14px", borderTop: "1px solid var(--bd)", fontSize: 11, alignItems: "center" }}>
+                <div key={c.id} style={{ display: "grid", gridTemplateColumns: "2fr 2fr 1fr 1fr 1fr 1fr 0.5fr", padding: "10px 14px", borderTop: "1px solid var(--bd)", fontSize: 11, alignItems: "center" }}>
                   <span style={{ fontWeight: 600 }}>{c.candidate_name || c.candidate_email?.split("@")[0] || '—'}</span>
                   <span style={{ color: "var(--tx3)", fontSize: 10 }}>{c.candidate_email}</span>
                   <span>{c.role_id ? (ROLES.find(r => r.id === c.role_id)?.icon || c.role_id) : "—"}</span>
@@ -3892,6 +3893,23 @@ export default function ThreatReady() {
                   </span>
                   <span style={{ fontSize: 9, fontWeight: 600, color: c.status === "completed" ? "var(--ok)" : c.status === "in_progress" ? "var(--wn)" : "var(--tx3)" }}>
                     {c.status === "completed" ? "✓ Done" : c.status === "in_progress" ? "● Active" : "○ Pending"}
+                  </span>
+                  <span style={{ display: "flex", gap: 4 }}>
+                    {c.status === "completed" && (
+                      <div style={{ position: "relative" }} className="report-btn-wrap">
+                        <button style={{ background: "rgba(0,229,255,.1)", border: "1px solid rgba(0,229,255,.3)", cursor: "pointer", fontSize: 10, color: "var(--ac)", padding: "3px 8px", borderRadius: 6, fontWeight: 700 }}
+                          onClick={async (e) => {
+                            e.stopPropagation();
+                            const tok = localStorage.getItem('token');
+                            const res = await fetch(`https://threatready-db.onrender.com/api/b2b/candidate-report/${c.id}`, {
+                              headers: { 'Authorization': `Bearer ${tok}` }
+                            });
+                            const data = await res.json();
+                            if (data.report) setReportModal({ candidate: c, report: data.report });
+                            else showToast('Report not available yet', 'warning');
+                          }}>📋 Report</button>
+                      </div>
+                    )}
                   </span>
                   <span>
                     <button style={{ background: "none", border: "none", cursor: "pointer", fontSize: 14, color: "var(--dn)", padding: "2px 6px" }}
@@ -3912,6 +3930,31 @@ export default function ThreatReady() {
               ))}
             </div>
           </>)}
+
+          {/* ── REPORT MODAL ── */}
+          {reportModal && (
+            <div className="overlay" onClick={() => setReportModal(null)}>
+              <div onClick={e => e.stopPropagation()} style={{ background: "var(--s1)", border: "1px solid var(--bd)", borderRadius: 16, padding: 28, maxWidth: 700, width: "95%", maxHeight: "85vh", overflowY: "auto" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
+                  <div>
+                    <div style={{ fontSize: 16, fontWeight: 800 }}>📋 Assessment Report</div>
+                    <div style={{ fontSize: 11, color: "var(--tx3)", marginTop: 2 }}>{reportModal.candidate.candidate_name} · {reportModal.candidate.candidate_email}</div>
+                  </div>
+                  <div style={{ display: "flex", gap: 8 }}>
+                    <button className="btn bp" style={{ fontSize: 11, padding: "6px 14px" }} onClick={() => {
+                      const html = document.getElementById('report-content').innerHTML;
+                      const win = window.open('', '_blank');
+                      win.document.write(`<html><head><title>Report</title><style>body{font-family:sans-serif;background:#0a0e1a;color:#e8eaf6;padding:20px}</style></head><body>${html}</body></html>`);
+                      win.document.close();
+                      win.print();
+                    }}>⬇️ Download</button>
+                    <button className="btn bs" style={{ fontSize: 11, padding: "6px 14px" }} onClick={() => setReportModal(null)}>✕ Close</button>
+                  </div>
+                </div>
+                <div id="report-content" dangerouslySetInnerHTML={{ __html: reportModal.report }} />
+              </div>
+            </div>
+          )}
 
           {/* ── TEAM SKILLS TAB ── */}
           {b2bTab === "teamskills" && (<>
@@ -4635,7 +4678,7 @@ export default function ThreatReady() {
                 Hello <strong style={{ color: "var(--tx1)" }}>{candidateAssessData.candidate.name}</strong>! You have been invited to complete a cybersecurity skills assessment.
               </p>
               <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 10, marginBottom: 24 }}>
-                {[["📋", `${candidateAssessData.questions?.length || candidateAssessData.candidate?.question_count || 5} Questions`, "Scenario-based"], ["🤖", "AI Evaluated", "Instant scoring"], ["📧", "Email Report", "Sent after submit"]].map(([icon, t, d], i) => (
+                {[["📋", "5 Questions", "Scenario-based"], ["🤖", "AI Evaluated", "Instant scoring"], ["📧", "Email Report", "Sent after submit"]].map(([icon, t, d], i) => (
                   <div key={i} className="card" style={{ padding: 14, textAlign: "center" }}>
                     <div style={{ fontSize: 24, marginBottom: 6 }}>{icon}</div>
                     <div style={{ fontSize: 11, fontWeight: 700 }}>{t}</div>

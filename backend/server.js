@@ -2041,36 +2041,61 @@ app.get('/api/b2b/candidate-report/:id', auth, async (req, res) => {
       [id]
     ).catch(() => ({ rows: [] }));
 
+    const topStrength = evals.rows.length > 0 ? evals.rows.reduce((best, e) => e.score > best.score ? e : best, evals.rows[0]) : null;
+    const topWeakness = evals.rows.length > 0 ? evals.rows.reduce((worst, e) => e.score < worst.score ? e : worst, evals.rows[0]) : null;
+    const nextSteps = finalScore >= 7
+      ? ['Apply to senior security roles', 'Consider OSCP or CISSP certification', 'Contribute to open source security projects', 'Build a portfolio of CTF writeups', 'Explore bug bounty programs']
+      : finalScore >= 5
+      ? ['Practice on ThreatReady at harder difficulty', 'Complete TryHackMe or HackTheBox labs', 'Study OWASP Top 10 and MITRE ATT&CK', 'Get CompTIA Security+ or CEH certification', 'Work on real-world security projects']
+      : ['Start with CompTIA Security+ fundamentals', 'Complete beginner labs on TryHackMe', 'Study networking and OS security basics', 'Read NIST Cybersecurity Framework', 'Retry this assessment in 30 days'];
+
     const evalRows = evals.rows.length > 0 ? evals.rows.map((e, i) => `
-      <div style="margin-bottom:14px;padding:14px;background:#111827;border-radius:10px;border-left:3px solid ${e.score >= 7 ? '#00e096' : e.score >= 5 ? '#ffab40' : '#ff5252'}">
-        <div style="display:flex;justify-content:space-between;margin-bottom:6px">
-          <span style="font-size:12px;font-weight:700;color:#00e5ff">Q${i+1} · ${e.category || ''}</span>
-          <span style="font-size:16px;font-weight:800;color:${e.score >= 7 ? '#00e096' : e.score >= 5 ? '#ffab40' : '#ff5252'}">${e.score}/10</span>
+      <div style="margin-bottom:14px;padding:16px;background:#111827;border-radius:10px;border-left:3px solid ${e.score >= 7 ? '#00e096' : e.score >= 5 ? '#ffab40' : '#ff5252'}">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+          <span style="font-size:13px;font-weight:700;color:#00e5ff">Q${i+1} · ${e.category || ''}</span>
+          <span style="font-size:18px;font-weight:900;color:${e.score >= 7 ? '#00e096' : e.score >= 5 ? '#ffab40' : '#ff5252'}">${e.score}/10</span>
         </div>
-        <div style="font-size:11px;color:#22c55e;margin-bottom:3px">✓ ${e.strengths || ''}</div>
-        <div style="font-size:11px;color:#ef4444;margin-bottom:6px">✗ ${e.weaknesses || ''}</div>
-        <div style="font-size:11px;color:#8b5cf6"><strong style="color:#a78bfa">Model answer:</strong> ${e.improved_answer || ''}</div>
+        <div style="font-size:12px;color:#22c55e;margin-bottom:4px">✓ ${e.strengths || ''}</div>
+        <div style="font-size:12px;color:#ef4444;margin-bottom:8px">✗ ${e.weaknesses || ''}</div>
+        <div style="font-size:12px;color:#a78bfa"><strong>Model answer:</strong> ${e.improved_answer || ''}</div>
       </div>`).join('') : '<div style="color:#8890b0;font-size:12px">No detailed evaluations available</div>';
 
     const report = `
-      <div style="font-family:sans-serif;color:#e8eaf6">
+      <div style="font-family:sans-serif;color:#e8eaf6;background:#0a0e1a;padding:20px;border-radius:14px">
         <div style="text-align:center;margin-bottom:24px">
-          <div style="font-size:24px;font-weight:900;color:#00e5ff">⚡ THREATREADY</div>
-          <div style="font-size:11px;color:#8890b0">Cybersecurity Assessment Report</div>
+          <div style="font-size:26px;font-weight:900;color:#00e5ff;letter-spacing:2px">⚡ THREATREADY</div>
+          <div style="font-size:12px;color:#8890b0;margin-top:4px">Cybersecurity Assessment Report</div>
         </div>
-        <div style="text-align:center;background:#111827;border-radius:14px;padding:24px;margin-bottom:16px">
-          <div style="font-size:12px;color:#8890b0;margin-bottom:6px">Hello <strong style="color:#e8eaf6">${c.candidate_name}</strong>,</div>
-          <div style="font-size:56px;font-weight:900;color:${finalScore >= 7 ? '#00e096' : finalScore >= 5 ? '#ffab40' : '#ff5252'};line-height:1">${finalScore}</div>
-          <div style="font-size:12px;color:#8890b0;margin:6px 0 12px">out of 10 · ${roleName} · ${c.difficulty}</div>
-          <div style="display:inline-block;border:2px solid ${badgeColor};color:${badgeColor};padding:4px 16px;border-radius:20px;font-size:11px;font-weight:800;letter-spacing:2px">${badge.toUpperCase()}</div>
+        <div style="text-align:center;background:#111827;border-radius:14px;padding:28px;margin-bottom:16px">
+          <div style="font-size:13px;color:#8890b0;margin-bottom:8px">Hello <strong style="color:#e8eaf6">${c.candidate_name}</strong>,</div>
+          <div style="font-size:64px;font-weight:900;color:${finalScore >= 7 ? '#00e096' : finalScore >= 5 ? '#ffab40' : '#ff5252'};line-height:1">${finalScore}</div>
+          <div style="font-size:13px;color:#8890b0;margin:8px 0 14px">out of 10 · ${roleName} · ${c.difficulty}</div>
+          <div style="display:inline-block;border:2px solid ${badgeColor};color:${badgeColor};padding:6px 20px;border-radius:20px;font-size:12px;font-weight:800;letter-spacing:2px">${badge.toUpperCase()}</div>
         </div>
-        <div style="background:#1a1f2e;border-radius:12px;padding:16px;margin-bottom:12px;border-left:4px solid ${finalScore >= 7 ? '#00e096' : finalScore >= 5 ? '#ffab40' : '#ff5252'}">
-          <div style="font-size:10px;color:#00e5ff;font-weight:700;letter-spacing:1px;margin-bottom:4px">OVERALL VERDICT</div>
-          <div style="font-size:13px;font-weight:700">${verdict}</div>
+        <div style="background:#1a1f2e;border-radius:12px;padding:18px;margin-bottom:14px;border-left:4px solid ${finalScore >= 7 ? '#00e096' : finalScore >= 5 ? '#ffab40' : '#ff5252'}">
+          <div style="font-size:11px;color:#00e5ff;font-weight:700;letter-spacing:1px;margin-bottom:6px">1. OVERALL VERDICT</div>
+          <div style="font-size:14px;font-weight:700;color:#e8eaf6">${verdict}</div>
         </div>
-        <div style="background:#1a1f2e;border-radius:12px;padding:16px;margin-bottom:12px;border-left:4px solid #8b5cf6">
-          <div style="font-size:10px;color:#00e5ff;font-weight:700;letter-spacing:1px;margin-bottom:10px">QUESTION-BY-QUESTION BREAKDOWN</div>
+        ${topStrength ? `<div style="background:#1a1f2e;border-radius:12px;padding:18px;margin-bottom:14px;border-left:4px solid #00e096">
+          <div style="font-size:11px;color:#00e5ff;font-weight:700;letter-spacing:1px;margin-bottom:6px">2. YOUR TOP STRENGTH</div>
+          <div style="font-size:12px;color:#8890b0;margin-bottom:4px">${topStrength.category} — Q${evals.rows.indexOf(topStrength)+1} (${topStrength.score}/10)</div>
+          <div style="font-size:13px;color:#e8eaf6">${topStrength.strengths}</div>
+        </div>` : ''}
+        ${topWeakness ? `<div style="background:#1a1f2e;border-radius:12px;padding:18px;margin-bottom:14px;border-left:4px solid #ff5252">
+          <div style="font-size:11px;color:#00e5ff;font-weight:700;letter-spacing:1px;margin-bottom:6px">3. KEY AREA TO IMPROVE</div>
+          <div style="font-size:12px;color:#8890b0;margin-bottom:4px">${topWeakness.category} — Q${evals.rows.indexOf(topWeakness)+1} (${topWeakness.score}/10)</div>
+          <div style="font-size:13px;color:#e8eaf6">${topWeakness.weaknesses}</div>
+        </div>` : ''}
+        <div style="background:#1a1f2e;border-radius:12px;padding:18px;margin-bottom:14px;border-left:4px solid #ffab40">
+          <div style="font-size:11px;color:#00e5ff;font-weight:700;letter-spacing:1px;margin-bottom:10px">4. RECOMMENDED NEXT STEPS</div>
+          ${nextSteps.map((s, i) => `<div style="display:flex;gap:10px;margin-bottom:8px"><span style="color:#00e5ff;font-weight:700;min-width:18px">${i+1}.</span><span style="font-size:13px;color:#e8eaf6">${s}</span></div>`).join('')}
+        </div>
+        <div style="background:#1a1f2e;border-radius:12px;padding:18px;margin-bottom:14px;border-left:4px solid #8b5cf6">
+          <div style="font-size:11px;color:#00e5ff;font-weight:700;letter-spacing:1px;margin-bottom:12px">5. QUESTION-BY-QUESTION BREAKDOWN</div>
           ${evalRows}
+        </div>
+        <div style="text-align:center;padding-top:14px;border-top:1px solid #1e2536;font-size:11px;color:#5a6380">
+          Assessment completed on ${new Date(c.completed_at || Date.now()).toLocaleDateString()} · ThreatReady Cybersecurity Platform
         </div>
       </div>`;
 
