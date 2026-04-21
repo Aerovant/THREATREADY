@@ -1570,23 +1570,12 @@ app.post('/api/b2b/invite', auth, async (req, res) => {
     const roleName = roleNames[role_id] || role_id;
     const diffName = difficulty ? difficulty.charAt(0).toUpperCase() + difficulty.slice(1) : '';
 
-    // Get assessment info if assessment_id provided
+    // Get assessment questions if assessment_id provided
     let assessmentQuestions = null;
-    let assessmentQuestionCount = 5;
     if (assessment_id) {
-      try {
-        const aq = await pool.query('SELECT questions, question_count FROM b2b_assessments WHERE id = $1', [assessment_id]);
-        if (aq.rows[0]) {
-          if (aq.rows[0].questions) assessmentQuestions = aq.rows[0].questions;
-          if (aq.rows[0].question_count) assessmentQuestionCount = aq.rows[0].question_count;
-        }
-      } catch (e) {
-        console.log('Assessment lookup failed:', e.message);
-      }
+      const aq = await pool.query('SELECT questions FROM b2b_assessments WHERE id = $1', [assessment_id]);
+      if (aq.rows[0]?.questions) assessmentQuestions = aq.rows[0].questions;
     }
-
-    // Ensure candidate_assessments has questions column
-    await pool.query(`ALTER TABLE candidate_assessments ADD COLUMN IF NOT EXISTS questions JSONB`).catch(()=>{});
 
     const results = [];
     const { Resend } = require('resend');
@@ -1599,19 +1588,10 @@ app.post('/api/b2b/invite', auth, async (req, res) => {
       const inserted = await pool.query(
         `INSERT INTO candidate_assessments
           (company_user_id, assessment_id, candidate_email, candidate_name,
-           role_id, difficulty, invite_token, status, invited_at, questions)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, 'not_started', NOW(), $8::jsonb)
+           role_id, difficulty, invite_token, status, invited_at)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, 'not_started', NOW())
          RETURNING *`,
-        [
-          req.user.id,
-          assessment_id || null,
-          email,
-          candidate_name || name,
-          role_id,
-          difficulty,
-          token,
-          assessmentQuestions ? JSON.stringify(assessmentQuestions) : null
-        ]
+        [req.user.id, assessment_id || null, email, candidate_name || name, role_id, difficulty, token]
       );
 
       const inviteLink = (process.env.FRONTEND_URL || 'http://localhost:5173') + '/?assess_token=' + token;
@@ -1632,7 +1612,7 @@ app.post('/api/b2b/invite', auth, async (req, res) => {
             <div style="background:#1a1f2e;border:1px solid #1e2536;border-radius:12px;padding:20px;margin-bottom:24px;text-align:center">
               <div style="font-size:13px;color:#8890b0;margin-bottom:8px">Assessment Details</div>
               <div style="font-size:20px;font-weight:800;color:#00e5ff;margin-bottom:4px">${roleName}</div>
-              <div style="font-size:12px;color:#8890b0;margin-bottom:20px">Difficulty: <strong style="color:#ffab40">${diffName}</strong> ·AI evaluated</div>
+              <div style="font-size:12px;color:#8890b0;margin-bottom:20px">Difficulty: <strong style="color:#ffab40">${diffName}</strong> · 5 questions · AI evaluated</div>
               <a href="${inviteLink}" style="background:#00e5ff;color:#000;padding:14px 36px;border-radius:10px;text-decoration:none;font-weight:800;font-size:15px;display:inline-block">
                 Start Assessment →
               </a>
@@ -2025,6 +2005,78 @@ app.post('/api/b2b/candidate/decision', auth, async (req, res) => {
     res.json({ success: true, decision });
   } catch (e) {
     console.error('Decision error:', e.message);
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// B2B Get Candidate Report
+app.get('/api/b2b/candidate-report/:id', auth, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const ca = await pool.query(
+      'SELECT * FROM candidate_assessments WHERE id = $1 AND company_user_id = $2',
+      [id, req.user.id]
+    );
+    if (!ca.rows[0]) return res.status(404).json({ error: 'Not found' });
+    const c = ca.rows[0];
+    if (c.status !== 'completed') return res.json({ report: null });
+
+    const roleNames = {
+      cloud:'Cloud Security',devsecops:'DevSecOps',appsec:'Application Security',
+      netsec:'Network Security',prodsec:'Product Security',secarch:'Security Architect',
+      dfir:'DFIR & Incident Response',grc:'GRC & Compliance',soc:'SOC Analyst',
+      threat:'Threat Hunter',red:'Red Team',blue:'Blue Team'
+    };
+    const roleName = roleNames[c.role_id] || c.role_id;
+    const finalScore = c.overall_score || 0;
+    const badge = finalScore >= 9 ? 'Platinum' : finalScore >= 7 ? 'Gold' : finalScore >= 6 ? 'Silver' : finalScore >= 4 ? 'Bronze' : 'Not Ready';
+    const badgeColor = finalScore >= 9 ? '#e2e8f0' : finalScore >= 7 ? '#f59e0b' : finalScore >= 6 ? '#94a3b8' : finalScore >= 4 ? '#b45309' : '#ff5252';
+    const verdict = finalScore >= 7 ? 'Strong performer — ready for industry roles' : finalScore >= 5 ? 'Developing — needs more hands-on practice' : 'Needs significant improvement — focus on fundamentals';
+
+    // Get evaluations
+    const evals = await pool.query(
+      `SELECT e.* FROM evaluations e
+       JOIN b2b_answers a ON a.id = e.answer_id
+       WHERE a.candidate_assessment_id = $1 ORDER BY e.id`,
+      [id]
+    ).catch(() => ({ rows: [] }));
+
+    const evalRows = evals.rows.length > 0 ? evals.rows.map((e, i) => `
+      <div style="margin-bottom:14px;padding:14px;background:#111827;border-radius:10px;border-left:3px solid ${e.score >= 7 ? '#00e096' : e.score >= 5 ? '#ffab40' : '#ff5252'}">
+        <div style="display:flex;justify-content:space-between;margin-bottom:6px">
+          <span style="font-size:12px;font-weight:700;color:#00e5ff">Q${i+1} · ${e.category || ''}</span>
+          <span style="font-size:16px;font-weight:800;color:${e.score >= 7 ? '#00e096' : e.score >= 5 ? '#ffab40' : '#ff5252'}">${e.score}/10</span>
+        </div>
+        <div style="font-size:11px;color:#22c55e;margin-bottom:3px">✓ ${e.strengths || ''}</div>
+        <div style="font-size:11px;color:#ef4444;margin-bottom:6px">✗ ${e.weaknesses || ''}</div>
+        <div style="font-size:11px;color:#8b5cf6"><strong style="color:#a78bfa">Model answer:</strong> ${e.improved_answer || ''}</div>
+      </div>`).join('') : '<div style="color:#8890b0;font-size:12px">No detailed evaluations available</div>';
+
+    const report = `
+      <div style="font-family:sans-serif;color:#e8eaf6">
+        <div style="text-align:center;margin-bottom:24px">
+          <div style="font-size:24px;font-weight:900;color:#00e5ff">⚡ THREATREADY</div>
+          <div style="font-size:11px;color:#8890b0">Cybersecurity Assessment Report</div>
+        </div>
+        <div style="text-align:center;background:#111827;border-radius:14px;padding:24px;margin-bottom:16px">
+          <div style="font-size:12px;color:#8890b0;margin-bottom:6px">Hello <strong style="color:#e8eaf6">${c.candidate_name}</strong>,</div>
+          <div style="font-size:56px;font-weight:900;color:${finalScore >= 7 ? '#00e096' : finalScore >= 5 ? '#ffab40' : '#ff5252'};line-height:1">${finalScore}</div>
+          <div style="font-size:12px;color:#8890b0;margin:6px 0 12px">out of 10 · ${roleName} · ${c.difficulty}</div>
+          <div style="display:inline-block;border:2px solid ${badgeColor};color:${badgeColor};padding:4px 16px;border-radius:20px;font-size:11px;font-weight:800;letter-spacing:2px">${badge.toUpperCase()}</div>
+        </div>
+        <div style="background:#1a1f2e;border-radius:12px;padding:16px;margin-bottom:12px;border-left:4px solid ${finalScore >= 7 ? '#00e096' : finalScore >= 5 ? '#ffab40' : '#ff5252'}">
+          <div style="font-size:10px;color:#00e5ff;font-weight:700;letter-spacing:1px;margin-bottom:4px">OVERALL VERDICT</div>
+          <div style="font-size:13px;font-weight:700">${verdict}</div>
+        </div>
+        <div style="background:#1a1f2e;border-radius:12px;padding:16px;margin-bottom:12px;border-left:4px solid #8b5cf6">
+          <div style="font-size:10px;color:#00e5ff;font-weight:700;letter-spacing:1px;margin-bottom:10px">QUESTION-BY-QUESTION BREAKDOWN</div>
+          ${evalRows}
+        </div>
+      </div>`;
+
+    res.json({ report });
+  } catch(e) {
+    console.error('Report error:', e.message);
     res.status(500).json({ error: e.message });
   }
 });
