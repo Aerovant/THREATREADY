@@ -1552,7 +1552,7 @@ Respond ONLY valid JSON no markdown:
 app.post('/api/b2b/invite', auth, async (req, res) => {
   console.log('--- B2B INVITE ---');
   try {
-    const { candidate_email, candidate_emails, candidate_name, assessment_id, role_id, difficulty, question_count } = req.body;
+    const { candidate_email, candidate_emails, candidate_name, assessment_id, role_id, difficulty } = req.body;
 
     // Support both single email and array of emails
     const emails = candidate_emails?.length
@@ -1570,14 +1570,23 @@ app.post('/api/b2b/invite', auth, async (req, res) => {
     const roleName = roleNames[role_id] || role_id;
     const diffName = difficulty ? difficulty.charAt(0).toUpperCase() + difficulty.slice(1) : '';
 
-    // Get assessment questions and question_count if assessment_id provided
+    // Get assessment info if assessment_id provided
     let assessmentQuestions = null;
-    let assessmentQuestionCount = question_count || 5;
+    let assessmentQuestionCount = 5;
     if (assessment_id) {
-      const aq = await pool.query('SELECT questions, question_count FROM b2b_assessments WHERE id = $1', [assessment_id]);
-      if (aq.rows[0]?.questions) assessmentQuestions = aq.rows[0].questions;
-      if (aq.rows[0]?.question_count) assessmentQuestionCount = aq.rows[0].question_count;
+      try {
+        const aq = await pool.query('SELECT questions, question_count FROM b2b_assessments WHERE id = $1', [assessment_id]);
+        if (aq.rows[0]) {
+          if (aq.rows[0].questions) assessmentQuestions = aq.rows[0].questions;
+          if (aq.rows[0].question_count) assessmentQuestionCount = aq.rows[0].question_count;
+        }
+      } catch (e) {
+        console.log('Assessment lookup failed:', e.message);
+      }
     }
+
+    // Ensure candidate_assessments has questions column
+    await pool.query(`ALTER TABLE candidate_assessments ADD COLUMN IF NOT EXISTS questions JSONB`).catch(()=>{});
 
     const results = [];
     const { Resend } = require('resend');
@@ -1590,10 +1599,19 @@ app.post('/api/b2b/invite', auth, async (req, res) => {
       const inserted = await pool.query(
         `INSERT INTO candidate_assessments
           (company_user_id, assessment_id, candidate_email, candidate_name,
-           role_id, difficulty, invite_token, status, invited_at)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, 'not_started', NOW())
+           role_id, difficulty, invite_token, status, invited_at, questions)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, 'not_started', NOW(), $8::jsonb)
          RETURNING *`,
-        [req.user.id, assessment_id || null, email, candidate_name || name, role_id, difficulty, token]
+        [
+          req.user.id,
+          assessment_id || null,
+          email,
+          candidate_name || name,
+          role_id,
+          difficulty,
+          token,
+          assessmentQuestions ? JSON.stringify(assessmentQuestions) : null
+        ]
       );
 
       const inviteLink = (process.env.FRONTEND_URL || 'http://localhost:5173') + '/?assess_token=' + token;
