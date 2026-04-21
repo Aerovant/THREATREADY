@@ -2718,7 +2718,9 @@ export default function ThreatReady() {
             </div>
             <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
               <span className="tag" style={{ padding: "5px 12px" }}>⚡ {xp} XP</span>
+
               {/* Notification Bell */}
+
               <div style={{ position: "relative" }}>
                 <button className="btn bs" style={{ padding: "5px 10px", fontSize: 13 }}
                   onClick={async () => {
@@ -2730,14 +2732,17 @@ export default function ThreatReady() {
                       setNotifications(p => p.map(n => ({ ...n, is_read: true })));
                     }
                   }}>
+
                   🔔{unreadCount > 0 && <span style={{ background: "var(--dn)", color: "#fff", fontSize: 8, fontWeight: 700, borderRadius: "50%", padding: "1px 4px", marginLeft: 3 }}>{unreadCount}</span>}
                 </button>
+
                 {showNotifs && (
-                  <div style={{ position: "absolute", right: 0, top: 36, width: 280, background: "#111827", border: "1px solid #1e2536", borderRadius: 12, boxShadow: "0 16px 48px rgba(0,0,0,.6)", zIndex: 999, maxHeight: 300, overflowY: "auto" }}>
-                    <div style={{ padding: "10px 14px", borderBottom: "1px solid #1e2536", fontSize: 11, fontWeight: 700, color: "var(--ac)", display: "flex", justifyContent: "space-between" }}>
+                  <div style={{ position: "relative", zIndex: 1000, right: 0, top: 36, width: 280,  background: "#111827", border: "1px solid #1e2536", borderRadius: 12, boxShadow: "0 16px 48px rgba(0,0,0,.6)", zIndex: 999, maxHeight: 300, overflowY: "auto" }}>
+                    <div style={{ padding: "10px 14px",position: "relative", zIndex: 1000, borderBottom: "1px solid #1e2536", fontSize: 11, fontWeight: 700, color: "var(--ac)", display: "flex", justifyContent: "space-between" }}>
                       <span>NOTIFICATIONS</span>
                       <span style={{ cursor: "pointer", opacity: 1 }} onClick={() => setShowNotifs(false)}>×</span>
                     </div>
+
                     {notifications.length === 0
                       ? <div style={{ padding: 16, fontSize: 11, color: "var(--tx3)", textAlign: "center" }}>No notifications yet</div>
                       : notifications.map((n, i) => (
@@ -2751,6 +2756,7 @@ export default function ThreatReady() {
                   </div>
                 )}
               </div>
+
               <button className="btn bs" style={{ padding: "5px 10px", fontSize: 10 }} onClick={logout}>Logout</button>
             </div>
           </div>
@@ -3518,9 +3524,7 @@ export default function ThreatReady() {
               }}>📊 Download My Report (PDF)</button>
               <button className="btn bdn" style={{ fontSize: 11 }} onClick={() => showConfirm('Delete your account permanently? All data will be lost.', async () => { const token = localStorage.getItem('token'); const res = await fetch('https://threatready-db.onrender.com/api/settings/delete-account', { method: 'DELETE', headers: { 'Authorization': `Bearer ${token}` } }); if (res.ok) { localStorage.clear(); setUser(null); setView('landing'); showToast('Account deleted.', 'info'); } })}>🗑️ Delete Account</button>
             </div>
-            <div style={{ marginTop: 16 }}>
-              <button className="btn bs" style={{ fontSize: 11 }} onClick={() => { setUserType("b2b"); setView("b2b-dashboard"); }}>🏢 Switch to Hiring Manager Dashboard</button>
-            </div>
+            
           </>)}
 
           {/* ── C8: HELP ── */}
@@ -3604,62 +3608,122 @@ export default function ThreatReady() {
         <ToastContainer />
 
         {/* ── REPORT MODAL ── */}
-        {reportModal && (
-          <div style={{ position: "fixed", inset: 0, zIndex: 9998, background: "rgba(0,0,0,0.8)", backdropFilter: "blur(4px)", display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }}
-            onClick={() => setReportModal(null)}>
-            <div onClick={e => e.stopPropagation()}
-              style={{ width: "90%", maxWidth: 800, maxHeight: "90vh", overflow: "hidden", background: "#0f1420", border: "1px solid var(--ac)", borderRadius: 16, boxShadow: "0 20px 60px rgba(0,0,0,.9), 0 0 40px rgba(0,229,255,0.25)", display: "flex", flexDirection: "column" }}>
-              <div style={{ padding: "18px 24px", borderBottom: "1px solid #1e2536", background: "#0a0e1a", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                <div>
-                  <div style={{ fontSize: 10, color: "var(--ac)", fontWeight: 700, letterSpacing: 2, marginBottom: 4 }}>📊 CANDIDATE REPORT</div>
-                  <div style={{ fontSize: 16, fontWeight: 800 }}>{reportModal.name}</div>
-                  <div style={{ fontSize: 11, color: "var(--tx3)", marginTop: 2 }}>{reportModal.email}</div>
+        {reportModal && (() => {
+          const evals = reportModal.evaluations || [];
+          const score = parseFloat(reportModal.overall_score) || 0;
+          const avgStrength = evals.filter(e => e.score >= 7).length;
+          const avgWeak = evals.filter(e => e.score < 5).length;
+          const verdict = score >= 8 ? "Excellent candidate — strongly recommended for interview" :
+                         score >= 7 ? "Strong candidate — recommended for next round" :
+                         score >= 6 ? "Good candidate — consider for interview" :
+                         score >= 5 ? "Average — more assessment needed" :
+                         score >= 4 ? "Below expectations — not recommended" :
+                         "Not ready — significant skill gaps";
+          const verdictColor = score >= 7 ? "var(--ok)" : score >= 5 ? "var(--wn)" : "var(--dn)";
+          const badgeColor = score >= 8 ? "#e2e8f0" : score >= 7 ? "#f59e0b" : score >= 6 ? "#94a3b8" : score >= 4 ? "#cd7f32" : "#ff5252";
+
+          return (
+            <div style={{ position: "fixed", inset: 0, zIndex: 9998, background: "rgba(0,0,0,0.85)", backdropFilter: "blur(6px)", display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }}
+              onClick={() => setReportModal(null)}>
+              <div onClick={e => e.stopPropagation()}
+                style={{ width: "92%", maxWidth: 900, maxHeight: "92vh", overflow: "hidden", background: "#0f1420", border: "1px solid var(--ac)", borderRadius: 16, boxShadow: "0 20px 60px rgba(0,0,0,.9), 0 0 40px rgba(0,229,255,0.25)", display: "flex", flexDirection: "column" }}>
+
+                <div style={{ padding: "20px 28px", borderBottom: "1px solid #1e2536", background: "#0a0e1a", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                  <div>
+                    <div style={{ fontSize: 11, color: "var(--ac)", fontWeight: 700, letterSpacing: 2, marginBottom: 4 }}>📊 ASSESSMENT RESULTS</div>
+                    <div style={{ fontSize: 18, fontWeight: 800 }}>{reportModal.name}</div>
+                    <div style={{ fontSize: 11, color: "var(--tx3)", marginTop: 2 }}>{reportModal.email} · {reportModal.assessment_name || (ROLES.find(r => r.id === reportModal.role_id)?.name + ' Assessment')}</div>
+                  </div>
+                  <span style={{ cursor: "pointer", fontSize: 28, color: "var(--tx3)", padding: "0 8px" }} onClick={() => setReportModal(null)}>×</span>
                 </div>
-                <span style={{ cursor: "pointer", fontSize: 24, color: "var(--tx3)", padding: "0 8px" }} onClick={() => setReportModal(null)}>×</span>
-              </div>
-              <div style={{ padding: "20px 24px", borderBottom: "1px solid #1e2536", display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 12 }}>
-                <div style={{ textAlign: "center", padding: 12, background: "var(--s2)", borderRadius: 10 }}>
-                  <div style={{ fontSize: 9, color: "var(--tx3)", marginBottom: 4 }}>SCORE</div>
-                  <div className="mono" style={{ fontSize: 22, fontWeight: 800, color: reportModal.overall_score >= 7 ? "var(--ok)" : reportModal.overall_score >= 5 ? "var(--wn)" : "var(--dn)" }}>{reportModal.overall_score}/10</div>
-                </div>
-                <div style={{ textAlign: "center", padding: 12, background: "var(--s2)", borderRadius: 10 }}>
-                  <div style={{ fontSize: 9, color: "var(--tx3)", marginBottom: 4 }}>BADGE</div>
-                  <div style={{ fontSize: 13, fontWeight: 700, color: "var(--ac)" }}>{reportModal.badge || '—'}</div>
-                </div>
-                <div style={{ textAlign: "center", padding: 12, background: "var(--s2)", borderRadius: 10 }}>
-                  <div style={{ fontSize: 9, color: "var(--tx3)", marginBottom: 4 }}>ROLE</div>
-                  <div style={{ fontSize: 13, fontWeight: 700 }}>{ROLES.find(r => r.id === reportModal.role_id)?.name || reportModal.role_id}</div>
-                </div>
-                <div style={{ textAlign: "center", padding: 12, background: "var(--s2)", borderRadius: 10 }}>
-                  <div style={{ fontSize: 9, color: "var(--tx3)", marginBottom: 4 }}>DIFFICULTY</div>
-                  <div style={{ fontSize: 13, fontWeight: 700, textTransform: "capitalize" }}>{reportModal.difficulty}</div>
-                </div>
-              </div>
-              <div style={{ overflow: "auto", flex: 1, padding: "20px 24px" }}>
-                <div style={{ fontSize: 11, color: "var(--ac)", fontWeight: 700, letterSpacing: 2, marginBottom: 12 }}>QUESTION-BY-QUESTION BREAKDOWN</div>
-                {(reportModal.evaluations || []).length === 0 ? (
-                  <div style={{ textAlign: "center", padding: 30, color: "var(--tx3)" }}>No evaluation data available</div>
-                ) : (
-                  (reportModal.evaluations || []).map((ev, i) => (
-                    <div key={i} style={{ marginBottom: 16, padding: 16, background: "var(--s2)", borderRadius: 10, border: "1px solid var(--bd)" }}>
-                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
-                        <span style={{ fontSize: 11, color: "var(--tx3)", fontWeight: 700 }}>Q{i + 1} · {ev.category || 'General'}</span>
-                        <span className="mono" style={{ fontSize: 13, fontWeight: 700, color: ev.score >= 7 ? "var(--ok)" : ev.score >= 5 ? "var(--wn)" : "var(--dn)" }}>{ev.score}/10</span>
-                      </div>
-                      <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 8, color: "var(--tx1)" }}>Q: {ev.question}</div>
-                      <div style={{ fontSize: 11, color: "var(--tx2)", marginBottom: 10, padding: 10, background: "var(--s1)", borderRadius: 6, lineHeight: 1.5 }}>
-                        <strong style={{ color: "var(--tx3)" }}>Candidate's Answer:</strong><br />{ev.answer || '(No answer provided)'}
-                      </div>
-                      {ev.strengths && <div style={{ fontSize: 10, color: "var(--ok)", marginBottom: 4 }}><strong>✓ Strengths:</strong> {ev.strengths}</div>}
-                      {ev.weaknesses && <div style={{ fontSize: 10, color: "var(--dn)", marginBottom: 4 }}><strong>✗ Weaknesses:</strong> {ev.weaknesses}</div>}
-                      {ev.improved_answer && ev.improved_answer !== '-' && <div style={{ fontSize: 10, color: "var(--ac)", marginTop: 6, padding: 8, background: "rgba(0,229,255,.05)", borderRadius: 6 }}><strong>💡 Ideal Answer:</strong> {ev.improved_answer}</div>}
+
+                <div style={{ overflow: "auto", flex: 1 }}>
+
+                  <div style={{ padding: "32px 28px", textAlign: "center", borderBottom: "1px solid #1e2536", background: "linear-gradient(180deg, rgba(0,229,255,0.04) 0%, transparent 100%)" }}>
+                    <div style={{ fontSize: 11, color: "var(--tx3)", marginBottom: 8, letterSpacing: 2, fontWeight: 700 }}>OVERALL SCORE</div>
+                    <div className="mono" style={{ fontSize: 72, fontWeight: 900, lineHeight: 1, color: verdictColor, marginBottom: 8 }}>
+                      {score.toFixed(1)}<span style={{ fontSize: 28, color: "var(--tx3)" }}>/10</span>
                     </div>
-                  ))
-                )}
+                    <div style={{ display: "inline-block", border: `2px solid ${badgeColor}`, color: badgeColor, padding: "6px 24px", borderRadius: 24, fontSize: 12, fontWeight: 800, letterSpacing: 2, marginTop: 8, marginBottom: 14 }}>
+                      {(reportModal.badge || '').toUpperCase()}
+                    </div>
+                    <div style={{ fontSize: 13, color: verdictColor, fontWeight: 600, marginTop: 4 }}>
+                      {verdict}
+                    </div>
+                  </div>
+
+                  <div style={{ padding: "20px 28px", borderBottom: "1px solid #1e2536", display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 12 }}>
+                    <div style={{ textAlign: "center", padding: 14, background: "var(--s2)", borderRadius: 10 }}>
+                      <div style={{ fontSize: 9, color: "var(--tx3)", marginBottom: 4, letterSpacing: 1 }}>ROLE</div>
+                      <div style={{ fontSize: 13, fontWeight: 700 }}>{ROLES.find(r => r.id === reportModal.role_id)?.icon} {ROLES.find(r => r.id === reportModal.role_id)?.name || reportModal.role_id}</div>
+                    </div>
+                    <div style={{ textAlign: "center", padding: 14, background: "var(--s2)", borderRadius: 10 }}>
+                      <div style={{ fontSize: 9, color: "var(--tx3)", marginBottom: 4, letterSpacing: 1 }}>DIFFICULTY</div>
+                      <div style={{ fontSize: 13, fontWeight: 700, textTransform: "capitalize" }}>{reportModal.difficulty}</div>
+                    </div>
+                    <div style={{ textAlign: "center", padding: 14, background: "var(--s2)", borderRadius: 10 }}>
+                      <div style={{ fontSize: 9, color: "var(--tx3)", marginBottom: 4, letterSpacing: 1 }}>QUESTIONS</div>
+                      <div style={{ fontSize: 13, fontWeight: 700 }}>{evals.length} answered</div>
+                    </div>
+                    <div style={{ textAlign: "center", padding: 14, background: "var(--s2)", borderRadius: 10 }}>
+                      <div style={{ fontSize: 9, color: "var(--tx3)", marginBottom: 4, letterSpacing: 1 }}>COMPLETED</div>
+                      <div style={{ fontSize: 13, fontWeight: 700 }}>{reportModal.completed_at?.substring(0, 10) || '—'}</div>
+                    </div>
+                  </div>
+
+                  <div style={{ padding: "20px 28px", borderBottom: "1px solid #1e2536", display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+                    <div style={{ padding: 14, background: "rgba(0,224,150,.05)", border: "1px solid rgba(0,224,150,.25)", borderRadius: 10 }}>
+                      <div style={{ fontSize: 10, color: "var(--ok)", fontWeight: 700, marginBottom: 6, letterSpacing: 1 }}>✓ STRONG ANSWERS</div>
+                      <div style={{ fontSize: 24, fontWeight: 900, color: "var(--ok)" }}>{avgStrength}</div>
+                      <div style={{ fontSize: 10, color: "var(--tx3)", marginTop: 2 }}>Questions scored 7+ / 10</div>
+                    </div>
+                    <div style={{ padding: 14, background: "rgba(255,82,82,.05)", border: "1px solid rgba(255,82,82,.25)", borderRadius: 10 }}>
+                      <div style={{ fontSize: 10, color: "var(--dn)", fontWeight: 700, marginBottom: 6, letterSpacing: 1 }}>✗ WEAK AREAS</div>
+                      <div style={{ fontSize: 24, fontWeight: 900, color: "var(--dn)" }}>{avgWeak}</div>
+                      <div style={{ fontSize: 10, color: "var(--tx3)", marginTop: 2 }}>Questions scored below 5 / 10</div>
+                    </div>
+                  </div>
+
+                  <div style={{ padding: "24px 28px" }}>
+                    <div style={{ fontSize: 12, color: "var(--ac)", fontWeight: 700, letterSpacing: 2, marginBottom: 16 }}>📝 DETAILED QUESTION BREAKDOWN</div>
+                    {evals.length === 0 ? (
+                      <div style={{ textAlign: "center", padding: 30, color: "var(--tx3)", fontSize: 12 }}>No evaluation data available</div>
+                    ) : (
+                      evals.map((ev, i) => (
+                        <div key={i} style={{ marginBottom: 18, padding: 18, background: "var(--s2)", borderRadius: 12, border: `1px solid ${ev.score >= 7 ? "rgba(0,224,150,.3)" : ev.score >= 5 ? "rgba(245,158,11,.3)" : "rgba(255,82,82,.3)"}` }}>
+                          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12, paddingBottom: 10, borderBottom: "1px solid var(--bd)" }}>
+                            <span style={{ fontSize: 11, color: "var(--tx3)", fontWeight: 700, letterSpacing: 1 }}>QUESTION {i + 1} · {ev.category || 'General'}</span>
+                            <span className="mono" style={{ fontSize: 16, fontWeight: 900, color: ev.score >= 7 ? "var(--ok)" : ev.score >= 5 ? "var(--wn)" : "var(--dn)" }}>{ev.score}/10</span>
+                          </div>
+                          <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 12, color: "var(--tx1)", lineHeight: 1.5 }}>❓ {ev.question}</div>
+                          <div style={{ fontSize: 12, color: "var(--tx2)", marginBottom: 12, padding: 12, background: "var(--s1)", borderRadius: 8, lineHeight: 1.6, borderLeft: "3px solid var(--tx3)" }}>
+                            <div style={{ fontSize: 9, color: "var(--tx3)", marginBottom: 6, fontWeight: 700, letterSpacing: 1 }}>CANDIDATE'S ANSWER</div>
+                            {ev.answer || '(No answer provided)'}
+                          </div>
+                          {ev.strengths && (
+                            <div style={{ fontSize: 11, color: "var(--ok)", marginBottom: 8, padding: 10, background: "rgba(0,224,150,.05)", borderRadius: 8, borderLeft: "3px solid var(--ok)" }}>
+                              <strong>✓ Strengths:</strong> {ev.strengths}
+                            </div>
+                          )}
+                          {ev.weaknesses && (
+                            <div style={{ fontSize: 11, color: "var(--dn)", marginBottom: 8, padding: 10, background: "rgba(255,82,82,.05)", borderRadius: 8, borderLeft: "3px solid var(--dn)" }}>
+                              <strong>✗ Weaknesses:</strong> {ev.weaknesses}
+                            </div>
+                          )}
+                          {ev.improved_answer && ev.improved_answer !== '-' && (
+                            <div style={{ fontSize: 11, color: "var(--ac)", marginTop: 8, padding: 10, background: "rgba(0,229,255,.05)", borderRadius: 8, borderLeft: "3px solid var(--ac)" }}>
+                              <strong>💡 Ideal Answer:</strong> {ev.improved_answer}
+                            </div>
+                          )}
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </div>
               </div>
             </div>
-          </div>
-        )}
+          );
+        })()}
 
         <div className="page"><div className="cnt">
 
@@ -3690,31 +3754,8 @@ export default function ThreatReady() {
                 </button>
                 {showNotifs && (
                   <>
-                    {/* Backdrop - dim everything else + click outside to close */}
-                    <div
-                      style={{
-                        position: "fixed",
-                        inset: 0,
-                        zIndex: 9998,
-                        background: "rgba(0,0,0,0.7)",
-                        backdropFilter: "blur(2px)"
-                      }}
-                      onClick={() => setShowNotifs(false)}
-                    />
-                    {/* Dropdown panel */}
-                    <div style={{
-                      position: "fixed",
-                      top: 80,
-                      right: 24,
-                      width: 360,
-                      maxHeight: "80vh",
-                      overflow: "auto",
-                      background: "#0f1420",
-                      border: "1px solid var(--ac)",
-                      borderRadius: 12,
-                      boxShadow: "0 20px 60px rgba(0,0,0,.9), 0 0 30px rgba(0,229,255,0.15)",
-                      zIndex: 9999
-                    }}>
+                    <div style={{ position: "fixed", top: 0, left: 0, right: 0, bottom: 0, zIndex: 99998, background: "rgba(0,0,0,0.5)" }} onClick={() => setShowNotifs(false)} />
+                    <div style={{ position: "fixed", top: 60, right: 16, width: 360, maxHeight: "75vh", overflow: "auto", background: "#0f1420", border: "1px solid var(--ac)", borderRadius: 12, boxShadow: "0 20px 60px rgba(0,0,0,.9)", zIndex: 99999 }}>
                       <div style={{ padding: "12px 16px", borderBottom: "1px solid #1e2536", fontSize: 11, fontWeight: 700, color: "var(--ac)", letterSpacing: 1, display: "flex", justifyContent: "space-between", alignItems: "center", background: "#0a0e1a", position: "sticky", top: 0 }}>
                         <span>NOTIFICATIONS ({notifications.length})</span>
                         <span style={{ cursor: "pointer", fontSize: 16, color: "var(--tx3)" }} onClick={() => setShowNotifs(false)}>×</span>
@@ -3734,7 +3775,7 @@ export default function ThreatReady() {
                 )}
               </div>
 
-              <button className="btn bs" style={{ padding: "5px 10px", fontSize: 10 }} onClick={() => { setUserType("b2c"); setView("dashboard"); }}>B2C View</button>
+              
               <button className="btn bs" style={{ padding: "5px 10px", fontSize: 10 }} onClick={logout}>Logout</button>
             </div>
           </div>
@@ -3915,20 +3956,144 @@ export default function ThreatReady() {
               <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
                 <div className="lbl">ALL CANDIDATES ({filterBySearch(candidates, candidatesSearch, c => c.candidate_name, c => c.candidate_email, c => c.invited_at).length})</div>
                 {selectedCandidates.length > 0 && (
-                  <button className="btn bdn" style={{ fontSize: 10, padding: "4px 10px" }}
-                    onClick={() => {
-                      showConfirm(`Delete ${selectedCandidates.length} selected candidate(s)?`, async () => {
+                  <>
+                    <button className="btn" style={{ fontSize: 10, padding: "4px 10px", background: "rgba(0,224,150,.15)", border: "1px solid var(--ok)", color: "var(--ok)" }}
+                      onClick={async () => {
                         const token = localStorage.getItem('token');
-                        await Promise.all(selectedCandidates.map(id =>
-                          fetch(`https://threatready-db.onrender.com/api/b2b/candidates/${id}`, {
-                            method: 'DELETE', headers: { 'Authorization': `Bearer ${token}` }
-                          })
-                        ));
-                        setSelectedCandidates([]);
-                        loadB2bData();
-                        showToast(`${selectedCandidates.length} candidates deleted.`, 'success');
-                      });
-                    }}>🗑 Delete Selected ({selectedCandidates.length})</button>
+                        const selectedCompleted = candidates.filter(c => selectedCandidates.includes(c.id) && c.status === 'completed');
+                        if (selectedCompleted.length === 0) {
+                          showToast('No completed assessments in selection', 'error');
+                          return;
+                        }
+                        showToast(`Generating ${selectedCompleted.length} PDF(s)...`, 'info');
+                        for (const c of selectedCompleted) {
+                          try {
+                            const res = await fetch(`https://threatready-db.onrender.com/api/b2b/candidates/${c.id}/report`, {
+                              headers: { 'Authorization': `Bearer ${token}` }
+                            });
+                            const data = await res.json();
+                            if (!data.candidate) continue;
+                            const cand = data.candidate;
+                            const score = parseFloat(cand.overall_score) || 0;
+                            const scoreColor = score >= 7 ? '#00e096' : score >= 5 ? '#f59e0b' : '#ff5252';
+                            const badgeColor = score >= 8 ? '#e2e8f0' : score >= 7 ? '#f59e0b' : score >= 6 ? '#94a3b8' : score >= 4 ? '#cd7f32' : '#ff5252';
+                            const verdict = score >= 8 ? "Excellent candidate — strongly recommended for interview" :
+                                           score >= 7 ? "Strong candidate — recommended for next round" :
+                                           score >= 6 ? "Good candidate — consider for interview" :
+                                           score >= 5 ? "Average — more assessment needed" :
+                                           score >= 4 ? "Below expectations — not recommended" :
+                                           "Not ready — significant skill gaps";
+                            const evals = cand.evaluations || [];
+                            const strongCount = evals.filter(e => e.score >= 7).length;
+                            const weakCount = evals.filter(e => e.score < 5).length;
+                            const roleName = ROLES.find(r => r.id === cand.role_id)?.name || cand.role_id;
+                            const escape = s => (s || '').toString().replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\n/g, '<br/>');
+                            const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Report - ${escape(cand.name)}</title>
+<style>
+@page { size: A4; margin: 20mm; }
+body { font-family: -apple-system, 'Segoe UI', Arial, sans-serif; color: #1a1a1a; line-height: 1.5; margin: 0; padding: 0; background: #fff; }
+.header { border-bottom: 3px solid #00b8d4; padding-bottom: 16px; margin-bottom: 24px; }
+.brand { color: #00b8d4; font-size: 22px; font-weight: 900; letter-spacing: 2px; margin-bottom: 4px; }
+.subtitle { color: #666; font-size: 11px; margin-bottom: 12px; }
+h1 { font-size: 20px; margin: 0 0 6px 0; }
+.meta { color: #666; font-size: 12px; }
+.score-card { background: linear-gradient(135deg, #0a0e1a 0%, #1a1f2e 100%); color: #fff; padding: 30px; border-radius: 12px; text-align: center; margin: 24px 0; }
+.score-label { font-size: 11px; color: #8890b0; letter-spacing: 2px; font-weight: 700; margin-bottom: 12px; }
+.score-value { font-size: 56px; font-weight: 900; color: ${scoreColor}; line-height: 1; margin-bottom: 8px; }
+.score-max { font-size: 22px; color: #8890b0; }
+.badge { display: inline-block; border: 2px solid ${badgeColor}; color: ${badgeColor}; padding: 6px 20px; border-radius: 20px; font-size: 12px; font-weight: 800; letter-spacing: 2px; margin: 12px 0; }
+.verdict { font-size: 13px; color: ${scoreColor}; font-weight: 600; margin-top: 8px; }
+.stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin: 20px 0; }
+.stat { background: #f5f7fa; padding: 12px; border-radius: 8px; text-align: center; }
+.stat-label { font-size: 9px; color: #666; letter-spacing: 1px; margin-bottom: 4px; font-weight: 700; }
+.stat-val { font-size: 13px; font-weight: 700; }
+.summary { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin: 20px 0; }
+.sum-box { padding: 14px; border-radius: 10px; border: 1px solid; }
+.sum-strong { background: #e6faf1; border-color: #00c48a; }
+.sum-weak { background: #fff0f0; border-color: #ff5252; }
+.sum-count { font-size: 26px; font-weight: 900; }
+.sum-label { font-size: 11px; font-weight: 700; letter-spacing: 1px; margin-bottom: 4px; }
+.sum-desc { font-size: 10px; color: #666; margin-top: 2px; }
+.section-title { font-size: 13px; color: #00b8d4; font-weight: 700; letter-spacing: 2px; margin: 28px 0 14px; text-transform: uppercase; border-bottom: 2px solid #00b8d4; padding-bottom: 6px; }
+.q-block { margin-bottom: 16px; padding: 14px; background: #f9fafb; border-radius: 10px; border-left: 4px solid #ccc; page-break-inside: avoid; }
+.q-block.good { border-left-color: #00c48a; }
+.q-block.avg { border-left-color: #f59e0b; }
+.q-block.bad { border-left-color: #ff5252; }
+.q-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; padding-bottom: 8px; border-bottom: 1px solid #e5e7eb; }
+.q-num { font-size: 10px; color: #666; font-weight: 700; letter-spacing: 1px; }
+.q-score { font-size: 14px; font-weight: 900; }
+.q-question { font-size: 13px; font-weight: 700; margin-bottom: 10px; }
+.q-answer { background: #fff; padding: 10px; border-radius: 6px; border-left: 3px solid #999; font-size: 11px; margin-bottom: 10px; color: #333; }
+.q-tag { font-size: 9px; font-weight: 700; letter-spacing: 1px; color: #666; margin-bottom: 4px; }
+.q-str { background: #e6faf1; padding: 8px; border-radius: 6px; border-left: 3px solid #00c48a; font-size: 11px; margin-bottom: 6px; color: #1a5f3f; }
+.q-wk { background: #fff0f0; padding: 8px; border-radius: 6px; border-left: 3px solid #ff5252; font-size: 11px; margin-bottom: 6px; color: #8b1a1a; }
+.q-ideal { background: #e7f5ff; padding: 8px; border-radius: 6px; border-left: 3px solid #00b8d4; font-size: 11px; color: #0a4d68; }
+.footer { margin-top: 30px; padding-top: 14px; border-top: 1px solid #ccc; font-size: 10px; color: #999; text-align: center; }
+</style></head>
+<body>
+<div class="header">
+<div class="brand">⚡ THREATREADY</div>
+<div class="subtitle">Cybersecurity Assessment Platform · Candidate Report</div>
+<h1>${escape(cand.name)}</h1>
+<div class="meta">${escape(cand.email)} · ${escape(cand.assessment_name || roleName + ' Assessment')}</div>
+</div>
+<div class="score-card">
+<div class="score-label">OVERALL SCORE</div>
+<div class="score-value">${score.toFixed(1)}<span class="score-max">/10</span></div>
+<div class="badge">${escape((cand.badge || '').toUpperCase())}</div>
+<div class="verdict">${escape(verdict)}</div>
+</div>
+<div class="stats">
+<div class="stat"><div class="stat-label">ROLE</div><div class="stat-val">${escape(roleName)}</div></div>
+<div class="stat"><div class="stat-label">DIFFICULTY</div><div class="stat-val" style="text-transform:capitalize">${escape(cand.difficulty)}</div></div>
+<div class="stat"><div class="stat-label">QUESTIONS</div><div class="stat-val">${evals.length} answered</div></div>
+<div class="stat"><div class="stat-label">COMPLETED</div><div class="stat-val">${escape(cand.completed_at?.substring(0, 10) || '—')}</div></div>
+</div>
+<div class="summary">
+<div class="sum-box sum-strong"><div class="sum-label" style="color:#00a878">✓ STRONG ANSWERS</div><div class="sum-count" style="color:#00a878">${strongCount}</div><div class="sum-desc">Questions scored 7+ / 10</div></div>
+<div class="sum-box sum-weak"><div class="sum-label" style="color:#d32f2f">✗ WEAK AREAS</div><div class="sum-count" style="color:#d32f2f">${weakCount}</div><div class="sum-desc">Questions scored below 5 / 10</div></div>
+</div>
+<div class="section-title">📝 Detailed Question Breakdown</div>
+${evals.map((ev, i) => {
+  const cls = ev.score >= 7 ? 'good' : ev.score >= 5 ? 'avg' : 'bad';
+  const col = ev.score >= 7 ? '#00a878' : ev.score >= 5 ? '#d97706' : '#d32f2f';
+  return `<div class="q-block ${cls}">
+    <div class="q-header"><span class="q-num">QUESTION ${i + 1} · ${escape(ev.category || 'General')}</span><span class="q-score" style="color:${col}">${ev.score}/10</span></div>
+    <div class="q-question">❓ ${escape(ev.question)}</div>
+    <div class="q-tag">CANDIDATE'S ANSWER</div>
+    <div class="q-answer">${escape(ev.answer || '(No answer provided)')}</div>
+    ${ev.strengths ? `<div class="q-str"><strong>✓ Strengths:</strong> ${escape(ev.strengths)}</div>` : ''}
+    ${ev.weaknesses ? `<div class="q-wk"><strong>✗ Weaknesses:</strong> ${escape(ev.weaknesses)}</div>` : ''}
+    ${ev.improved_answer && ev.improved_answer !== '-' ? `<div class="q-ideal"><strong>💡 Ideal Answer:</strong> ${escape(ev.improved_answer)}</div>` : ''}
+  </div>`;
+}).join('')}
+<div class="footer">Generated by ThreatReady · ${new Date().toLocaleString()}</div>
+<script>window.onload = function() { setTimeout(function() { window.print(); }, 500); };</script>
+</body></html>`;
+                            const w = window.open('', '_blank');
+                            if (!w) { showToast('Please allow popups for bulk download', 'error'); return; }
+                            w.document.write(html);
+                            w.document.close();
+                            await new Promise(r => setTimeout(r, 800));
+                          } catch (e) { console.error('PDF error:', e); }
+                        }
+                        showToast(`${selectedCompleted.length} PDF(s) opened!`, 'success');
+                      }}>📥 Download PDFs ({selectedCandidates.length})</button>
+                    <button className="btn bdn" style={{ fontSize: 10, padding: "4px 10px" }}
+                      onClick={() => {
+                        showConfirm(`Delete ${selectedCandidates.length} selected candidate(s)?`, async () => {
+                          const token = localStorage.getItem('token');
+                          await Promise.all(selectedCandidates.map(id =>
+                            fetch(`https://threatready-db.onrender.com/api/b2b/candidates/${id}`, {
+                              method: 'DELETE', headers: { 'Authorization': `Bearer ${token}` }
+                            })
+                          ));
+                          setSelectedCandidates([]);
+                          loadB2bData();
+                          showToast(`${selectedCandidates.length} candidates deleted.`, 'success');
+                        });
+                      }}>🗑 Delete Selected ({selectedCandidates.length})</button>
+                  </>
                 )}
               </div>
               <div style={{ display: "flex", gap: 8, alignItems: "center", flex: 1, maxWidth: 400, minWidth: 250 }}>
@@ -4002,7 +4167,7 @@ export default function ThreatReady() {
                             } catch (e) { showToast('Error loading report', 'error'); }
                           }}>👁 View</button>
                         <button style={{ background: "rgba(0,224,150,.1)", border: "1px solid var(--ok)", cursor: "pointer", fontSize: 10, color: "var(--ok)", padding: "3px 8px", borderRadius: 4 }}
-                          title="Download CSV"
+                          title="Download PDF"
                           onClick={async () => {
                             try {
                               const token = localStorage.getItem('token');
@@ -4012,23 +4177,130 @@ export default function ThreatReady() {
                               const data = await res.json();
                               if (!data.candidate) { showToast('Report not available', 'error'); return; }
                               const cand = data.candidate;
-                              const rows = ['Candidate,Email,Role,Difficulty,Score,Badge,Completed'];
-                              rows.push(`"${cand.name}","${cand.email}","${ROLES.find(r => r.id === cand.role_id)?.name || cand.role_id}",${cand.difficulty},${cand.overall_score}/10,${cand.badge},${cand.completed_at?.substring(0, 10)}`);
-                              rows.push('');
-                              rows.push('Q#,Question,Answer,Score,Strengths,Weaknesses,Ideal Answer');
-                              (cand.evaluations || []).forEach((ev, i) => {
-                                const safe = s => `"${(s || '').replace(/"/g, '""').replace(/\n/g, ' ')}"`;
-                                rows.push(`${i + 1},${safe(ev.question)},${safe(ev.answer)},${ev.score}/10,${safe(ev.strengths)},${safe(ev.weaknesses)},${safe(ev.improved_answer)}`);
-                              });
-                              const blob = new Blob([rows.join('\n')], { type: 'text/csv;charset=utf-8;' });
-                              const url = URL.createObjectURL(blob);
-                              const a = document.createElement('a');
-                              a.href = url;
-                              a.download = `report-${cand.name}-${cand.completed_at?.substring(0, 10)}.csv`;
-                              document.body.appendChild(a); a.click(); document.body.removeChild(a);
-                              URL.revokeObjectURL(url);
-                              showToast('Report downloaded!', 'success');
-                            } catch (e) { showToast('Error downloading', 'error'); }
+                              const score = parseFloat(cand.overall_score) || 0;
+                              const scoreColor = score >= 7 ? '#00e096' : score >= 5 ? '#f59e0b' : '#ff5252';
+                              const badgeColor = score >= 8 ? '#e2e8f0' : score >= 7 ? '#f59e0b' : score >= 6 ? '#94a3b8' : score >= 4 ? '#cd7f32' : '#ff5252';
+                              const verdict = score >= 8 ? "Excellent candidate — strongly recommended for interview" :
+                                             score >= 7 ? "Strong candidate — recommended for next round" :
+                                             score >= 6 ? "Good candidate — consider for interview" :
+                                             score >= 5 ? "Average — more assessment needed" :
+                                             score >= 4 ? "Below expectations — not recommended" :
+                                             "Not ready — significant skill gaps";
+                              const evals = cand.evaluations || [];
+                              const strongCount = evals.filter(e => e.score >= 7).length;
+                              const weakCount = evals.filter(e => e.score < 5).length;
+                              const roleName = ROLES.find(r => r.id === cand.role_id)?.name || cand.role_id;
+                              const escape = s => (s || '').toString().replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\n/g, '<br/>');
+
+                              const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Assessment Report - ${escape(cand.name)}</title>
+<style>
+  @page { size: A4; margin: 20mm; }
+  body { font-family: -apple-system, 'Segoe UI', Arial, sans-serif; color: #1a1a1a; line-height: 1.5; margin: 0; padding: 0; background: #fff; }
+  .header { border-bottom: 3px solid #00b8d4; padding-bottom: 16px; margin-bottom: 24px; }
+  .brand { color: #00b8d4; font-size: 22px; font-weight: 900; letter-spacing: 2px; margin-bottom: 4px; }
+  .subtitle { color: #666; font-size: 11px; margin-bottom: 12px; }
+  h1 { font-size: 20px; margin: 0 0 6px 0; color: #1a1a1a; }
+  .meta { color: #666; font-size: 12px; }
+  .score-card { background: linear-gradient(135deg, #0a0e1a 0%, #1a1f2e 100%); color: #fff; padding: 30px; border-radius: 12px; text-align: center; margin: 24px 0; }
+  .score-label { font-size: 11px; color: #8890b0; letter-spacing: 2px; font-weight: 700; margin-bottom: 12px; }
+  .score-value { font-size: 56px; font-weight: 900; color: ${scoreColor}; line-height: 1; margin-bottom: 8px; }
+  .score-max { font-size: 22px; color: #8890b0; }
+  .badge { display: inline-block; border: 2px solid ${badgeColor}; color: ${badgeColor}; padding: 6px 20px; border-radius: 20px; font-size: 12px; font-weight: 800; letter-spacing: 2px; margin: 12px 0; }
+  .verdict { font-size: 13px; color: ${scoreColor}; font-weight: 600; margin-top: 8px; }
+  .stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin: 20px 0; }
+  .stat { background: #f5f7fa; padding: 12px; border-radius: 8px; text-align: center; }
+  .stat-label { font-size: 9px; color: #666; letter-spacing: 1px; margin-bottom: 4px; font-weight: 700; }
+  .stat-val { font-size: 13px; font-weight: 700; color: #1a1a1a; }
+  .summary { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin: 20px 0; }
+  .sum-box { padding: 14px; border-radius: 10px; border: 1px solid; }
+  .sum-strong { background: #e6faf1; border-color: #00c48a; }
+  .sum-weak { background: #fff0f0; border-color: #ff5252; }
+  .sum-count { font-size: 26px; font-weight: 900; }
+  .sum-label { font-size: 11px; font-weight: 700; letter-spacing: 1px; margin-bottom: 4px; }
+  .sum-desc { font-size: 10px; color: #666; margin-top: 2px; }
+  .section-title { font-size: 13px; color: #00b8d4; font-weight: 700; letter-spacing: 2px; margin: 28px 0 14px; text-transform: uppercase; border-bottom: 2px solid #00b8d4; padding-bottom: 6px; }
+  .q-block { margin-bottom: 16px; padding: 14px; background: #f9fafb; border-radius: 10px; border-left: 4px solid #ccc; page-break-inside: avoid; }
+  .q-block.good { border-left-color: #00c48a; }
+  .q-block.avg { border-left-color: #f59e0b; }
+  .q-block.bad { border-left-color: #ff5252; }
+  .q-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; padding-bottom: 8px; border-bottom: 1px solid #e5e7eb; }
+  .q-num { font-size: 10px; color: #666; font-weight: 700; letter-spacing: 1px; }
+  .q-score { font-size: 14px; font-weight: 900; }
+  .q-question { font-size: 13px; font-weight: 700; color: #1a1a1a; margin-bottom: 10px; }
+  .q-answer { background: #fff; padding: 10px; border-radius: 6px; border-left: 3px solid #999; font-size: 11px; margin-bottom: 10px; color: #333; }
+  .q-tag { font-size: 9px; font-weight: 700; letter-spacing: 1px; color: #666; margin-bottom: 4px; }
+  .q-str { background: #e6faf1; padding: 8px; border-radius: 6px; border-left: 3px solid #00c48a; font-size: 11px; margin-bottom: 6px; color: #1a5f3f; }
+  .q-wk { background: #fff0f0; padding: 8px; border-radius: 6px; border-left: 3px solid #ff5252; font-size: 11px; margin-bottom: 6px; color: #8b1a1a; }
+  .q-ideal { background: #e7f5ff; padding: 8px; border-radius: 6px; border-left: 3px solid #00b8d4; font-size: 11px; color: #0a4d68; }
+  .footer { margin-top: 30px; padding-top: 14px; border-top: 1px solid #ccc; font-size: 10px; color: #999; text-align: center; }
+</style></head>
+<body>
+  <div class="header">
+    <div class="brand">⚡ THREATREADY</div>
+    <div class="subtitle">Cybersecurity Assessment Platform · Candidate Report</div>
+    <h1>${escape(cand.name)}</h1>
+    <div class="meta">${escape(cand.email)} · ${escape(cand.assessment_name || roleName + ' Assessment')}</div>
+  </div>
+
+  <div class="score-card">
+    <div class="score-label">OVERALL SCORE</div>
+    <div class="score-value">${score.toFixed(1)}<span class="score-max">/10</span></div>
+    <div class="badge">${escape((cand.badge || '').toUpperCase())}</div>
+    <div class="verdict">${escape(verdict)}</div>
+  </div>
+
+  <div class="stats">
+    <div class="stat"><div class="stat-label">ROLE</div><div class="stat-val">${escape(roleName)}</div></div>
+    <div class="stat"><div class="stat-label">DIFFICULTY</div><div class="stat-val" style="text-transform:capitalize">${escape(cand.difficulty)}</div></div>
+    <div class="stat"><div class="stat-label">QUESTIONS</div><div class="stat-val">${evals.length} answered</div></div>
+    <div class="stat"><div class="stat-label">COMPLETED</div><div class="stat-val">${escape(cand.completed_at?.substring(0, 10) || '—')}</div></div>
+  </div>
+
+  <div class="summary">
+    <div class="sum-box sum-strong">
+      <div class="sum-label" style="color:#00a878">✓ STRONG ANSWERS</div>
+      <div class="sum-count" style="color:#00a878">${strongCount}</div>
+      <div class="sum-desc">Questions scored 7+ / 10</div>
+    </div>
+    <div class="sum-box sum-weak">
+      <div class="sum-label" style="color:#d32f2f">✗ WEAK AREAS</div>
+      <div class="sum-count" style="color:#d32f2f">${weakCount}</div>
+      <div class="sum-desc">Questions scored below 5 / 10</div>
+    </div>
+  </div>
+
+  <div class="section-title">📝 Detailed Question Breakdown</div>
+  ${evals.map((ev, i) => {
+    const cls = ev.score >= 7 ? 'good' : ev.score >= 5 ? 'avg' : 'bad';
+    const col = ev.score >= 7 ? '#00a878' : ev.score >= 5 ? '#d97706' : '#d32f2f';
+    return `<div class="q-block ${cls}">
+      <div class="q-header">
+        <span class="q-num">QUESTION ${i + 1} · ${escape(ev.category || 'General')}</span>
+        <span class="q-score" style="color:${col}">${ev.score}/10</span>
+      </div>
+      <div class="q-question">❓ ${escape(ev.question)}</div>
+      <div class="q-tag">CANDIDATE'S ANSWER</div>
+      <div class="q-answer">${escape(ev.answer || '(No answer provided)')}</div>
+      ${ev.strengths ? `<div class="q-str"><strong>✓ Strengths:</strong> ${escape(ev.strengths)}</div>` : ''}
+      ${ev.weaknesses ? `<div class="q-wk"><strong>✗ Weaknesses:</strong> ${escape(ev.weaknesses)}</div>` : ''}
+      ${ev.improved_answer && ev.improved_answer !== '-' ? `<div class="q-ideal"><strong>💡 Ideal Answer:</strong> ${escape(ev.improved_answer)}</div>` : ''}
+    </div>`;
+  }).join('')}
+
+  <div class="footer">Generated by ThreatReady · ${new Date().toLocaleString()}</div>
+  <script>
+    window.onload = function() {
+      setTimeout(function() { window.print(); }, 500);
+    };
+  </script>
+</body></html>`;
+
+                              const w = window.open('', '_blank');
+                              if (!w) { showToast('Please allow popups for PDF download', 'error'); return; }
+                              w.document.write(html);
+                              w.document.close();
+                              showToast("Opening PDF... use your browser's Save as PDF option", 'success');
+                            } catch (e) { showToast('Error downloading: ' + e.message, 'error'); }
                           }}>📥</button>
                       </>
                     ) : (
@@ -4680,9 +4952,7 @@ export default function ThreatReady() {
                 💡 Invite team members as candidates with their work email — they'll appear after completing their assessment.
               </div>
             </div>
-            <div style={{ marginTop: 16 }}>
-              <button className="btn bs" style={{ fontSize: 11 }} onClick={() => { setUserType("b2c"); setView("dashboard"); }}>👤 Switch to Candidate Dashboard</button>
-            </div>
+            
           </>)}
 
           {/* ── B8: HELP ── */}
