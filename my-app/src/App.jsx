@@ -732,7 +732,7 @@ export default function ThreatReady() {
   const [inviteAssessmentId, setInviteAssessmentId] = useState('');
   // Search states
   const [candidatesSearch, setCandidatesSearch] = useState('');
-  const [reportModal, setReportModal] = useState(null); // holds candidate report data
+  const [selectedCandidates, setSelectedCandidates] = useState([]);
   const [teamSkillsSearch, setTeamSkillsSearch] = useState('');
   const [librarySearch, setLibrarySearch] = useState('');
   // Filter helper
@@ -3852,7 +3852,25 @@ export default function ThreatReady() {
 
             {/* ── ALL CANDIDATES TABLE ── */}
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10, gap: 10, flexWrap: "wrap" }}>
-              <div className="lbl">ALL CANDIDATES ({filterBySearch(candidates, candidatesSearch, c => c.candidate_name, c => c.candidate_email, c => c.invited_at).length})</div>
+              <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+                <div className="lbl">ALL CANDIDATES ({filterBySearch(candidates, candidatesSearch, c => c.candidate_name, c => c.candidate_email, c => c.invited_at).length})</div>
+                {selectedCandidates.length > 0 && (
+                  <button className="btn bdn" style={{ fontSize: 10, padding: "4px 10px" }}
+                    onClick={() => {
+                      showConfirm(`Delete ${selectedCandidates.length} selected candidate(s)?`, async () => {
+                        const token = localStorage.getItem('token');
+                        await Promise.all(selectedCandidates.map(id =>
+                          fetch(`https://threatready-db.onrender.com/api/b2b/candidates/${id}`, {
+                            method: 'DELETE', headers: { 'Authorization': `Bearer ${token}` }
+                          })
+                        ));
+                        setSelectedCandidates([]);
+                        loadB2bData();
+                        showToast(`${selectedCandidates.length} candidates deleted.`, 'success');
+                      });
+                    }}>🗑 Delete Selected ({selectedCandidates.length})</button>
+                )}
+              </div>
               <div style={{ display: "flex", gap: 8, alignItems: "center", flex: 1, maxWidth: 400, minWidth: 250 }}>
                 <input className="input" type="text" placeholder="🔍 Search name, email, or date..."
                   value={candidatesSearch} onChange={e => setCandidatesSearch(e.target.value)}
@@ -3874,7 +3892,15 @@ export default function ThreatReady() {
             </div>
             {b2bLoading && <div style={{ textAlign: "center", padding: 20 }}><div className="loader" /></div>}
             <div className="card fadeUp" style={{ padding: 0, overflow: "hidden" }}>
-              <div style={{ display: "grid", gridTemplateColumns: "2fr 2fr 1fr 1fr 1fr 1fr 0.5fr", padding: "10px 14px", background: "var(--s2)", fontSize: 9, fontWeight: 700, color: "var(--ac)", letterSpacing: 1, textTransform: "uppercase" }}>
+              <div style={{ display: "grid", gridTemplateColumns: "30px 2fr 2fr 1fr 1fr 1fr 1fr 0.5fr", padding: "10px 14px", background: "var(--s2)", fontSize: 9, fontWeight: 700, color: "var(--ac)", letterSpacing: 1, textTransform: "uppercase" }}>
+                <span>
+                  <input type="checkbox" style={{ cursor: "pointer" }}
+                    checked={selectedCandidates.length === filterBySearch(candidates, candidatesSearch, c => c.candidate_name, c => c.candidate_email, c => c.invited_at).length && candidates.length > 0}
+                    onChange={e => {
+                      const filtered = filterBySearch(candidates, candidatesSearch, c => c.candidate_name, c => c.candidate_email, c => c.invited_at);
+                      setSelectedCandidates(e.target.checked ? filtered.map(c => c.id) : []);
+                    }} />
+                </span>
                 <span>Name</span><span>Email</span><span>Role</span><span>Score</span><span>Status</span><span>Report</span><span></span>
               </div>
               {candidates.length === 0 && !b2bLoading && (
@@ -3884,7 +3910,12 @@ export default function ThreatReady() {
                 <div style={{ padding: 20, textAlign: "center", color: "var(--tx3)", fontSize: 12 }}>No candidates match "{candidatesSearch}"</div>
               )}
               {filterBySearch(candidates, candidatesSearch, c => c.candidate_name, c => c.candidate_email, c => c.invited_at).map((c, i) => (
-                <div key={c.id} style={{ display: "grid", gridTemplateColumns: "2fr 2fr 1fr 1fr 1fr 1fr 0.5fr", padding: "10px 14px", borderTop: "1px solid var(--bd)", fontSize: 11, alignItems: "center" }}>
+                <div key={c.id} style={{ display: "grid", gridTemplateColumns: "30px 2fr 2fr 1fr 1fr 1fr 1fr 0.5fr", padding: "10px 14px", borderTop: "1px solid var(--bd)", fontSize: 11, alignItems: "center", background: selectedCandidates.includes(c.id) ? "rgba(0,229,255,0.05)" : undefined }}>
+                  <span>
+                    <input type="checkbox" style={{ cursor: "pointer" }}
+                      checked={selectedCandidates.includes(c.id)}
+                      onChange={e => setSelectedCandidates(prev => e.target.checked ? [...prev, c.id] : prev.filter(id => id !== c.id))} />
+                  </span>
                   <span style={{ fontWeight: 600 }}>{c.candidate_name || c.candidate_email?.split("@")[0] || '—'}</span>
                   <span style={{ color: "var(--tx3)", fontSize: 10 }}>{c.candidate_email}</span>
                   <span>{c.role_id ? (ROLES.find(r => r.id === c.role_id)?.icon || c.role_id) : "—"}</span>
@@ -3893,23 +3924,6 @@ export default function ThreatReady() {
                   </span>
                   <span style={{ fontSize: 9, fontWeight: 600, color: c.status === "completed" ? "var(--ok)" : c.status === "in_progress" ? "var(--wn)" : "var(--tx3)" }}>
                     {c.status === "completed" ? "✓ Done" : c.status === "in_progress" ? "● Active" : "○ Pending"}
-                  </span>
-                  <span style={{ display: "flex", gap: 4 }}>
-                    {c.status === "completed" && (
-                      <div style={{ position: "relative" }} className="report-btn-wrap">
-                        <button style={{ background: "rgba(0,229,255,.1)", border: "1px solid rgba(0,229,255,.3)", cursor: "pointer", fontSize: 10, color: "var(--ac)", padding: "3px 8px", borderRadius: 6, fontWeight: 700 }}
-                          onClick={async (e) => {
-                            e.stopPropagation();
-                            const tok = localStorage.getItem('token');
-                            const res = await fetch(`https://threatready-db.onrender.com/api/b2b/candidate-report/${c.id}`, {
-                              headers: { 'Authorization': `Bearer ${tok}` }
-                            });
-                            const data = await res.json();
-                            if (data.report) setReportModal({ candidate: c, report: data.report });
-                            else showToast('Report not available yet', 'warning');
-                          }}>📋 Report</button>
-                      </div>
-                    )}
                   </span>
                   <span>
                     <button style={{ background: "none", border: "none", cursor: "pointer", fontSize: 14, color: "var(--dn)", padding: "2px 6px" }}
@@ -3930,31 +3944,6 @@ export default function ThreatReady() {
               ))}
             </div>
           </>)}
-
-          {/* ── REPORT MODAL ── */}
-          {reportModal && (
-            <div className="overlay" onClick={() => setReportModal(null)}>
-              <div onClick={e => e.stopPropagation()} style={{ background: "var(--s1)", border: "1px solid var(--bd)", borderRadius: 16, padding: 28, maxWidth: 700, width: "95%", maxHeight: "85vh", overflowY: "auto" }}>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
-                  <div>
-                    <div style={{ fontSize: 16, fontWeight: 800 }}>📋 Assessment Report</div>
-                    <div style={{ fontSize: 11, color: "var(--tx3)", marginTop: 2 }}>{reportModal.candidate.candidate_name} · {reportModal.candidate.candidate_email}</div>
-                  </div>
-                  <div style={{ display: "flex", gap: 8 }}>
-                    <button className="btn bp" style={{ fontSize: 11, padding: "6px 14px" }} onClick={() => {
-                      const html = document.getElementById('report-content').innerHTML;
-                      const win = window.open('', '_blank');
-                      win.document.write(`<html><head><title>Report</title><style>body{font-family:sans-serif;background:#0a0e1a;color:#e8eaf6;padding:20px}</style></head><body>${html}</body></html>`);
-                      win.document.close();
-                      win.print();
-                    }}>⬇️ Download</button>
-                    <button className="btn bs" style={{ fontSize: 11, padding: "6px 14px" }} onClick={() => setReportModal(null)}>✕ Close</button>
-                  </div>
-                </div>
-                <div id="report-content" dangerouslySetInnerHTML={{ __html: reportModal.report }} />
-              </div>
-            </div>
-          )}
 
           {/* ── TEAM SKILLS TAB ── */}
           {b2bTab === "teamskills" && (<>
