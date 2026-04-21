@@ -465,7 +465,7 @@ function AIAvatar({ isSpeaking, isMuted, qIndex }) {
 
   return (
     <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-start", marginBottom: 0 }}> 
-      <div style={{ position: "relative", width: 48, height: 48 }}>
+      <div style={{ position: "relative", width: 150, height: 170 }}>
 
         {/* Outer pulse ring when speaking
         {isSpeaking && (
@@ -487,7 +487,7 @@ function AIAvatar({ isSpeaking, isMuted, qIndex }) {
 
         {/* Video Avatar */}
         <div style={{
-          width: 100, height: 100, borderRadius: 5,
+          width: 150, height: 170, borderRadius: 12,
           overflow: "hidden", position: "relative",
           border: `2px solid ${isSpeaking ? (isFemale ? "#ff6b9d" : "#00e5ff") : "#1e2536"}`,
           transition: "border-color 0.3s",
@@ -744,6 +744,21 @@ export default function ThreatReady() {
   const [inviteRole, setInviteRole] = useState('cloud');
   const [inviteDiff, setInviteDiff] = useState('intermediate');
   const [inviteAssessmentId, setInviteAssessmentId] = useState('');
+  // Search states
+  const [candidatesSearch, setCandidatesSearch] = useState('');
+  const [teamSkillsSearch, setTeamSkillsSearch] = useState('');
+  const [librarySearch, setLibrarySearch] = useState('');
+  // Filter helper
+  const filterBySearch = (items, search, getName, getEmail, getDate) => {
+    if (!search?.trim()) return items;
+    const q = search.toLowerCase().trim();
+    return items.filter(item => {
+      const name = (getName(item) || '').toLowerCase();
+      const email = (getEmail(item) || '').toLowerCase();
+      const date = (getDate(item) || '').toLowerCase();
+      return name.includes(q) || email.includes(q) || date.includes(q);
+    });
+  };
   const [inviteMsg, setInviteMsg] = useState('');
   const [newAssessName, setNewAssessName] = useState('');
   const [newAssessRole, setNewAssessRole] = useState('cloud');
@@ -2379,17 +2394,19 @@ export default function ThreatReady() {
               <span className="tag">Q{qIndex + 1}/5</span>
             </div>
           </div>
-          <div style={{ display: "flex", flexDirection: "column", gap: 8, alignItems: "center" }}>
-            <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+          <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
               <span className="mono" style={{ fontSize: 15, fontWeight: 700, color: elapsed > 600 ? "var(--dn)" : "var(--ac)" }}>⏱ {fmt(elapsed)}</span>
               <button className="btn bs" style={{ padding: "5px 16px", fontSize: 11, color: "var(--dn)", borderColor: "var(--dn)", fontWeight: 700 }} onClick={exitScenario}>Exit</button>
             </div>
+        </div>
+
+        {/* Architecture Diagram (Zoomable + Pannable) with Avatar */}
+        <div style={{ position: "relative" }}>
+          <ArchDiagram nodes={scenario.no} edges={scenario.ed} />
+          <div style={{ position: "absolute", bottom: 10, right: 10, zIndex: 10 }}>
             <AIAvatar isSpeaking={isSpeaking} isMuted={isMuted} qIndex={qIndex} />
           </div>
         </div>
-
-        {/* Architecture Diagram (Zoomable + Pannable) */}
-        <ArchDiagram nodes={scenario.no} edges={scenario.ed} />
 
         {/* Attack Chain */}
         <div style={{ marginBottom: 12 }}>
@@ -2731,7 +2748,7 @@ export default function ThreatReady() {
                   <div style={{ position: "absolute", right: 0, top: 36, width: 280, background: "#111827", border: "1px solid #1e2536", borderRadius: 12, boxShadow: "0 16px 48px rgba(0,0,0,.6)", zIndex: 999, maxHeight: 300, overflowY: "auto" }}>
                     <div style={{ padding: "10px 14px", borderBottom: "1px solid #1e2536", fontSize: 11, fontWeight: 700, color: "var(--ac)", display: "flex", justifyContent: "space-between" }}>
                       <span>NOTIFICATIONS</span>
-                      <span style={{ cursor: "pointer", opacity: 0.5 }} onClick={() => setShowNotifs(false)}>×</span>
+                      <span style={{ cursor: "pointer", opacity: 1 }} onClick={() => setShowNotifs(false)}>×</span>
                     </div>
                     {notifications.length === 0
                       ? <div style={{ padding: 16, fontSize: 11, color: "var(--tx3)", textAlign: "center" }}>No notifications yet</div>
@@ -3639,16 +3656,16 @@ export default function ThreatReady() {
                     />
                     {/* Dropdown panel */}
                     <div style={{
-                      position: "absolute",
-                      top: "calc(100% + 8px)",
-                      right: 0,
-                      width: 340,
-                      maxHeight: 450,
+                      position: "fixed",
+                      top: 80,
+                      right: 24,
+                      width: 360,
+                      maxHeight: "80vh",
                       overflow: "auto",
                       background: "#0f1420",
-                      border: "1px solid var(--bd)",
+                      border: "1px solid var(--ac)",
                       borderRadius: 12,
-                      boxShadow: "0 20px 50px rgba(0,0,0,.7)",
+                      boxShadow: "0 20px 60px rgba(0,0,0,.9), 0 0 30px rgba(0,229,255,0.15)",
                       zIndex: 9999
                     }}>
                       <div style={{ padding: "12px 16px", borderBottom: "1px solid #1e2536", fontSize: 11, fontWeight: 700, color: "var(--ac)", letterSpacing: 1, display: "flex", justifyContent: "space-between", alignItems: "center", background: "#0a0e1a", position: "sticky", top: 0 }}>
@@ -3847,12 +3864,21 @@ export default function ThreatReady() {
             </div>
 
             {/* ── ALL CANDIDATES TABLE ── */}
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
-              <div className="lbl">ALL CANDIDATES ({candidates.length})</div>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10, gap: 10, flexWrap: "wrap" }}>
+              <div className="lbl">ALL CANDIDATES ({filterBySearch(candidates, candidatesSearch, c => c.candidate_name, c => c.candidate_email, c => c.invited_at).length})</div>
+              <div style={{ display: "flex", gap: 8, alignItems: "center", flex: 1, maxWidth: 400, minWidth: 250 }}>
+                <input className="input" type="text" placeholder="🔍 Search name, email, or date..."
+                  value={candidatesSearch} onChange={e => setCandidatesSearch(e.target.value)}
+                  style={{ fontSize: 11, padding: "6px 12px", flex: 1 }} />
+                {candidatesSearch && (
+                  <button className="btn bs" style={{ fontSize: 10, padding: "4px 10px" }} onClick={() => setCandidatesSearch('')}>✕</button>
+                )}
+              </div>
               <button className="btn bs" style={{ fontSize: 10, padding: "4px 10px" }}
                 onClick={() => {
+                  const filtered = filterBySearch(candidates, candidatesSearch, c => c.candidate_name, c => c.candidate_email, c => c.invited_at);
                   const csv = ['Name,Email,Role,Difficulty,Score,Status,Invited']
-                    .concat(candidates.map(c => `${c.candidate_name || ''},${c.candidate_email || ''},${c.role_id || ''},${c.difficulty || ''},${c.overall_score || ''},${c.status || ''},${c.invited_at?.substring(0, 10) || ''}`))
+                    .concat(filtered.map(c => `${c.candidate_name || ''},${c.candidate_email || ''},${c.role_id || ''},${c.difficulty || ''},${c.overall_score || ''},${c.status || ''},${c.invited_at?.substring(0, 10) || ''}`))
                     .join('\n');
                   const a = document.createElement('a');
                   a.href = 'data:text/csv,' + encodeURIComponent(csv);
@@ -3867,7 +3893,10 @@ export default function ThreatReady() {
               {candidates.length === 0 && !b2bLoading && (
                 <div style={{ padding: 20, textAlign: "center", color: "var(--tx3)", fontSize: 12 }}>No candidates yet. Use the invite form above.</div>
               )}
-              {candidates.map((c, i) => (
+              {candidates.length > 0 && filterBySearch(candidates, candidatesSearch, c => c.candidate_name, c => c.candidate_email, c => c.invited_at).length === 0 && (
+                <div style={{ padding: 20, textAlign: "center", color: "var(--tx3)", fontSize: 12 }}>No candidates match "{candidatesSearch}"</div>
+              )}
+              {filterBySearch(candidates, candidatesSearch, c => c.candidate_name, c => c.candidate_email, c => c.invited_at).map((c, i) => (
                 <div key={c.id} style={{ display: "grid", gridTemplateColumns: "2fr 2fr 1fr 1fr 1fr 0.5fr", padding: "10px 14px", borderTop: "1px solid var(--bd)", fontSize: 11, alignItems: "center" }}>
                   <span style={{ fontWeight: 600 }}>{c.candidate_name || c.candidate_email?.split("@")[0] || '—'}</span>
                   <span style={{ color: "var(--tx3)", fontSize: 10 }}>{c.candidate_email}</span>
@@ -3912,8 +3941,16 @@ export default function ThreatReady() {
                 </button>
               </div>
             ) : (<>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
-                <div className="lbl">CANDIDATE SKILL SCORES</div>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12, gap: 10, flexWrap: "wrap" }}>
+                <div className="lbl">CANDIDATE SKILL SCORES ({filterBySearch(teamMembers, teamSkillsSearch, m => m.name, m => m.email, m => m.completed_at).length})</div>
+                <div style={{ display: "flex", gap: 8, alignItems: "center", flex: 1, maxWidth: 400, minWidth: 250 }}>
+                  <input className="input" type="text" placeholder="🔍 Search name, email, or date..."
+                    value={teamSkillsSearch} onChange={e => setTeamSkillsSearch(e.target.value)}
+                    style={{ fontSize: 11, padding: "6px 12px", flex: 1 }} />
+                  {teamSkillsSearch && (
+                    <button className="btn bs" style={{ fontSize: 10, padding: "4px 10px" }} onClick={() => setTeamSkillsSearch('')}>✕</button>
+                  )}
+                </div>
                 <button className="btn bs" style={{ fontSize: 10, padding: "4px 10px" }} onClick={loadB2bData}>🔄 Refresh</button>
               </div>
               {b2bLoading && <div style={{ textAlign: "center", padding: 20 }}><div className="loader" /></div>}
@@ -3921,7 +3958,10 @@ export default function ThreatReady() {
                 <div style={{ display: "grid", gridTemplateColumns: "1.5fr 1fr 1fr 1fr 1fr", padding: "10px 14px", background: "var(--s2)", fontSize: 9, fontWeight: 700, color: "var(--ac)", letterSpacing: 1, textTransform: "uppercase" }}>
                   <span>Candidate</span><span style={{ textAlign: "center" }}>Role</span><span style={{ textAlign: "center" }}>Difficulty</span><span style={{ textAlign: "center" }}>Score</span><span style={{ textAlign: "center" }}>Badge</span>
                 </div>
-                {teamMembers.map((m, i) => {
+                {filterBySearch(teamMembers, teamSkillsSearch, m => m.name, m => m.email, m => m.completed_at).length === 0 && teamSkillsSearch && (
+                  <div style={{ padding: 20, textAlign: "center", color: "var(--tx3)", fontSize: 12 }}>No candidates match "{teamSkillsSearch}"</div>
+                )}
+                {filterBySearch(teamMembers, teamSkillsSearch, m => m.name, m => m.email, m => m.completed_at).map((m, i) => {
                   const score = m.score;
                   const badge = score >= 8 ? "Platinum" : score >= 7 ? "Gold" : score >= 6 ? "Silver" : score >= 4 ? "Bronze" : "Not Ready";
                   const badgeColor = score >= 8 ? "#e2e8f0" : score >= 7 ? "#f59e0b" : score >= 6 ? "#94a3b8" : score >= 4 ? "#b45309" : "var(--dn)";
@@ -4315,8 +4355,16 @@ export default function ThreatReady() {
 
           {/* ── B6: LIBRARY (Saved Assessments + Invite Candidate) ── */}
           {b2bTab === "library" && (<>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
-              <div className="lbl">SAVED ASSESSMENTS ({assessments.length})</div>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12, gap: 10, flexWrap: "wrap" }}>
+              <div className="lbl">SAVED ASSESSMENTS ({filterBySearch(assessments, librarySearch, a => a.name, a => '', a => a.created_at).length})</div>
+              <div style={{ display: "flex", gap: 8, alignItems: "center", flex: 1, maxWidth: 400, minWidth: 250 }}>
+                <input className="input" type="text" placeholder="🔍 Search name or date..."
+                  value={librarySearch} onChange={e => setLibrarySearch(e.target.value)}
+                  style={{ fontSize: 11, padding: "6px 12px", flex: 1 }} />
+                {librarySearch && (
+                  <button className="btn bs" style={{ fontSize: 10, padding: "4px 10px" }} onClick={() => setLibrarySearch('')}>✕</button>
+                )}
+              </div>
               <button className="btn bp" style={{ fontSize: 11, padding: "6px 14px" }}
                 onClick={() => { setB2bTab("create"); localStorage.setItem('cyberprep_b2btab', 'create'); }}>
                 + New Assessment
@@ -4334,7 +4382,12 @@ export default function ThreatReady() {
                 </button>
               </div>
             )}
-            {assessments.map((a, i) => (
+            {assessments.length > 0 && filterBySearch(assessments, librarySearch, a => a.name, a => '', a => a.created_at).length === 0 && (
+              <div className="card fadeUp" style={{ padding: 20, textAlign: "center", color: "var(--tx3)", fontSize: 12 }}>
+                No assessments match "{librarySearch}"
+              </div>
+            )}
+            {filterBySearch(assessments, librarySearch, a => a.name, a => '', a => a.created_at).map((a, i) => (
               <div key={a.id} className="card card-glow fadeUp" style={{ padding: 14, marginBottom: 10, animationDelay: `${i * .04}s` }}>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                   <div>
