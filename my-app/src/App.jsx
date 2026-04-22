@@ -636,13 +636,15 @@ export default function ThreatReady() {
   useEffect(() => {
     localStorage.setItem('roleAttempts', JSON.stringify(roleAttempts));
   }, [roleAttempts]);
+  const getTotalUsedAttempts = () => Object.values(roleAttempts).reduce((sum, v) => sum + v, 0);
   const getRemainingAttempts = (roleId) => {
-    const used = roleAttempts[roleId] || 0;
-    return Math.max(0, 2 - used);
+    const totalUsed = getTotalUsedAttempts();
+    const totalRemaining = Math.max(0, 2 - totalUsed);
+    return totalRemaining;
   };
   const isTrialExhausted = () => {
     if (isPaid || subscribedRoles.length === 0) return false;
-    return subscribedRoles.every(rid => getRemainingAttempts(rid) === 0);
+    return getTotalUsedAttempts() >= 2;
   };
   const [billingPeriod, setBillingPeriod] = useState('monthly'); // 'monthly' | 'yearly'
   const [trialRoles, setTrialRoles] = useState([]); // exactly 2 roles for free trial
@@ -687,6 +689,8 @@ export default function ThreatReady() {
 
   const [feedbackText, setFeedbackText] = useState("");
   const [feedbackSent, setFeedbackSent] = useState(false);
+  const [feedbackInputMode, setFeedbackInputMode] = useState("text");
+  const feedbackVoice = useVoice();
 
   const demoVoice = useVoice();
   // ---------------Mute------------------
@@ -1844,9 +1848,9 @@ export default function ThreatReady() {
       <div className="page"><div className="cnt" style={{ paddingTop: 60 }}>
         <div style={{ textAlign: "center", marginBottom: 28 }} className="fadeUp">
           <div className="lbl" style={{ marginBottom: 10 }}>FREE TRIAL</div>
-          <h2 style={{ fontSize: 26, fontWeight: 800 }}>Select 2 Roles to Try</h2>
+          <h2 style={{ fontSize: 26, fontWeight: 800 }}>Select 1 or 2 Roles to Try</h2>
           <p style={{ fontSize: 13, color: "var(--tx2)", marginTop: 8, lineHeight: 1.7, maxWidth: 500, margin: "8px auto 0" }}>
-            Pick exactly 2 security roles. You'll get 2 beginner-level interview attempts — no credit card needed.
+            Pick 1 or 2 security roles. You'll get 2 beginner-level interview attempts — no credit card needed.
           </p>
           <div style={{ background: "rgba(0,229,255,.06)", border: "1px solid rgba(0,229,255,.2)", borderRadius: 10, padding: "10px 16px", marginTop: 14, fontSize: 11, color: "var(--ac)", display: "inline-block" }}>
             🎯 Beginner difficulty only &nbsp;·&nbsp; 2 total attempts &nbsp;·&nbsp; No signup to start
@@ -1878,12 +1882,7 @@ export default function ThreatReady() {
         </div>
 
         <div style={{ marginTop: 16, textAlign: "center" }}>
-          {trialRoles.length < 2 && (
-            <div style={{ fontSize: 12, color: "var(--tx3)", marginBottom: 12 }}>
-              Select {2 - trialRoles.length} more role{2 - trialRoles.length !== 1 ? "s" : ""} to continue
-            </div>
-          )}
-          {trialRoles.length === 2 && (
+          {trialRoles.length >= 1 && (
             <div className="card fadeUp" style={{ padding: 24, borderColor: "var(--ac)", maxWidth: 480, margin: "0 auto" }}>
               <div style={{ display: "flex", justifyContent: "center", gap: 10, flexWrap: "wrap", marginBottom: 16 }}>
                 {trialRoles.map(rid => {
@@ -1897,7 +1896,7 @@ export default function ThreatReady() {
                 })}
               </div>
               <div style={{ fontSize: 11, color: "var(--tx3)", marginBottom: 16 }}>
-                2 roles selected · Beginner difficulty · 2 attempts per role (4 total)
+                {trialRoles.length} role{trialRoles.length > 1 ? "s" : ""} selected · Beginner difficulty · 2 total attempts
               </div>
               <button className="btn bp" style={{ width: "100%", padding: "14px 0", fontSize: 15 }}
                 onClick={() => {
@@ -1910,7 +1909,7 @@ export default function ThreatReady() {
                   localStorage.setItem('roleAttempts', JSON.stringify(init));
                   setView("dashboard");
                   setDashTab("home");
-                  showToast("Free trial started! 2 attempts per role on Beginner only.", "success");
+                  showToast("Free trial started! 2 total attempts on Beginner only.", "success");
                 }}>
                 Start Free Trial →
               </button>
@@ -1980,8 +1979,8 @@ export default function ThreatReady() {
           </button>
 
           <button className="btn bs" style={{ width: "100%", padding: 12, fontSize: 12 }}
-            onClick={() => user ? setView("dashboard") : setView("landing")}>
-            {user ? "Back to Dashboard" : "Back to Home"}
+            onClick={() => setView("dashboard")}>
+            Back to Home
           </button>
         </div>
       </div>
@@ -2763,29 +2762,14 @@ export default function ThreatReady() {
 
          {/* Nav Tabs */}
           <div className="nav-tabs">
-            {tabs.map(t => {
-              // Lock tabs ONLY for non-logged-in trial users. Logged-in users can access all tabs.
-              const isLocked = !user && t.id !== "home";
-              return (
-                <div key={t.id}
-                  className={`nav-tab ${dashTab === t.id ? "active" : ""}`}
-                  style={{
-                    opacity: isLocked ? 0.35 : 1,
-                    cursor: isLocked ? "not-allowed" : "pointer",
-                    position: "relative"
-                  }}
-                  onClick={() => {
-                    if (isLocked) {
-                      showToast("🔒 Subscribe to unlock " + t.label.replace(/[^a-zA-Z ]/g, '').trim(), "warning");
-                      return;
-                    }
-                    setDashTab(t.id);
-                    localStorage.setItem('cyberprep_tab', t.id);
-                  }}>
-                  {t.label}{isLocked && <span style={{ marginLeft: 4, fontSize: 9 }}>🔒</span>}
-                </div>
-              );
-            })}
+            {tabs.map(t => (
+              <div key={t.id}
+                className={`nav-tab ${dashTab === t.id ? "active" : ""}`}
+                style={{ cursor: "pointer" }}
+                onClick={() => { setDashTab(t.id); localStorage.setItem('cyberprep_tab', t.id); }}>
+                {t.label}
+              </div>
+            ))}
           </div>
 
 
@@ -2908,8 +2892,8 @@ export default function ThreatReady() {
                       </div>
                       <span style={{ color: "var(--ac)", fontSize: 12, fontWeight: 600 }}>Open →</span>
                     </div>
-                    <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 6, marginTop: 10 }}>
-                      {["Beginner", "Intermediate", "Advanced", "Expert"].map((d, i) => (
+                    <div style={{ display: "grid", gridTemplateColumns: isPaid ? "repeat(4,1fr)" : "repeat(1,1fr)", gap: 6, marginTop: 10 }}>
+                      {(isPaid ? ["Beginner", "Intermediate", "Advanced", "Expert"] : ["Beginner"]).map((d, i) => (
                         <div key={i} style={{ background: "var(--s2)", borderRadius: 6, padding: "4px 8px", textAlign: "center" }}>
                           <div style={{ fontSize: 9, color: "var(--ac)" }}>
                             {d}
@@ -2968,6 +2952,7 @@ export default function ThreatReady() {
 
           {/* ── C2: SCORES & HISTORY ── */}
           {dashTab === "scores" && (<>
+            <div style={{ opacity: !user ? 0.4 : 1, pointerEvents: !user ? "none" : "auto" }}>
             {completedScenarios.length === 0 ? (
               <div className="card fadeUp" style={{ padding: 48, textAlign: "center" }}>
                 <div style={{ fontSize: 56, marginBottom: 16 }}>📊</div>
@@ -3005,10 +2990,13 @@ export default function ThreatReady() {
                   </div>
                 ))}
               </div>
-            </>)}</>)}
+            </>)}
+            </div>
+          </>)}
 
           {/* ── C3: BADGES ── */}
           {dashTab === "badges" && (<>
+            <div style={{ opacity: !user ? 0.4 : 1, pointerEvents: !user ? "none" : "auto" }}>
             <div className="lbl" style={{ marginBottom: 12 }}>YOUR BADGES</div>
             <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 12 }}>
               {ROLES.map(r => {
@@ -3038,10 +3026,12 @@ export default function ThreatReady() {
                 </div>
               ))}
             </div>
+            </div>
           </>)}
 
           {/* ── C4: PROFILE ── */}
           {dashTab === "profile" && (<>
+            <div style={{ opacity: !user ? 0.4 : 1, pointerEvents: !user ? "none" : "auto" }}>
             <div className="lbl" style={{ marginBottom: 10 }}>RESUME CONTEXT</div>
             <div className="card fadeUp" style={{ padding: 16, marginBottom: 16 }}>
               <textarea
@@ -3106,6 +3096,7 @@ export default function ThreatReady() {
                   <div key={i}><div className="mono" style={{ fontSize: 14, color: v >= 70 ? "var(--ok)" : "var(--wn)" }}>{v}</div><div style={{ fontSize: 9, color: "var(--tx3)" }}>{l}</div></div>
                 ))}
               </div>
+            </div>
             </div>
           </>)}
 
@@ -3230,6 +3221,7 @@ export default function ThreatReady() {
 
           {/* ── C6: BILLING ── */}
           {dashTab === "billing" && (<>
+            <div style={{ opacity: !user ? 0.4 : 1, pointerEvents: !user ? "none" : "auto" }}>
             {/* Monthly / Yearly Toggle */}
             <div style={{ display: "flex", background: "var(--s2)", borderRadius: 10, padding: 4, maxWidth: 300, margin: "0 auto 24px", gap: 4 }}>
               <button
@@ -3349,10 +3341,12 @@ export default function ThreatReady() {
                 Pause Subscription
               </button>
             )}
+            </div>
           </>)}
 
           {/* ── C7: SETTINGS ── */}
           {dashTab === "settings" && (<>
+            <div style={{ opacity: !user ? 0.4 : 1, pointerEvents: !user ? "none" : "auto" }}>
             <div className="card fadeUp" style={{ padding: 16, marginBottom: 16 }}>
               <div className="lbl" style={{ marginBottom: 10 }}>PROFILE SETTINGS</div>
               <input className="input" placeholder="Full Name"
@@ -3525,6 +3519,7 @@ export default function ThreatReady() {
               <button className="btn bdn" style={{ fontSize: 11 }} onClick={() => showConfirm('Delete your account permanently? All data will be lost.', async () => { const token = localStorage.getItem('token'); const res = await fetch('https://threatready-db.onrender.com/api/settings/delete-account', { method: 'DELETE', headers: { 'Authorization': `Bearer ${token}` } }); if (res.ok) { localStorage.clear(); setUser(null); setView('landing'); showToast('Account deleted.', 'info'); } })}>🗑️ Delete Account</button>
             </div>
             
+            </div>
           </>)}
 
           {/* ── C8: HELP ── */}
@@ -3548,30 +3543,59 @@ export default function ThreatReady() {
                 </div>
               ) : (
                 <>
-                  <textarea
-                    className="input"
-                    placeholder="Report a problem, suggest a feature, or share feedback..."
-                    style={{ minHeight: 60, marginBottom: 10 }}
-                    value={feedbackText}
-                    onChange={e => setFeedbackText(e.target.value)}
-                  />
+                  <div style={{ display: "flex", gap: 6, marginBottom: 10 }}>
+                    <button className={`btn ${feedbackInputMode === "text" ? "bp" : "bs"}`} style={{ padding: "4px 12px", fontSize: 10 }} onClick={() => setFeedbackInputMode("text")}>✏️ Type</button>
+                    <button className={`btn ${feedbackInputMode === "voice" ? "bp" : "bs"}`} style={{ padding: "4px 12px", fontSize: 10 }} onClick={() => setFeedbackInputMode("voice")}>🎤 Dictate</button>
+                  </div>
+                  {feedbackInputMode === "text" ? (
+                    <textarea
+                      className="input"
+                      placeholder="Report a problem, suggest a feature, or share feedback..."
+                      style={{ minHeight: 60, marginBottom: 10 }}
+                      value={feedbackText}
+                      onChange={e => setFeedbackText(e.target.value)}
+                    />
+                  ) : (
+                    <div style={{ textAlign: "center", marginBottom: 12 }}>
+                      <div className={`rec-ring ${feedbackVoice.recording ? "active" : ""}`}
+                        onClick={() => {
+                          if (feedbackVoice.recording) {
+                            feedbackVoice.stop();
+                            if (feedbackVoice.transcript?.trim()) {
+                              setFeedbackText(prev => (prev ? prev + ' ' : '') + feedbackVoice.transcript.trim());
+                              feedbackVoice.reset();
+                            }
+                          } else {
+                            feedbackVoice.start();
+                          }
+                        }}
+                        style={{ margin: "0 auto 8px" }}>{feedbackVoice.recording ? "⏹" : "🎤"}</div>
+                      <div style={{ fontSize: 10, color: feedbackVoice.recording ? "var(--dn)" : "var(--tx3)" }}>
+                        {feedbackVoice.recording ? "Recording... tap to stop" : "Tap to start dictating"}
+                      </div>
+                      {feedbackVoice.transcript && <div style={{ marginTop: 10, padding: 10, background: "var(--s2)", borderRadius: 8, fontSize: 12, textAlign: "left", lineHeight: 1.6 }}>{feedbackVoice.transcript}</div>}
+                      {feedbackText && !feedbackVoice.recording && <div style={{ marginTop: 10, padding: 10, background: "var(--s2)", borderRadius: 8, fontSize: 12, textAlign: "left", lineHeight: 1.6, border: "1px solid var(--bd)" }}>{feedbackText}</div>}
+                    </div>
+                  )}
                   <button
                     className="btn bp"
                     style={{ fontSize: 11 }}
-                    disabled={!feedbackText.trim()}
+                    disabled={!feedbackText.trim() && !feedbackVoice.transcript?.trim()}
                     onClick={async () => {
                       try {
+                        const finalMessage = feedbackText.trim() || feedbackVoice.transcript?.trim() || "";
                         const token = localStorage.getItem('token');
+                        const headers = { 'Content-Type': 'application/json' };
+                        if (token) headers['Authorization'] = `Bearer ${token}`;
                         await fetch('https://threatready-db.onrender.com/api/feedback', {
                           method: 'POST',
-                          headers: {
-                            'Content-Type': 'application/json',
-                            'Authorization': `Bearer ${token}`
-                          },
-                          body: JSON.stringify({ message: feedbackText })
+                          headers,
+                          body: JSON.stringify({ message: finalMessage })
                         });
                         setFeedbackSent(true);
                         setFeedbackText("");
+                        feedbackVoice.reset();
+                        setFeedbackInputMode("text");
                         setTimeout(() => setFeedbackSent(false), 4000);
                       } catch (e) {
                         showToast('Failed to submit. Please try again.', 'error');
@@ -3754,8 +3778,31 @@ export default function ThreatReady() {
                 </button>
                 {showNotifs && (
                   <>
-                    <div style={{ position: "fixed", top: 0, left: 0, right: 0, bottom: 0, zIndex: 99998, background: "rgba(0,0,0,0.5)" }} onClick={() => setShowNotifs(false)} />
-                    <div style={{ position: "fixed", top: 60, right: 16, width: 360, maxHeight: "75vh", overflow: "auto", background: "#0f1420", border: "1px solid var(--ac)", borderRadius: 12, boxShadow: "0 20px 60px rgba(0,0,0,.9)", zIndex: 99999 }}>
+                    {/* Backdrop - dim everything else + click outside to close */}
+                    <div
+                      style={{
+                        position: "absolute", zIndex: 1000,
+                        inset: 0,
+                        
+                        background: "rgba(0,0,0,0.7)",
+                        backdropFilter: "blur(2px)"
+                      }}
+                      onClick={() => setShowNotifs(false)}
+                    />
+                    {/* Dropdown panel */}
+                    <div style={{
+                      position: "absolute", zIndex: 1000,
+                      top: 80,
+                      right: 24,
+                      width: 360,
+                      maxHeight: "80vh",
+                      overflow: "auto",
+                      background: "#0f1420",
+                      border: "1px solid var(--ac)",
+                      borderRadius: 12,
+                      boxShadow: "0 20px 60px rgba(0,0,0,.9), 0 0 30px rgba(0,229,255,0.15)",
+                      
+                    }}>
                       <div style={{ padding: "12px 16px", borderBottom: "1px solid #1e2536", fontSize: 11, fontWeight: 700, color: "var(--ac)", letterSpacing: 1, display: "flex", justifyContent: "space-between", alignItems: "center", background: "#0a0e1a", position: "sticky", top: 0 }}>
                         <span>NOTIFICATIONS ({notifications.length})</span>
                         <span style={{ cursor: "pointer", fontSize: 16, color: "var(--tx3)" }} onClick={() => setShowNotifs(false)}>×</span>
@@ -4982,9 +5029,11 @@ ${evals.map((ev, i) => {
                     onClick={async () => {
                       try {
                         const token = localStorage.getItem('token');
+                        const headers = { 'Content-Type': 'application/json' };
+                        if (token) headers['Authorization'] = `Bearer ${token}`;
                         await fetch('https://threatready-db.onrender.com/api/feedback', {
                           method: 'POST',
-                          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                          headers,
                           body: JSON.stringify({ message: feedbackText })
                         });
                         setFeedbackSent(true);
