@@ -1279,6 +1279,11 @@ app.post('/api/evaluate', async (req, res) => {
         communication_score: 0,
         depth_score: 0,
         decision_score: 0,
+        iam_score: 0,
+        detection_score: 0,
+        remediation_score: 0,
+        architecture_score: 0,
+        communication_skill_score: 0,
         follow_up_topic: randomFollowUp,
         follow_up_category: category,
         auto_scored: true
@@ -1358,8 +1363,15 @@ CRITICAL RULES:
 - If the answer does not address the specific question asked, max score is 3.
 - If answer is very short (<10 words) and lacks substance, max score is 2.
 
+5-SKILL ASSESSMENT (score each 0-10 based on how well the answer demonstrates each skill — use 0 if the skill isn't relevant to the question):
+- iam_score: Identity & Access Management knowledge (authentication, authorization, least privilege, IAM policies, SSO, MFA)
+- detection_score: Threat detection & monitoring (logging, SIEM, anomaly detection, IDS/IPS, observability)
+- remediation_score: Incident response & remediation (containment, recovery, patching, mitigation, root cause analysis)
+- architecture_score: Security architecture & design (zero-trust, defense-in-depth, secure design patterns, network segmentation)
+- communication_skill_score: Communication clarity (explaining technical concepts, structure, precision of language)
+
 Respond ONLY in valid JSON with no markdown:
-{"score":7,"category":"${scenario_context?.category || 'Security'}","strengths":"specific strength based on their answer - or 'None' if no real strengths","weaknesses":"specific gap based on their answer","improved_answer":"ideal answer in 3-4 sentences","communication_score":7,"depth_score":7,"decision_score":7,"follow_up_topic":"skill-specific follow-up question based on their answer","follow_up_category":"category"}`
+{"score":7,"category":"${scenario_context?.category || 'Security'}","strengths":"specific strength based on their answer - or 'None' if no real strengths","weaknesses":"specific gap based on their answer","improved_answer":"ideal answer in 3-4 sentences","communication_score":7,"depth_score":7,"decision_score":7,"iam_score":5,"detection_score":7,"remediation_score":6,"architecture_score":7,"communication_skill_score":7,"follow_up_topic":"skill-specific follow-up question based on their answer","follow_up_category":"category"}`
       }]
     });
 
@@ -1393,6 +1405,13 @@ Respond ONLY in valid JSON with no markdown:
     const validatedCommScore = validateScore(evalResult.communication_score);
     const validatedDepthScore = validateScore(evalResult.depth_score);
 
+    // Validate 5 new skill scores (null if invalid, will default to overall score later)
+    const validatedIamScore = validateScore(evalResult.iam_score);
+    const validatedDetectionScore = validateScore(evalResult.detection_score);
+    const validatedRemediationScore = validateScore(evalResult.remediation_score);
+    const validatedArchitectureScore = validateScore(evalResult.architecture_score);
+    const validatedCommSkillScore = validateScore(evalResult.communication_skill_score);
+
     // If AI didn't return a valid score, log it and flag the response
     if (validatedScore === null) {
       console.error('AI returned invalid score:', evalResult.score, '— full response:', JSON.stringify(evalResult).substring(0, 300));
@@ -1404,6 +1423,12 @@ Respond ONLY in valid JSON with no markdown:
       score: validatedScore !== null ? validatedScore : null,
       communication_score: validatedCommScore !== null ? validatedCommScore : validatedScore,
       depth_score: validatedDepthScore !== null ? validatedDepthScore : validatedScore,
+      // 5 skill scores for radar chart (fall back to overall score if AI didn't provide them)
+      iam_score: validatedIamScore !== null ? validatedIamScore : validatedScore,
+      detection_score: validatedDetectionScore !== null ? validatedDetectionScore : validatedScore,
+      remediation_score: validatedRemediationScore !== null ? validatedRemediationScore : validatedScore,
+      architecture_score: validatedArchitectureScore !== null ? validatedArchitectureScore : validatedScore,
+      communication_skill_score: validatedCommSkillScore !== null ? validatedCommSkillScore : validatedScore,
       ai_failed: validatedScore === null
     };
 
