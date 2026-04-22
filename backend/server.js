@@ -1268,11 +1268,52 @@ Respond ONLY in valid JSON with no markdown:
     });
 
     const evalText = msg.content[0]?.text || '{}';
-    const evalResult = JSON.parse(evalText.replace(/```json|```/g, '').trim());
 
-    // Save to DB
-    if (session_id && question_id) {
-      console.log('Saving to DB: session', session_id, 'question', question_id);
+    // Log what AI actually returned (for debugging)
+    console.log('AI raw response length:', evalText.length);
+
+    // Safely parse AI response — if it fails, log the raw text and return error
+    let evalResult;
+    try {
+      evalResult = JSON.parse(evalText.replace(/```json|```/g, '').trim());
+    } catch (parseErr) {
+      console.error('AI JSON parse failed. Raw response:', evalText.substring(0, 500));
+      return res.status(500).json({
+        error: 'AI returned invalid response. Please try again.',
+        score: null,
+        ai_failed: true
+      });
+    }
+
+    // Helper: validate score is a real number 0-10 (treats 0 as valid, not falsy)
+    const validateScore = (val) => {
+      const n = Number(val);
+      if (isNaN(n) || n < 0 || n > 10) return null;
+      return n;
+    };
+
+    // Clean the result with proper validation (no more "|| 5" bug)
+    const validatedScore = validateScore(evalResult.score);
+    const validatedCommScore = validateScore(evalResult.communication_score);
+    const validatedDepthScore = validateScore(evalResult.depth_score);
+
+    // If AI didn't return a valid score, log it and flag the response
+    if (validatedScore === null) {
+      console.error('AI returned invalid score:', evalResult.score, '— full response:', JSON.stringify(evalResult).substring(0, 300));
+    }
+
+    // Build final result with validated values (null if AI failed, not fake 5)
+    const finalResult = {
+      ...evalResult,
+      score: validatedScore !== null ? validatedScore : null,
+      communication_score: validatedCommScore !== null ? validatedCommScore : validatedScore,
+      depth_score: validatedDepthScore !== null ? validatedDepthScore : validatedScore,
+      ai_failed: validatedScore === null
+    };
+
+    // Save to DB only if we got a valid score from AI
+    if (session_id && question_id && validatedScore !== null) {
+      console.log('Saving to DB: session', session_id, 'question', question_id, 'score', validatedScore);
       try {
         await pool.query(
           `INSERT INTO answers (session_id, question_id, question_number, answer_text, input_mode, submitted_at)
@@ -1283,25 +1324,28 @@ Respond ONLY in valid JSON with no markdown:
         await pool.query(
           `INSERT INTO evaluations (session_id, question_id, score, communication_score, depth_score, strengths, weaknesses, improved_answer, follow_up_topic, evaluated_at)
            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, NOW())`,
-          [session_id, String(question_id), evalResult.score || 5,
-            evalResult.communication_score || 5, evalResult.depth_score || 5,
+          [session_id, String(question_id), validatedScore,
+            validatedCommScore !== null ? validatedCommScore : validatedScore,
+            validatedDepthScore !== null ? validatedDepthScore : validatedScore,
             evalResult.strengths || '', evalResult.weaknesses || '',
             evalResult.improved_answer || '', evalResult.follow_up_topic || '']
         );
-        console.log('DB save SUCCESS: score', evalResult.score);
+        console.log('DB save SUCCESS: score', validatedScore);
       } catch (dbErr) {
         console.error('DB SAVE FAILED:', dbErr.message);
       }
+    } else if (validatedScore === null) {
+      console.log('DB save SKIPPED: AI returned invalid score');
     } else {
       console.log('DB save SKIPPED: session_id=' + session_id + ' question_id=' + question_id);
     }
 
-    console.log('Evaluated! Score:', evalResult.score, '/10');
-    res.json(evalResult);
+    console.log('Evaluated! Score:', validatedScore, '/10');
+    res.json(finalResult);
 
   } catch (e) {
-    console.error('Evaluate error:', e.message);
-    res.status(500).json({ error: e.message });
+    console.error('Evaluate error:', e.message, e.stack?.split('\n').slice(0, 3).join(' | '));
+    res.status(500).json({ error: e.message, ai_failed: true });
   }
 });
 
