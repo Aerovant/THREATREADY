@@ -1308,18 +1308,73 @@ Respond ONLY in valid JSON with no markdown:
 // ═══════════════════════════════════════════════════════════════
 // FEEDBACK
 // ═══════════════════════════════════════════════════════════════
-app.post('/api/feedback', auth, async (req, res) => {
+app.post('/api/feedback', async (req, res) => {
   console.log('--- FEEDBACK RECEIVED ---');
   try {
     const { message } = req.body;
     if (!message?.trim()) return res.status(400).json({ error: 'Message required' });
 
+    // Optional auth — try to decode token if present, otherwise treat as free trial user
+    let userId = null;
+    let userLabel = 'Free Trial User (anonymous)';
+    let userType = 'Free Trial';
+    const token = req.headers.authorization?.replace('Bearer ', '');
+    if (token && token !== 'null' && token !== 'undefined') {
+      try {
+        const decoded = jwt.verify(token, JWT_SECRET);
+        userId = decoded.id;
+        userLabel = decoded.email || `User #${decoded.id}`;
+        userType = 'Logged-in User';
+      } catch (e) {
+        // Invalid token → treat as anonymous, don't reject
+      }
+    }
+
     await pool.query(
       'INSERT INTO feedback (user_id, message, created_at) VALUES ($1, $2, NOW())',
-      [req.user.id, message]
+      [userId, message]
     );
 
-    console.log('Feedback saved from user:', req.user.id);
+    console.log('Feedback saved from:', userLabel);
+
+    // Send email notification to admin (fire-and-forget, doesn't block response)
+    try {
+      const resendClient = new Resend(process.env.RESEND_API_KEY);
+      const submittedAt = new Date().toLocaleString('en-US', { timeZone: 'Asia/Kolkata', dateStyle: 'medium', timeStyle: 'short' });
+      const safeMessage = String(message).replace(/</g, '&lt;').replace(/>/g, '&gt;');
+      resendClient.emails.send({
+        from: 'ThreatReady <noreply@threatready.io>',
+        to: 'aerovanttechnologies@gmail.com',
+        subject: `📬 New Feedback — ${userType}`,
+        html: `
+          <div style="font-family:sans-serif;max-width:560px;margin:0 auto;background:#0a0e1a;color:#e8eaf6;padding:32px;border-radius:12px">
+            <h2 style="color:#00e5ff;margin:0 0 8px 0">📬 New Feedback Received</h2>
+            <p style="color:#8890b0;margin:0 0 20px 0">Someone just submitted feedback on ThreatReady.</p>
+
+            <div style="background:#1a1f2e;border:1px solid #1e2536;border-radius:10px;padding:20px;margin-bottom:16px">
+              <div style="display:flex;margin-bottom:10px"><span style="color:#5a6380;width:110px;font-size:13px">From:</span><span style="color:#e8eaf6;font-size:13px;font-weight:600">${userLabel}</span></div>
+              <div style="display:flex;margin-bottom:10px"><span style="color:#5a6380;width:110px;font-size:13px">Type:</span><span style="color:#00e5ff;font-size:13px;font-weight:600">${userType}</span></div>
+              <div style="display:flex;margin-bottom:10px"><span style="color:#5a6380;width:110px;font-size:13px">User ID:</span><span style="color:#e8eaf6;font-size:13px">${userId || 'N/A (free trial)'}</span></div>
+              <div style="display:flex"><span style="color:#5a6380;width:110px;font-size:13px">Submitted:</span><span style="color:#e8eaf6;font-size:13px">${submittedAt} IST</span></div>
+            </div>
+
+            <div style="background:#1a1f2e;border:1px solid #1e2536;border-radius:10px;padding:20px">
+              <div style="color:#5a6380;font-size:12px;text-transform:uppercase;letter-spacing:1px;margin-bottom:10px">Message</div>
+              <div style="color:#e8eaf6;font-size:14px;line-height:1.7;white-space:pre-wrap">${safeMessage}</div>
+            </div>
+
+            <p style="color:#5a6380;font-size:11px;margin-top:20px;text-align:center">This is an automated notification from ThreatReady feedback system.</p>
+          </div>
+        `
+      }).then(() => {
+        console.log('Feedback email sent to admin');
+      }).catch(emailErr => {
+        console.error('Feedback email failed:', emailErr.message);
+      });
+    } catch (emailSetupErr) {
+      console.error('Feedback email setup error:', emailSetupErr.message);
+    }
+
     res.json({ success: true });
   } catch (e) {
     console.error('Feedback error:', e.message);
