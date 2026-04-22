@@ -1221,13 +1221,87 @@ app.post('/api/evaluate', async (req, res) => {
     const { question, answer, scenario_context, difficulty, session_id, question_id, resume_context, jd_context } = req.body;
     if (!answer?.trim()) return res.status(400).json({ error: 'Answer required' });
 
+    // ═══════════════════════════════════════════════════════════════
+    // GARBAGE ANSWER DETECTION — score 0 without calling AI
+    // ═══════════════════════════════════════════════════════════════
+    const trimmedAnswer = answer.trim();
+    const wordCount = trimmedAnswer.split(/\s+/).filter(w => w.length > 0).length;
+    const cleanedAnswer = trimmedAnswer.toLowerCase().replace(/[^a-z0-9\s]/g, '').trim();
+
+    // Rule 1: Too short (less than 3 words)
+    const isTooShort = wordCount < 3;
+
+    // Rule 2: Single character or very short junk (a, x, asdf, test, etc.)
+    const isJunk = trimmedAnswer.length < 5;
+
+    // Rule 3: Common "I don't know" responses
+    const idkPatterns = [
+      /^(i\s*)?(don'?t|do not)\s*know/,
+      /^(no\s*idea|idk|dunno|nope|no)$/,
+      /^(n\/?a|none|nothing|skip|pass)$/,
+      /^(i\s*am\s*not\s*sure|not\s*sure)$/
+    ];
+    const isIDK = idkPatterns.some(p => p.test(cleanedAnswer));
+
+    // Rule 4: Random characters / keyboard mashing (asdf, qwerty, aaaaa)
+    const isRandomChars = /^([a-z])\1{2,}$/.test(cleanedAnswer) || // aaaa, bbbb
+                          /^(asdf|qwerty|test|abcd|1234|xyz|hello|hi)+$/i.test(cleanedAnswer);
+
+    if (isTooShort || isJunk || isIDK || isRandomChars) {
+      console.log('GARBAGE ANSWER DETECTED — auto-scoring 0');
+      console.log('  Answer:', trimmedAnswer.substring(0, 50));
+      console.log('  Reasons:', { isTooShort, isJunk, isIDK, isRandomChars });
+
+      const zeroResult = {
+        score: 0,
+        category: scenario_context?.category || 'Security',
+        strengths: 'None — no meaningful attempt was made.',
+        weaknesses: isIDK
+          ? 'Answer indicates no knowledge of the topic. No technical content provided to evaluate.'
+          : isTooShort || isJunk
+            ? 'Response is too brief to demonstrate any understanding of the topic.'
+            : 'Answer appears to be random characters and does not address the question.',
+        improved_answer: 'A proper answer would explain the key concepts, provide technical details relevant to the question, and demonstrate understanding of the scenario.',
+        communication_score: 0,
+        depth_score: 0,
+        decision_score: 0,
+        follow_up_topic: question,
+        follow_up_category: scenario_context?.category || 'Security',
+        auto_scored: true
+      };
+
+      // Save zero to DB
+      if (session_id && question_id) {
+        try {
+          await pool.query(
+            `INSERT INTO answers (session_id, question_id, question_number, answer_text, input_mode, submitted_at)
+             VALUES ($1, $2, $3, $4, $5, NOW())
+             ON CONFLICT DO NOTHING`,
+            [session_id, String(question_id), 1, answer, 'text']
+          );
+          await pool.query(
+            `INSERT INTO evaluations (session_id, question_id, score, communication_score, depth_score, strengths, weaknesses, improved_answer, follow_up_topic, evaluated_at)
+             VALUES ($1, $2, 0, 0, 0, $3, $4, $5, $6, NOW())`,
+            [session_id, String(question_id), zeroResult.strengths, zeroResult.weaknesses, zeroResult.improved_answer, zeroResult.follow_up_topic]
+          );
+        } catch (dbErr) {
+          console.error('DB SAVE FAILED (zero score):', dbErr.message);
+        }
+      }
+
+      return res.json(zeroResult);
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    // NORMAL AI EVALUATION (for real attempts)
+    // ═══════════════════════════════════════════════════════════════
     const diffRubric = difficulty === "beginner"
-      ? "Be encouraging. Give credit for partial understanding. Highlight what they got right first."
+      ? "Beginner level. Give credit for partial understanding on the right topic. But: wrong answers, vague answers, or off-topic answers must get 1-3. Only give 4+ if they show actual relevant knowledge."
       : difficulty === "intermediate"
-        ? "Be balanced. Credit correct reasoning but penalize technical gaps."
+        ? "Intermediate level. Balanced scoring. Credit correct reasoning, penalize technical gaps. Wrong/vague = 1-3."
         : difficulty === "advanced"
-          ? "Be strict. Apply interview-grade standards. Challenge incomplete thinking."
-          : "Be rigorous. Expert-level expectations. Challenge assumptions and require defensive reasoning.";
+          ? "Advanced level. Strict interview-grade standards. Wrong or incomplete = 1-3. Only give 6+ for solid technical answers."
+          : "Expert level. Rigorous. Wrong or surface-level = 1-3. Only give 7+ for defensive-reasoning-level answers.";
 
     const Anthropic = require('@anthropic-ai/sdk');
     const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
@@ -1246,7 +1320,7 @@ app.post('/api/evaluate', async (req, res) => {
       max_tokens: 1000,
       messages: [{
         role: 'user',
-        content: `You are an expert cybersecurity interview evaluator. ${diffRubric}
+        content: `You are a strict cybersecurity interview evaluator. ${diffRubric}
 
 SCENARIO: ${scenario_context?.title} - ${scenario_context?.description}
 DIFFICULTY: ${difficulty?.toUpperCase()}
@@ -1256,14 +1330,22 @@ CANDIDATE ANSWER: ${answer}
 ${(resume_context || resumeCtx) ? 'CANDIDATE BACKGROUND: ' + (resume_context || resumeCtx).substring(0, 300) : ''}
 ${jd_context ? 'JOB REQUIREMENTS FROM JD: ' + jd_context.substring(0, 300) : ''}
 
-INSTRUCTIONS:
-1. Score the answer strictly based on technical accuracy
-2. If JOB REQUIREMENTS are provided, evaluate whether the answer meets those specific job needs
-3. Generate the NEXT follow-up question relevant to the job requirements and candidate's answer
-4. If resume shows weak areas compared to job requirements, probe those gaps
+STRICT SCORING RUBRIC (0-10):
+- 0: No answer, blank, single character, random chars (e.g., "a", "asdf", "xyz")
+- 1-2: "I don't know" / admits no knowledge / completely off-topic
+- 3-4: Attempts the topic but shows major misunderstanding
+- 5-6: Partially correct, missing key details
+- 7-8: Good answer with minor gaps
+- 9-10: Excellent, comprehensive, technically sound
+
+CRITICAL RULES:
+- DO NOT give credit for just "being honest about not knowing" — that's a 1-2 at best.
+- DO NOT give encouragement points. Score based on technical content only.
+- If the answer does not address the specific question asked, max score is 3.
+- If answer is very short (<10 words) and lacks substance, max score is 2.
 
 Respond ONLY in valid JSON with no markdown:
-{"score":7,"category":"${scenario_context?.category || 'Security'}","strengths":"specific strength based on their answer","weaknesses":"specific gap based on their answer and resume skills","improved_answer":"ideal answer in 3-4 sentences","communication_score":7,"depth_score":7,"decision_score":7,"follow_up_topic":"skill-specific follow-up question based on resume and their answer","follow_up_category":"category"}`
+{"score":7,"category":"${scenario_context?.category || 'Security'}","strengths":"specific strength based on their answer - or 'None' if no real strengths","weaknesses":"specific gap based on their answer","improved_answer":"ideal answer in 3-4 sentences","communication_score":7,"depth_score":7,"decision_score":7,"follow_up_topic":"skill-specific follow-up question based on their answer","follow_up_category":"category"}`
       }]
     });
 
