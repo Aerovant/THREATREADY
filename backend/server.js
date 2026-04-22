@@ -1252,9 +1252,23 @@ app.post('/api/evaluate', async (req, res) => {
       console.log('  Answer:', trimmedAnswer.substring(0, 50));
       console.log('  Reasons:', { isTooShort, isJunk, isIDK, isRandomChars });
 
+      // Generate a varied follow-up question so we don't loop the same one
+      const category = scenario_context?.category || 'Security';
+      const fallbackQuestions = [
+        `What security controls would you put in place for ${category.toLowerCase()}?`,
+        `How would you detect a breach in a ${category.toLowerCase()} environment?`,
+        `What are the top 3 risks in ${category.toLowerCase()} and how do you mitigate them?`,
+        `Describe an incident response process for a ${category.toLowerCase()} attack.`,
+        `What logging and monitoring would you set up for ${category.toLowerCase()}?`,
+        `How would you harden a ${category.toLowerCase()} system against common attacks?`,
+        `Walk through a threat model for a ${category.toLowerCase()} scenario.`
+      ];
+      // Pick a random one from the pool
+      const randomFollowUp = fallbackQuestions[Math.floor(Math.random() * fallbackQuestions.length)];
+
       const zeroResult = {
         score: 0,
-        category: scenario_context?.category || 'Security',
+        category: category,
         strengths: 'None — no meaningful attempt was made.',
         weaknesses: isIDK
           ? 'Answer indicates no knowledge of the topic. No technical content provided to evaluate.'
@@ -1265,8 +1279,8 @@ app.post('/api/evaluate', async (req, res) => {
         communication_score: 0,
         depth_score: 0,
         decision_score: 0,
-        follow_up_topic: question,
-        follow_up_category: scenario_context?.category || 'Security',
+        follow_up_topic: randomFollowUp,
+        follow_up_category: category,
         auto_scored: true
       };
 
