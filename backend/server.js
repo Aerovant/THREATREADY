@@ -1305,7 +1305,7 @@ app.post('/api/evaluate', async (req, res) => {
                           /^(asdf|qwerty|test|abcd|1234|xyz|hello|hi)+$/i.test(cleanedAnswer);
 
     if (isTooShort || isJunk || isIDK || isRandomChars) {
-      console.log('GARBAGE ANSWER DETECTED — auto-scoring 0');
+      console.log('GARBAGE ANSWER DETECTED — auto-scoring 0, generating model answer');
       console.log('  Answer:', trimmedAnswer.substring(0, 50));
       console.log('  Reasons:', { isTooShort, isJunk, isIDK, isRandomChars });
 
@@ -1323,6 +1323,37 @@ app.post('/api/evaluate', async (req, res) => {
       // Pick a random one from the pool
       const randomFollowUp = fallbackQuestions[Math.floor(Math.random() * fallbackQuestions.length)];
 
+      // ═══════════════════════════════════════════════════════════════
+      // Generate a REAL model answer using cheap Haiku model
+      // (so users still learn the correct answer even if they typed garbage)
+      // ═══════════════════════════════════════════════════════════════
+      let realModelAnswer = 'A proper answer would explain the key concepts, provide technical details relevant to the question, and demonstrate understanding of the scenario.';
+      try {
+        const Anthropic = require('@anthropic-ai/sdk');
+        const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+        const modelMsg = await anthropic.messages.create({
+          model: MODEL_QUESTIONS, // Use cheap Haiku for model answer generation
+          max_tokens: 250,
+          messages: [{
+            role: 'user',
+            content: `You are a cybersecurity expert. Give a concise, correct model answer (3-4 sentences) to this interview question. Be specific and technical.
+
+SCENARIO: ${scenario_context?.title || 'Security scenario'}
+CATEGORY: ${category}
+QUESTION: ${question}
+
+Respond with ONLY the model answer text — no preamble, no markdown, no quotes.`
+          }]
+        });
+        const generated = modelMsg.content[0]?.text?.trim();
+        if (generated && generated.length > 20) {
+          realModelAnswer = generated;
+          console.log('Real model answer generated:', generated.substring(0, 80) + '...');
+        }
+      } catch (modelErr) {
+        console.error('Model answer generation failed (using fallback):', modelErr.message);
+      }
+
       const zeroResult = {
         score: 0,
         category: category,
@@ -1332,7 +1363,7 @@ app.post('/api/evaluate', async (req, res) => {
           : isTooShort || isJunk
             ? 'Response is too brief to demonstrate any understanding of the topic.'
             : 'Answer appears to be random characters and does not address the question.',
-        improved_answer: 'A proper answer would explain the key concepts, provide technical details relevant to the question, and demonstrate understanding of the scenario.',
+        improved_answer: realModelAnswer,
         communication_score: 0,
         depth_score: 0,
         decision_score: 0,

@@ -355,7 +355,8 @@ function FileUpload({ onUpload, label }) {
       });
       const resumeData = await resumeResp.json();
       const keyPoints = resumeData.key_points || extractedText.substring(0, 500);
-      onUpload(keyPoints);
+      // Pass full AI data so parent can display skills, recommendations, etc.
+      onUpload(keyPoints, resumeData);
 
     } catch (err) {
       console.error(err);
@@ -446,92 +447,93 @@ function PasswordStrength({ password }) {
 // ── TIME FORMAT ──
 const fmt = s => `${Math.floor(s / 60)}:${(s % 60).toString().padStart(2, "0")}`;
 
-// ── AI AVATAR COMPONENT — Video Avatars ──
+// ── AI AVATAR COMPONENT — Static Avatar with Audio Wave Visualizer ──
 function AIAvatar({ isSpeaking, isMuted, qIndex }) {
   const isFemale = qIndex % 2 === 0;
-  const videoRef = useRef(null);
-
-  // Play/pause video based on speaking state
-  useEffect(() => {
-    if (videoRef.current) {
-      if (isSpeaking && !isMuted) {
-        videoRef.current.play().catch(() => {});
-      } else {
-        videoRef.current.pause();
-        videoRef.current.currentTime = 0;
-      }
-    }
-  }, [isSpeaking, isMuted]);
+  const accentColor = isFemale ? "#ff6b9d" : "#00e5ff";
+  const name = isFemale ? "ARIA" : "NEXUS";
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-start", marginBottom: 0 }}> 
+    <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-start", marginBottom: 0 }}>
       <div style={{ position: "relative", width: 150, height: 170 }}>
 
-        {/* Outer pulse ring when speaking
-        {isSpeaking && (
+        {/* Outer pulse ring when speaking */}
+        {isSpeaking && !isMuted && (
           <>
             <div style={{
-              position: "absolute", inset: -12, borderRadius: 16,
-              border: `2px solid ${isFemale ? "#ff6b9d" : "#00e5ff"}`,
+              position: "absolute", inset: -10, borderRadius: 16,
+              border: `2px solid ${accentColor}`,
               animation: "avatarRing 1s ease-in-out infinite",
-              opacity: 0.6
+              opacity: 0.6, pointerEvents: "none"
             }} />
             <div style={{
-              position: "absolute", inset: -24, borderRadius: 20,
-              border: `1px solid ${isFemale ? "#ff6b9d" : "#00e5ff"}`,
+              position: "absolute", inset: -20, borderRadius: 20,
+              border: `1px solid ${accentColor}`,
               animation: "avatarRing 1s ease-in-out infinite 0.3s",
-              opacity: 0.3
+              opacity: 0.3, pointerEvents: "none"
             }} />
           </>
-        )} */}
+        )}
 
-        {/* Video Avatar */}
+        {/* Static Avatar Card */}
         <div style={{
           width: 150, height: 170, borderRadius: 12,
           overflow: "hidden", position: "relative",
-          border: `2px solid ${isSpeaking ? (isFemale ? "#ff6b9d" : "#00e5ff") : "#1e2536"}`,
-          transition: "border-color 0.3s",
-          boxShadow: isSpeaking
+          border: `2px solid ${isSpeaking ? accentColor : "#1e2536"}`,
+          transition: "border-color 0.3s, box-shadow 0.3s",
+          background: `linear-gradient(135deg, ${isFemale ? "rgba(255,107,157,0.08)" : "rgba(0,229,255,0.08)"}, rgba(10,14,26,0.9))`,
+          display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
+          boxShadow: isSpeaking && !isMuted
             ? `0 0 30px ${isFemale ? "rgba(255,107,157,0.4)" : "rgba(0,229,255,0.4)"}`
             : "0 4px 20px rgba(0,0,0,0.5)"
         }}>
-          <video
-            ref={videoRef}
-            key={isFemale ? "female" : "male"}
-            src={isFemale ? "/women.mp4" : "/men.mp4"}
-            muted
-            loop
-            playsInline
-            style={{ width: "100%", height: "100%", objectFit: "cover", objectPosition: "center top" }}
-          />
+
+          {/* Avatar Icon (static) */}
+          <div style={{
+            fontSize: 50, marginBottom: 6,
+            opacity: isMuted ? 0.3 : 1,
+            filter: isSpeaking && !isMuted ? "none" : "grayscale(0.2)"
+          }}>
+            {isFemale ? "👩‍💼" : "👨‍💼"}
+          </div>
+
+          {/* Name */}
+          <div style={{
+            fontSize: 12, fontWeight: 700, letterSpacing: 1.5,
+            color: isSpeaking && !isMuted ? accentColor : "#8890b0",
+            marginBottom: 8, transition: "color 0.3s"
+          }}>
+            {name}
+          </div>
+
+          {/* Status / Audio Wave */}
+          <div style={{ height: 24, display: "flex", alignItems: "center", justifyContent: "center", gap: 3 }}>
+            {isSpeaking && !isMuted ? (
+              // Active audio waves (larger, more prominent)
+              [1, 2, 3, 4, 5, 6, 7, 8, 9].map(i => (
+                <div key={i} style={{
+                  width: 3, borderRadius: 3,
+                  background: accentColor,
+                  animation: `soundBar${i % 3 + 1} ${0.35 + (i % 4) * 0.08}s ease-in-out infinite alternate`,
+                  height: 14
+                }} />
+              ))
+            ) : (
+              // Idle state
+              <div style={{ fontSize: 9, color: "#5a6380", letterSpacing: 1 }}>
+                {isMuted ? "MUTED" : "READY"}
+              </div>
+            )}
+          </div>
 
           {/* Dark overlay when muted */}
           {isMuted && (
             <div style={{
               position: "absolute", inset: 0,
-              background: "rgba(0,0,0,0.5)",
+              background: "rgba(0,0,0,0.45)",
               display: "flex", alignItems: "center", justifyContent: "center",
-              fontSize: 32
+              fontSize: 40, pointerEvents: "none"
             }}>🔇</div>
-          )}
-
-          {/* Speaking indicator at bottom */}
-          {isSpeaking && (
-            <div style={{
-              position: "absolute", bottom: 0, left: 0, right: 0,
-              background: "linear-gradient(transparent, rgba(0,0,0,0.8))",
-              padding: "20px 10px 8px",
-              display: "flex", justifyContent: "center", gap: 4, alignItems: "flex-end"
-            }}>
-              {[1, 2, 3, 4, 5, 6, 7].map(i => (
-                <div key={i} style={{
-                  width: 3, borderRadius: 3,
-                  background: isFemale ? "#ff6b9d" : "#00e5ff",
-                  animation: `soundBar${i % 3 + 1} ${0.3 + i * 0.05}s ease-in-out infinite alternate`,
-                  height: 8
-                }} />
-              ))}
-            </div>
           )}
         </div>
 
@@ -546,9 +548,6 @@ function AIAvatar({ isSpeaking, isMuted, qIndex }) {
           }}>🔇</div>
         )}
       </div>
-
-      {/* Name and sound bars */}
-      
     </div>
   );
 }
@@ -587,6 +586,8 @@ export default function ThreatReady() {
     const token = localStorage.getItem('token');
     const savedUser = localStorage.getItem('cyberprep_user');
     const savedUserType = localStorage.getItem('cyberprep_usertype');
+    const isFreeTrial = localStorage.getItem('cyberprep_freetrial') === 'true';
+
     if (token && savedUser) {
       const savedView = localStorage.getItem('cyberprep_view');
       if (savedView && !['interview', 'results', 'auth', 'landing'].includes(savedView)) {
@@ -594,6 +595,16 @@ export default function ThreatReady() {
       }
       return savedUserType === 'b2b' ? 'b2b-dashboard' : 'dashboard';
     }
+
+    // Free trial user — no token but has trial flag
+    if (isFreeTrial) {
+      const savedView = localStorage.getItem('cyberprep_view');
+      if (savedView && !['interview', 'results', 'auth', 'landing'].includes(savedView)) {
+        return savedView;
+      }
+      return 'dashboard';
+    }
+
     return 'landing';
   });
 
@@ -624,7 +635,10 @@ export default function ThreatReady() {
   const [sessionId, setSessionId] = useState(null);
 
   // ── SUBSCRIPTION ──
-  const [subscribedRoles, setSubscribedRoles] = useState([]);
+  const [subscribedRoles, setSubscribedRoles] = useState(() => {
+    const saved = localStorage.getItem('subscribedRoles');
+    return saved ? JSON.parse(saved) : [];
+  });
   const [selectedRoles, setSelectedRoles] = useState([]);
   const [isPaid, setIsPaid] = useState(false);
   const [freeAttempts, setFreeAttempts] = useState(2);
@@ -647,7 +661,10 @@ export default function ThreatReady() {
     return getTotalUsedAttempts() >= 2;
   };
   const [billingPeriod, setBillingPeriod] = useState('monthly'); // 'monthly' | 'yearly'
-  const [trialRoles, setTrialRoles] = useState([]); // exactly 2 roles for free trial
+  const [trialRoles, setTrialRoles] = useState(() => {
+    const saved = localStorage.getItem('trialRoles');
+    return saved ? JSON.parse(saved) : [];
+  });
 
   // ── SCENARIO STATE ──
   const [activeRole, setActiveRole] = useState(null);
@@ -705,6 +722,8 @@ export default function ThreatReady() {
   const [targetRole, setTargetRole] = useState("");
   const [experienceLevel, setExperienceLevel] = useState("");
   const [resumeText, setResumeText] = useState("");
+  const [resumeAiData, setResumeAiData] = useState(null); // {skills, recommended_difficulty, weak_areas, recommended_roles}
+  const [readiness, setReadiness] = useState(null); // {overall_readiness, technical, communication, decision, total_sessions, has_data}
   const [jdText, setJdText] = useState("");
   const [xp, setXp] = useState(0);
   const [streak, setStreak] = useState(0);
@@ -734,6 +753,10 @@ export default function ThreatReady() {
   const [inviteRole, setInviteRole] = useState('cloud');
   const [inviteDiff, setInviteDiff] = useState('intermediate');
   const [inviteAssessmentId, setInviteAssessmentId] = useState('');
+  const [inviteMode, setInviteMode] = useState('individual'); // 'individual' | 'multiple' | 'csv'
+  const [inviteMultipleEmails, setInviteMultipleEmails] = useState('');
+  const [inviteCsvFile, setInviteCsvFile] = useState(null);
+  const [inviteParsedEmails, setInviteParsedEmails] = useState([]);
   // Search states
   const [candidatesSearch, setCandidatesSearch] = useState('');
   const [selectedCandidates, setSelectedCandidates] = useState([]);
@@ -811,10 +834,9 @@ export default function ThreatReady() {
   ]);
 
   // ── BADGES ──
-  const [badges] = useState([
-    { role: "cloud", tier: "gold", name: "Advanced Cloud Architect", earned: "2026-04-01" },
-    { role: "devsecops", tier: "silver", name: "DevSecOps Practitioner", earned: "2026-03-28" }
-  ]);
+  // Badges are earned per role by completing assessments with Bronze+ score
+  // Computed from backend session history (see useEffect below)
+  const [badges, setBadges] = useState([]);
 
 
 
@@ -866,6 +888,16 @@ export default function ThreatReady() {
         if (data.user?.experience_level) setExperienceLevel(data.user.experience_level);
       })
       .catch(err => console.log('Profile load error:', err));
+
+    // Load Interview Readiness Score (real, computed from completed sessions)
+    fetch('https://threatready-db.onrender.com/api/readiness', {
+      headers: { 'Authorization': `Bearer ${token}` }
+    })
+      .then(r => r.json())
+      .then(data => {
+        if (!data.error) setReadiness(data);
+      })
+      .catch(err => console.log('Readiness load error:', err));
   }, [user]);
 
   // ── B2B DATA LOADER ──
@@ -922,7 +954,39 @@ export default function ThreatReady() {
       if (lb.leaderboard) { setLeaderboard(lb.leaderboard); setMyRank(lb.my_rank); }
       if (notif.notifications) { setNotifications(notif.notifications); setUnreadCount(notif.unread_count || 0); }
       if (dc.challenge) { setDailyChallenge(dc.challenge); setDailyAnswered(dc.already_answered); if (dc.response) setDailyResult(dc.response); }
-      if (hist.history) setScenarioHistory(hist.history.map(h => h.scenario_id));
+      if (hist.history) {
+        setScenarioHistory(hist.history.map(h => h.scenario_id));
+
+        // ═══════════════════════════════════════════════════════════════
+        // COMPUTE REAL BADGES from scenario history
+        // For each role the user has completed, pick the HIGHEST score
+        // and map it to a tier (Platinum/Gold/Silver/Bronze)
+        // ═══════════════════════════════════════════════════════════════
+        const bestByRole = {};
+        hist.history.forEach(h => {
+          const score = parseFloat(h.score) || 0;
+          if (score < 4) return; // No badge for "Not Ready" scores
+          if (!bestByRole[h.role_id] || score > bestByRole[h.role_id].score) {
+            bestByRole[h.role_id] = { score, completed_at: h.completed_at };
+          }
+        });
+
+        const computedBadges = Object.entries(bestByRole).map(([role_id, data]) => {
+          const tier = data.score >= 8 ? "platinum"
+                     : data.score >= 7 ? "gold"
+                     : data.score >= 6 ? "silver"
+                     : "bronze";
+          const roleName = ROLES.find(r => r.id === role_id)?.name || role_id;
+          const tierLabel = tier.charAt(0).toUpperCase() + tier.slice(1);
+          return {
+            role: role_id,
+            tier,
+            name: `${tierLabel} ${roleName}`,
+            earned: data.completed_at ? data.completed_at.substring(0, 10) : ''
+          };
+        });
+        setBadges(computedBadges);
+      }
     } catch (e) { console.log('Dashboard extras load error:', e.message); }
   };
 
@@ -1029,6 +1093,7 @@ export default function ThreatReady() {
 
     if (token && email) {
       localStorage.setItem("token", token);
+      localStorage.setItem('cyberprep_session_start', Date.now().toString());
       const newUser = { name, email };
       localStorage.setItem('cyberprep_user', JSON.stringify(newUser));
       setUser(newUser);
@@ -1189,6 +1254,7 @@ export default function ThreatReady() {
 
         // Save new user
         localStorage.setItem("token", data.token);
+        localStorage.setItem('cyberprep_session_start', Date.now().toString());
         localStorage.setItem('cyberprep_user', JSON.stringify(data.user));
         setUser(data.user);
         setSettingsName(data.user.name || '');
@@ -1347,57 +1413,70 @@ export default function ThreatReady() {
       const utterance = new SpeechSynthesisUtterance(text);
       const voices = window.speechSynthesis.getVoices();
 
-      // Priority female voices
-      const femaleVoices = voices.filter(v =>
-        v.name.includes('Samantha') ||
-        v.name.includes('Victoria') ||
-        v.name.includes('Karen') ||
-        v.name.includes('Moira') ||
-        v.name.includes('Tessa') ||
-        v.name.includes('Veena') ||
-        v.name.includes('Zira') ||
-        v.name.includes('Google UK English Female') ||
-        v.name.includes('Google US English') ||
-        (v.name.includes('Female') && v.lang.startsWith('en'))
-      );
+      // HIGH-QUALITY voice priority list (ordered best → fallback)
+      // These are the clearest, most natural voices across browsers/OS
+      // Premium "neural" / "natural" voices come first
+      const femalePriority = [
+        'Google UK English Female',        // Chrome — very clear
+        'Microsoft Aria Online (Natural)', // Edge — neural, premium
+        'Microsoft Jenny Online (Natural)',// Edge — neural, professional
+        'Microsoft Zira',                   // Windows — clear
+        'Samantha',                         // macOS — natural, clear
+        'Karen',                            // macOS (Australian) — professional
+        'Victoria',                         // macOS — clear
+        'Tessa',                            // macOS — clear
+        'Moira',                            // macOS (Irish) — clear
+        'Google US English'                 // Chrome — female US
+      ];
 
-      // Priority male voices
-      const maleVoices = voices.filter(v =>
-        v.name.includes('Daniel') ||
-        v.name.includes('Alex') ||
-        v.name.includes('Fred') ||
-        v.name.includes('David') ||
-        v.name.includes('James') ||
-        v.name.includes('Google UK English Male') ||
-        (v.name.includes('Male') && v.lang.startsWith('en'))
-      );
+      const malePriority = [
+        'Google UK English Male',          // Chrome — very clear
+        'Microsoft Guy Online (Natural)',  // Edge — neural, premium
+        'Microsoft Davis Online (Natural)',// Edge — neural, professional
+        'Microsoft David',                  // Windows — clear
+        'Daniel',                           // macOS (British) — very clear
+        'Alex',                             // macOS — natural, professional
+        'Fred',                             // macOS — clear
+        'Oliver',                           // macOS (British)
+        'Aaron'                             // macOS
+      ];
 
-      // English fallback voices
-      const englishVoices = voices.filter(v =>
-        v.lang === 'en-US' || v.lang === 'en-GB' || v.lang === 'en-IN'
+      // Find the best voice by priority — match partial name
+      const findBestVoice = (priorityList) => {
+        for (const preferredName of priorityList) {
+          const match = voices.find(v => v.name.includes(preferredName) && v.lang.startsWith('en'));
+          if (match) return match;
+        }
+        return null;
+      };
+
+      // Generic English fallback (any English voice)
+      const englishFallback = voices.find(v =>
+        v.lang === 'en-US' || v.lang === 'en-GB' || v.lang === 'en-IN' || v.lang.startsWith('en')
       );
 
       let selectedVoice = null;
       if (useFemale) {
-        selectedVoice = femaleVoices[0] || englishVoices[0] || voices[0];
+        selectedVoice = findBestVoice(femalePriority) || englishFallback || voices[0];
       } else {
-        selectedVoice = maleVoices[0] || englishVoices[1] || englishVoices[0] || voices[0];
+        selectedVoice = findBestVoice(malePriority) || englishFallback || voices[0];
       }
 
       if (selectedVoice) utterance.voice = selectedVoice;
 
-      // ARIA: higher pitch, slightly faster
-      // NEXUS: lower pitch, slightly slower
-      utterance.rate = useFemale ? 0.92 : 0.88;
-      utterance.pitch = useFemale ? 1.2 : 0.8;
-      utterance.volume = 1.0;
+      // Speech parameters — tuned for MAXIMUM CLARITY
+      // Slower rate = easier for beginners to understand
+      // Natural pitch (not too high/low) = professional sound
+      utterance.rate = 0.85;   // Slower than default for clarity (was 0.88-0.92)
+      utterance.pitch = 1.0;   // Natural pitch for both (was 0.8-1.2 — sounded robotic)
+      utterance.volume = 1.0;  // Full volume
 
       utterance.onstart = () => setIsSpeaking(true);
       utterance.onend = () => setIsSpeaking(false);
       utterance.onerror = () => setIsSpeaking(false);
 
       window.speechSynthesis.speak(utterance);
-      console.log(useFemale ? 'ARIA speaking (female)' : 'NEXUS speaking (male)', selectedVoice?.name);
+      console.log(useFemale ? 'ARIA speaking (female)' : 'NEXUS speaking (male)', '—', selectedVoice?.name || 'default voice');
     };
 
     // Wait for voices to load if not ready yet
@@ -1458,14 +1537,20 @@ export default function ThreatReady() {
       }
 
       return {
-        score: result.score || 5,
+        score: result.score ?? 5,
         category: result.category || question.ca,
         strengths: result.strengths || "",
         weaknesses: result.weaknesses || "",
         improved_answer: result.improved_answer || "",
-        communication_score: result.communication_score || 5,
-        depth_score: result.depth_score || 5,
-        decision_score: result.decision_score || 5,
+        communication_score: result.communication_score ?? 5,
+        depth_score: result.depth_score ?? 5,
+        decision_score: result.decision_score ?? 5,
+        // 5 skill scores for radar chart
+        iam_score: result.iam_score ?? result.score ?? 5,
+        detection_score: result.detection_score ?? result.score ?? 5,
+        remediation_score: result.remediation_score ?? result.score ?? 5,
+        architecture_score: result.architecture_score ?? result.score ?? 5,
+        communication_skill_score: result.communication_skill_score ?? result.communication_score ?? result.score ?? 5,
         follow_up_question: result.follow_up_topic || "What additional considerations would you factor in?",
         follow_up_category: result.follow_up_category || question.ca
       };
@@ -1490,7 +1575,7 @@ export default function ThreatReady() {
     if (!ans?.trim()) return;
     setLoading(true);
     const ev = await evaluateAnswer(currentQ, ans, scenario);
-    const newEvals = [...evaluations, { ...ev, question_id: currentQ.id }];
+    const newEvals = [...evaluations, { ...ev, question_id: currentQ.id, user_answer: ans, question_text: currentQ.t }];
     setEvaluations(newEvals);
 
     if (askedQs.length < 5) {
@@ -1508,7 +1593,7 @@ export default function ThreatReady() {
       setTimeout(() => speakQuestion(nextQ.t, qIndex + 1), 300);
     } else {
       // Complete - calculate scores
-      const avg = (arr, k) => arr.reduce((s, e) => s + (e[k] || 5), 0) / arr.length;
+      const avg = (arr, k) => arr.reduce((s, e) => s + (e[k] ?? 5), 0) / arr.length;
       const score = Math.round(avg(newEvals, "score") * 10) / 10;
       const earned = Math.round(score * 50);
       const skillsScore = Math.min(500, Math.round(score * 50));
@@ -1518,6 +1603,12 @@ export default function ThreatReady() {
         communication: Math.round(avg(newEvals, "communication_score") * 10) / 10,
         depth: Math.round(avg(newEvals, "depth_score") * 10) / 10,
         decision: Math.round(avg(newEvals, "decision_score") * 10) / 10,
+        // 5 skill averages for radar
+        iam: Math.round(avg(newEvals, "iam_score") * 10) / 10,
+        detection: Math.round(avg(newEvals, "detection_score") * 10) / 10,
+        remediation: Math.round(avg(newEvals, "remediation_score") * 10) / 10,
+        architecture: Math.round(avg(newEvals, "architecture_score") * 10) / 10,
+        communication_skill: Math.round(avg(newEvals, "communication_skill_score") * 10) / 10,
         earned, time: elapsed, evaluations: newEvals, questions_asked: askedQs.length,
         skillsScore, attackScore,
         percentile: Math.min(99, Math.round(score * 10)),
@@ -1528,12 +1619,9 @@ export default function ThreatReady() {
       setCompletedScenarios(p => [...new Set([...p, scenario.id])]);
       setStreak(p => p + 1);
       setLoading(false);
-      // Route: trial exhausted → trial-complete, otherwise → results
-      if (!isPaid && isTrialExhausted()) {
-        setView("trial-complete");
-      } else {
-        setView("results");
-      }
+      // Always show results page first — even for trial-exhausted users
+      // They can then click "View Subscription Options" button to go to trial-complete popup
+      setView("results");
 
       // Save completed session to backend
       try {
@@ -1688,20 +1776,52 @@ export default function ThreatReady() {
     localStorage.removeItem('subscribedRoles');
     localStorage.removeItem('freeAttempts');
     localStorage.removeItem('roleAttempts');
+    localStorage.removeItem('cyberprep_freetrial');
+    localStorage.removeItem('trialRoles');
+    localStorage.removeItem('cyberprep_session_start');
     setUser(null); setUserType('b2c'); setSettingsName('');
     setResumeText(''); setTargetRole(''); setExperienceLevel('');
+    setResumeAiData(null); setReadiness(null);
     setXp(0); setStreak(0); setCompletedScenarios([]);
+    setBadges([]);
     setIsPaid(false); setFreeAttempts(2); setRoleAttempts({});
+    setSubscribedRoles([]); setTrialRoles([]);
     setView("landing");
   };
   const logout = () => showConfirm('Are you sure you want to logout?', doLogout);
 
+  // ═══════════════════════════════════════════════════════════════
+  // 1-HOUR SESSION TIMEOUT
+  // ═══════════════════════════════════════════════════════════════
+  const SESSION_TIMEOUT_MS = 60 * 60 * 1000; // 1 hour
+
+  const expireSession = useCallback(() => {
+    console.log('Session expired — auto-logout');
+    doLogout();
+    showToast('Session expired, please login again', 'warning');
+  }, []);
+
+  // Check on app load + every 30 seconds while app is running
+  useEffect(() => {
+    const checkExpiry = () => {
+      const sessionStart = localStorage.getItem('cyberprep_session_start');
+      if (!sessionStart) return; // not logged in
+      const elapsed = Date.now() - parseInt(sessionStart, 10);
+      if (elapsed >= SESSION_TIMEOUT_MS) {
+        expireSession();
+      }
+    };
+    checkExpiry(); // run once immediately
+    const timer = setInterval(checkExpiry, 30 * 1000); // every 30 seconds
+    return () => clearInterval(timer);
+  }, [expireSession]);
+
   const radarData = results ? [
-    { s: "Threat ID", v: results.overall_score * 10 },
-    { s: "Architecture", v: results.depth * 10 },
-    { s: "Detection", v: results.communication * 10 },
-    { s: "Decision", v: results.decision * 10 },
-    { s: "Clarity", v: results.communication * 10 }
+    { s: "IAM", v: (results.iam ?? 0) * 10 },
+    { s: "Detection", v: (results.detection ?? 0) * 10 },
+    { s: "Remediation", v: (results.remediation ?? 0) * 10 },
+    { s: "Architecture", v: (results.architecture ?? 0) * 10 },
+    { s: "Communication", v: (results.communication_skill ?? results.communication ?? 0) * 10 }
   ] : [];
 
 
@@ -1730,6 +1850,10 @@ export default function ThreatReady() {
               localStorage.removeItem('token');
               localStorage.removeItem('cyberprep_user');
               localStorage.removeItem('cyberprep_usertype');
+              localStorage.removeItem('cyberprep_freetrial');
+              localStorage.removeItem('trialRoles');
+              localStorage.removeItem('subscribedRoles');
+              localStorage.removeItem('roleAttempts');
               setView("trial-role-select");
             }} style={{ fontSize: 18, padding: "18px 48px" }}>Start Free Trial</button>
             <button className="btn bs" onClick={() => { setAuthMode("login"); setView("auth"); }} style={{ fontSize: 15, padding: "14px 32px" }}>Sign In</button>
@@ -1906,7 +2030,11 @@ export default function ThreatReady() {
                   setSubscribedRoles(trialRoles);
                   setIsPaid(false);
                   localStorage.setItem('subscribedRoles', JSON.stringify(trialRoles));
+                  localStorage.setItem('trialRoles', JSON.stringify(trialRoles));
                   localStorage.setItem('roleAttempts', JSON.stringify(init));
+                  localStorage.setItem('cyberprep_freetrial', 'true');
+                  localStorage.setItem('cyberprep_usertype', 'b2c');
+                  localStorage.setItem('cyberprep_session_start', Date.now().toString());
                   setView("dashboard");
                   setDashTab("home");
                   showToast("Free trial started! 2 total attempts on Beginner only.", "success");
@@ -2338,9 +2466,9 @@ export default function ThreatReady() {
               const disabled = locked || trialExhausted;
               return (
                 <div key={d.id} className={`card fadeUp ${disabled ? "" : "card-glow"}`}
-                  style={{ padding: 20, textAlign: "center", animationDelay: `${i * .08}s`, opacity: disabled ? 0.4 : 1, cursor: disabled ? "not-allowed" : "pointer", borderColor: disabled ? "var(--bd)" : d.color + "40" }}
+                  style={{ padding: 20, textAlign: "center", animationDelay: `${i * .08}s`, opacity: disabled ? 0.6 : 1, cursor: locked ? "default" : (disabled ? "not-allowed" : "pointer"), borderColor: disabled ? "var(--bd)" : d.color + "40" }}
                   onClick={() => {
-                    if (locked) { showToast("Subscribe to unlock " + d.name + " difficulty.", "warning"); return; }
+                    if (locked) return; // button inside handles this
                     if (trialExhausted) { setView("trial-complete"); return; }
                     const scs = SCENARIOS[activeRole];
                     if (scs?.length) startScenario(scs[Math.floor(Math.random() * scs.length)], d.id);
@@ -2351,7 +2479,26 @@ export default function ThreatReady() {
                   <div style={{ fontSize: 9, color: "var(--tx3)" }}>
                     Hints: {d.hints === true ? "Full" : d.hints === "reduced" ? "Reduced" : d.hints === "minimal" ? "Minimal" : "None"}
                   </div>
-                  {locked && <div style={{ fontSize: 10, color: "var(--wn)", marginTop: 8 }}>🔒 Subscribe to unlock</div>}
+                  {locked && (
+                    <button
+                      className="btn bp"
+                      style={{ marginTop: 12, padding: "8px 18px", fontSize: 11, cursor: "pointer" }}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        if (!user) {
+                          // Free trial guest → send to signup
+                          setAuthMode("signup");
+                          setView("auth");
+                          showToast("Create an account to subscribe", "info");
+                        } else {
+                          // Logged in but not paid → send to Billing tab
+                          setView("dashboard");
+                          setDashTab("billing");
+                        }
+                      }}>
+                      🔒 Subscribe to Unlock
+                    </button>
+                  )}
                   {trialExhausted && <div style={{ fontSize: 10, color: "var(--dn)", marginTop: 8 }}>⚠️ No attempts left — subscribe</div>}
                   {!locked && !trialExhausted && !isPaid && <div style={{ fontSize: 10, color: "var(--ok)", marginTop: 8 }}>🆓 {getRemainingAttempts(activeRole)} free attempt{getRemainingAttempts(activeRole) !== 1 ? "s" : ""} left</div>}
                   {!locked && !trialExhausted && isPaid && <div style={{ fontSize: 10, color: "var(--ok)", marginTop: 8 }}>🔓 Unlocked</div>}
@@ -2537,6 +2684,33 @@ export default function ThreatReady() {
           </ResponsiveContainer>
         </div>
 
+        {/* Percentile Bar */}
+        <div className="card fadeUp" style={{ marginBottom: 20, padding: 20 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+            <div className="lbl">YOUR RANKING</div>
+            <div className="mono" style={{ fontSize: 14, fontWeight: 700, color: "var(--ac)" }}>Top {100 - results.percentile}%</div>
+          </div>
+          <div style={{ position: "relative", height: 14, background: "rgba(255,255,255,.04)", borderRadius: 8, overflow: "hidden", border: "1px solid rgba(0,229,255,.15)" }}>
+            <div style={{
+              position: "absolute", top: 0, left: 0, bottom: 0,
+              width: `${results.percentile}%`,
+              background: `linear-gradient(90deg, ${results.percentile >= 70 ? "#00e096" : results.percentile >= 50 ? "#ffab40" : "#ff5252"}, ${results.percentile >= 70 ? "#00e5ff" : results.percentile >= 50 ? "#ffab40" : "#ff5252"})`,
+              borderRadius: 8,
+              transition: "width 1s ease-out"
+            }} />
+          </div>
+          <div style={{ display: "flex", justifyContent: "space-between", marginTop: 6, fontSize: 10, color: "var(--tx3)" }}>
+            <span>0%</span>
+            <span>25%</span>
+            <span>50%</span>
+            <span>75%</span>
+            <span>100%</span>
+          </div>
+          <div style={{ fontSize: 11, color: "var(--tx2)", marginTop: 10, textAlign: "center" }}>
+            You scored better than {results.percentile}% of candidates at {activeDifficulty} level
+          </div>
+        </div>
+
         {/* Scoring Transparency */}
         <div className="card fadeUp" style={{ marginBottom: 16, padding: 16, borderColor: "var(--ac)", background: "rgba(0,229,255,.02)" }}>
           <div className="lbl" style={{ marginBottom: 8 }}>HOW YOUR SCORE WAS CALCULATED</div>
@@ -2558,10 +2732,27 @@ export default function ThreatReady() {
               <span className="tag">Q{i + 1} · {ev.category}</span>
               <span className="mono" style={{ fontSize: 14, fontWeight: 700, color: ev.score >= 7 ? "var(--ok)" : ev.score >= 5 ? "var(--wn)" : "var(--dn)" }}>{ev.score}/10</span>
             </div>
+
+            {/* Question text */}
+            {ev.question_text && (
+              <div style={{ fontSize: 11, fontWeight: 600, color: "var(--tx)", marginBottom: 8, lineHeight: 1.5 }}>
+                {ev.question_text}
+              </div>
+            )}
+
             <div style={{ fontSize: 11, marginBottom: 4 }}><span style={{ color: "var(--ok)" }}>✓</span> <span style={{ color: "var(--tx2)" }}>{ev.strengths}</span></div>
-            <div style={{ fontSize: 11, marginBottom: 4 }}><span style={{ color: "var(--dn)" }}>✗</span> <span style={{ color: "var(--tx2)" }}>{ev.weaknesses}</span></div>
-            <div style={{ marginTop: 6, padding: 8, background: "var(--s2)", borderRadius: 6, fontSize: 10, color: "var(--tx2)", lineHeight: 1.6 }}>
-              <span className="mono" style={{ fontSize: 8, color: "var(--ac)" }}>MODEL ANSWER </span><br />{ev.improved_answer}
+            <div style={{ fontSize: 11, marginBottom: 8 }}><span style={{ color: "var(--dn)" }}>✗</span> <span style={{ color: "var(--tx2)" }}>{ev.weaknesses}</span></div>
+
+            {/* Side-by-side: Your Answer vs Model Answer */}
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginTop: 8 }}>
+              <div style={{ padding: 10, background: "rgba(255,171,64,.06)", border: "1px solid rgba(255,171,64,.2)", borderRadius: 6 }}>
+                <div className="mono" style={{ fontSize: 9, color: "var(--wn)", marginBottom: 4, fontWeight: 700, letterSpacing: 0.5 }}>YOUR ANSWER</div>
+                <div style={{ fontSize: 10, color: "var(--tx2)", lineHeight: 1.6, whiteSpace: "pre-wrap" }}>{ev.user_answer || "— (no answer recorded)"}</div>
+              </div>
+              <div style={{ padding: 10, background: "rgba(0,224,150,.06)", border: "1px solid rgba(0,224,150,.2)", borderRadius: 6 }}>
+                <div className="mono" style={{ fontSize: 9, color: "var(--ok)", marginBottom: 4, fontWeight: 700, letterSpacing: 0.5 }}>MODEL ANSWER</div>
+                <div style={{ fontSize: 10, color: "var(--tx2)", lineHeight: 1.6 }}>{ev.improved_answer || "—"}</div>
+              </div>
             </div>
           </div>
         ))}
@@ -2736,8 +2927,8 @@ export default function ThreatReady() {
                 </button>
 
                 {showNotifs && (
-                  <div style={{ position: "relative", zIndex: 1000, right: 0, top: 36, width: 280,  background: "#111827", border: "1px solid #1e2536", borderRadius: 12, boxShadow: "0 16px 48px rgba(0,0,0,.6)", zIndex: 999, maxHeight: 300, overflowY: "auto" }}>
-                    <div style={{ padding: "10px 14px",position: "relative", zIndex: 1000, borderBottom: "1px solid #1e2536", fontSize: 11, fontWeight: 700, color: "var(--ac)", display: "flex", justifyContent: "space-between" }}>
+                  <div style={{ position: "absolute", zIndex: 1000, right: 0, top: 36, width: 280,  background: "#111827", border: "1px solid #1e2536", borderRadius: 12, boxShadow: "0 16px 48px rgba(0,0,0,.6)", maxHeight: 300, overflowY: "auto" }}>
+                    <div style={{ padding: "10px 14px", borderBottom: "1px solid #1e2536", fontSize: 11, fontWeight: 700, color: "var(--ac)", display: "flex", justifyContent: "space-between" }}>
                       <span>NOTIFICATIONS</span>
                       <span style={{ cursor: "pointer", opacity: 1 }} onClick={() => setShowNotifs(false)}>×</span>
                     </div>
@@ -3041,7 +3232,7 @@ export default function ThreatReady() {
                 onChange={e => setResumeText(e.target.value)}
                 style={{ minHeight: 120, marginBottom: 10 }}
               />
-              <FileUpload onUpload={text => { setResumeText(text); }} label="Upload Resume (PDF/DOC/TXT)" />
+              <FileUpload onUpload={(text, aiData) => { setResumeText(text); if (aiData) setResumeAiData(aiData); }} label="Upload Resume (PDF/DOC/TXT)" />
               {resumeText && <div style={{ marginTop: 8, fontSize: 10, color: "var(--ok)" }}>✓ Resume loaded · AI will personalize your scenarios</div>}
               <button className="btn bp" style={{ marginTop: 10, fontSize: 11, padding: "8px 20px" }}
                 onClick={async () => {
@@ -3058,6 +3249,58 @@ export default function ThreatReady() {
                 💾 Save Resume
               </button>
             </div>
+
+            {/* AI-DETECTED SKILLS (shown after resume upload) */}
+            {resumeAiData && (resumeAiData.skills?.length > 0 || resumeAiData.experience_years || resumeAiData.weak_areas?.length > 0) && (
+              <>
+                <div className="lbl" style={{ marginBottom: 10 }}>AI ANALYSIS OF YOUR RESUME</div>
+                <div className="card fadeUp" style={{ padding: 16, marginBottom: 16, borderColor: "var(--ac)", background: "rgba(0,229,255,.02)" }}>
+                  {resumeAiData.skills?.length > 0 && (
+                    <div style={{ marginBottom: 14 }}>
+                      <div style={{ fontSize: 11, fontWeight: 700, color: "var(--ac)", marginBottom: 6, letterSpacing: 0.5 }}>✓ WE DETECTED</div>
+                      <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                        {resumeAiData.skills.map((skill, i) => (
+                          <span key={i} style={{ background: "rgba(0,229,255,.1)", border: "1px solid rgba(0,229,255,.3)", color: "var(--ac)", fontSize: 11, padding: "4px 10px", borderRadius: 12, fontWeight: 600 }}>
+                            {skill}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  {resumeAiData.experience_years > 0 && (
+                    <div style={{ fontSize: 12, color: "var(--tx2)", marginBottom: 8 }}>
+                      <span style={{ color: "var(--tx3)" }}>Experience: </span>
+                      <span style={{ color: "var(--tx)", fontWeight: 600 }}>{resumeAiData.experience_years} years</span>
+                      {resumeAiData.top_role && <span> · Top strength: <span style={{ color: "var(--ok)" }}>{resumeAiData.top_role}</span></span>}
+                    </div>
+                  )}
+                  {resumeAiData.weak_areas?.length > 0 && (
+                    <div style={{ marginTop: 10 }}>
+                      <div style={{ fontSize: 11, fontWeight: 700, color: "var(--wn)", marginBottom: 6, letterSpacing: 0.5 }}>⚠️ AREAS TO IMPROVE</div>
+                      <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                        {resumeAiData.weak_areas.map((area, i) => (
+                          <span key={i} style={{ background: "rgba(255,171,64,.08)", border: "1px solid rgba(255,171,64,.25)", color: "var(--wn)", fontSize: 10, padding: "3px 8px", borderRadius: 10 }}>
+                            {area}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  {resumeAiData.recommended_difficulty && (
+                    <div style={{ marginTop: 12, padding: 10, background: "rgba(0,224,150,.06)", border: "1px solid rgba(0,224,150,.2)", borderRadius: 8 }}>
+                      <div style={{ fontSize: 11, color: "var(--ok)", fontWeight: 700, marginBottom: 3 }}>🎯 AI RECOMMENDS</div>
+                      <div style={{ fontSize: 12, color: "var(--tx)" }}>
+                        Start with <span style={{ color: "var(--ok)", fontWeight: 700, textTransform: "capitalize" }}>{resumeAiData.recommended_difficulty}</span> difficulty
+                        {resumeAiData.recommended_roles?.length > 0 && (
+                          <span> · focus on <span style={{ color: "var(--ac)" }}>{resumeAiData.recommended_roles.map(rid => ROLES.find(r => r.id === rid)?.name).filter(Boolean).join(", ")}</span></span>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </>
+            )}
+
             <div className="lbl" style={{ marginBottom: 10 }}>CAREER GOALS</div>
             <div className="card fadeUp" style={{ padding: 16, marginBottom: 16 }}>
               <div style={{ fontSize: 12, color: "var(--tx2)", marginBottom: 10 }}>Target role and experience level</div>
@@ -3087,15 +3330,36 @@ export default function ThreatReady() {
                 💾 Save Goals
               </button>
             </div>
+
             <div className="lbl" style={{ marginBottom: 10 }}>INTERVIEW READINESS</div>
             <div className="card fadeUp" style={{ padding: 20, textAlign: "center" }}>
-              <div className="mono" style={{ fontSize: 40, fontWeight: 700, color: "var(--ac)" }}>72<span style={{ fontSize: 16, color: "var(--tx3)" }}>/100</span></div>
-              <div style={{ fontSize: 11, color: "var(--tx2)", marginTop: 4 }}>Overall Interview Readiness</div>
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 10, marginTop: 14 }}>
-                {[["Technical", 78], ["Communication", 65], ["Decision Speed", 74]].map(([l, v], i) => (
-                  <div key={i}><div className="mono" style={{ fontSize: 14, color: v >= 70 ? "var(--ok)" : "var(--wn)" }}>{v}</div><div style={{ fontSize: 9, color: "var(--tx3)" }}>{l}</div></div>
-                ))}
-              </div>
+              {readiness && readiness.has_data ? (
+                <>
+                  <div className="mono" style={{ fontSize: 40, fontWeight: 700, color: readiness.overall_readiness >= 70 ? "var(--ok)" : readiness.overall_readiness >= 50 ? "var(--ac)" : "var(--wn)" }}>
+                    {readiness.overall_readiness}<span style={{ fontSize: 16, color: "var(--tx3)" }}>/100</span>
+                  </div>
+                  <div style={{ fontSize: 11, color: "var(--tx2)", marginTop: 4 }}>
+                    Overall Interview Readiness · based on {readiness.total_sessions} assessment{readiness.total_sessions !== 1 ? "s" : ""}
+                  </div>
+                  <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 10, marginTop: 14 }}>
+                    {[["Technical", readiness.technical], ["Communication", readiness.communication], ["Decision", readiness.decision]].map(([l, v], i) => (
+                      <div key={i}>
+                        <div className="mono" style={{ fontSize: 14, color: v >= 70 ? "var(--ok)" : v >= 50 ? "var(--ac)" : "var(--wn)" }}>{v}</div>
+                        <div style={{ fontSize: 9, color: "var(--tx3)" }}>{l}</div>
+                      </div>
+                    ))}
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div className="mono" style={{ fontSize: 28, fontWeight: 700, color: "var(--tx3)" }}>—</div>
+                  <div style={{ fontSize: 11, color: "var(--tx2)", marginTop: 8, lineHeight: 1.6 }}>
+                    Complete your first assessment to see your readiness score.
+                    <br />
+                    <span style={{ fontSize: 10, color: "var(--tx3)" }}>Score updates automatically after each session.</span>
+                  </div>
+                </>
+              )}
             </div>
             </div>
           </>)}
@@ -3179,8 +3443,8 @@ export default function ThreatReady() {
                         <span style={{ fontSize: 26 }}>{role.icon}</span>
                         <div style={{ textAlign: "left" }}>
                           <div style={{ fontSize: 13, fontWeight: 700 }}>{role.name}</div>
-                          <div style={{ fontSize: 9, color: activeRole === role.id ? "var(--ac)" : "var(--ok)", marginTop: 2, fontWeight: 600 }}>
-                            {activeRole === role.id ? "✓ SELECTED" : "🔓 All levels unlocked"}
+                          <div style={{ fontSize: 9, color: activeRole === role.id ? "var(--ac)" : (isPaid ? "var(--ok)" : "var(--wn)"), marginTop: 2, fontWeight: 600 }}>
+                            {activeRole === role.id ? "✓ SELECTED" : (isPaid ? "🔓 All levels unlocked" : "🔒 Beginner only · Subscribe to unlock all")}
                           </div>
                         </div>
                       </div>
@@ -3913,9 +4177,80 @@ export default function ThreatReady() {
           {b2bTab === "candidates" && (<>
             {/* ── INVITE CANDIDATE FORM ── */}
             <div className="card fadeUp" style={{ padding: 22, marginBottom: 16, borderColor: "var(--ac)", background: "rgba(0,229,255,.02)" }}>
-              <div className="lbl" style={{ marginBottom: 12 }}>📧 INVITE CANDIDATE</div>
-              <input id="invite-email-input" className="input" type="email" placeholder="candidate@company.com"
-                value={inviteEmail} onChange={e => setInviteEmail(e.target.value)} style={{ marginBottom: 10 }} />
+              <div className="lbl" style={{ marginBottom: 12 }}>📧 INVITE CANDIDATES</div>
+
+              {/* Mode selector tabs */}
+              <div style={{ display: "flex", gap: 6, marginBottom: 14 }}>
+                <button className={`btn ${inviteMode === "individual" ? "bp" : "bs"}`} style={{ padding: "6px 14px", fontSize: 11 }} onClick={() => { setInviteMode("individual"); setInviteMsg(''); }}>👤 Individual</button>
+                <button className={`btn ${inviteMode === "multiple" ? "bp" : "bs"}`} style={{ padding: "6px 14px", fontSize: 11 }} onClick={() => { setInviteMode("multiple"); setInviteMsg(''); }}>👥 Paste Multiple</button>
+                <button className={`btn ${inviteMode === "csv" ? "bp" : "bs"}`} style={{ padding: "6px 14px", fontSize: 11 }} onClick={() => { setInviteMode("csv"); setInviteMsg(''); }}>📄 Upload CSV</button>
+              </div>
+
+              {/* MODE: Individual email */}
+              {inviteMode === "individual" && (
+                <input id="invite-email-input" className="input" type="email" placeholder="candidate@company.com"
+                  value={inviteEmail} onChange={e => setInviteEmail(e.target.value)} style={{ marginBottom: 10 }} />
+              )}
+
+              {/* MODE: Paste multiple emails */}
+              {inviteMode === "multiple" && (
+                <div style={{ marginBottom: 10 }}>
+                  <textarea className="input" placeholder={"Paste emails (one per line OR comma-separated)\n\nExample:\njohn@company.com\njane@company.com\nbob@company.com"}
+                    value={inviteMultipleEmails}
+                    onChange={e => setInviteMultipleEmails(e.target.value)}
+                    style={{ minHeight: 120, fontFamily: "monospace", fontSize: 11 }} />
+                  {inviteMultipleEmails.trim() && (() => {
+                    const emails = inviteMultipleEmails.split(/[\n,;]+/).map(e => e.trim()).filter(e => e && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e));
+                    return (
+                      <div style={{ fontSize: 10, color: emails.length > 0 ? "var(--ok)" : "var(--wn)", marginTop: 6 }}>
+                        {emails.length > 0 ? `✓ ${emails.length} valid email${emails.length !== 1 ? "s" : ""} detected` : "⚠️ No valid emails detected yet"}
+                      </div>
+                    );
+                  })()}
+                </div>
+              )}
+
+              {/* MODE: CSV upload */}
+              {inviteMode === "csv" && (
+                <div style={{ marginBottom: 10 }}>
+                  <div style={{ padding: 14, border: "1px dashed var(--bd)", borderRadius: 8, background: "var(--s2)", textAlign: "center" }}>
+                    <input type="file" id="csv-invite-upload" accept=".csv,.txt" style={{ display: "none" }}
+                      onChange={async e => {
+                        const file = e.target.files[0];
+                        if (!file) return;
+                        setInviteCsvFile(file);
+                        const text = await file.text();
+                        // Parse CSV — extract all valid email patterns from any column
+                        const emailRegex = /[a-zA-Z0-9._+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/g;
+                        const matches = text.match(emailRegex) || [];
+                        const uniqueEmails = [...new Set(matches.map(e => e.toLowerCase()))];
+                        setInviteParsedEmails(uniqueEmails);
+                        setInviteMsg(uniqueEmails.length > 0 ? `✅ Found ${uniqueEmails.length} email${uniqueEmails.length !== 1 ? "s" : ""} in file` : '❌ No valid emails found in file');
+                        setTimeout(() => setInviteMsg(''), 3000);
+                      }} />
+                    <label htmlFor="csv-invite-upload" style={{ cursor: "pointer", display: "inline-block" }}>
+                      <div style={{ fontSize: 24, marginBottom: 6 }}>📄</div>
+                      <div style={{ fontSize: 12, color: "var(--tx)", fontWeight: 600 }}>
+                        {inviteCsvFile ? inviteCsvFile.name : "Click to upload CSV"}
+                      </div>
+                      <div style={{ fontSize: 10, color: "var(--tx3)", marginTop: 4 }}>
+                        Any column with email addresses works · .csv or .txt
+                      </div>
+                    </label>
+                  </div>
+                  {inviteParsedEmails.length > 0 && (
+                    <div style={{ marginTop: 10, padding: 10, background: "rgba(0,224,150,.04)", border: "1px solid rgba(0,224,150,.2)", borderRadius: 6, maxHeight: 120, overflowY: "auto" }}>
+                      <div style={{ fontSize: 10, color: "var(--ok)", fontWeight: 700, marginBottom: 6 }}>
+                        {inviteParsedEmails.length} EMAIL{inviteParsedEmails.length !== 1 ? "S" : ""} READY TO INVITE
+                      </div>
+                      <div style={{ fontSize: 10, color: "var(--tx2)", fontFamily: "monospace", lineHeight: 1.6 }}>
+                        {inviteParsedEmails.slice(0, 20).join(", ")}
+                        {inviteParsedEmails.length > 20 && ` ... and ${inviteParsedEmails.length - 20} more`}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
 
               {/* Assessment Selector — links to saved assessment with custom questions */}
               <div style={{ marginBottom: 12 }}>
@@ -3941,7 +4276,7 @@ export default function ThreatReady() {
                 </select>
                 {inviteAssessmentId && (
                   <div style={{ fontSize: 9, color: "var(--ok)", marginTop: 4 }}>
-                    ✅ Candidate will receive the full set of questions from this assessment
+                    ✅ Candidates will receive the full set of questions from this assessment
                   </div>
                 )}
               </div>
@@ -3966,17 +4301,41 @@ export default function ThreatReady() {
                 </div>
               )}
               <button className="btn bp" style={{ width: "100%", padding: 12, fontSize: 14 }}
-                disabled={!inviteEmail.trim()}
+                disabled={(() => {
+                  if (inviteMode === "individual") return !inviteEmail.trim();
+                  if (inviteMode === "multiple") {
+                    const emails = inviteMultipleEmails.split(/[\n,;]+/).map(e => e.trim()).filter(e => e && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e));
+                    return emails.length === 0;
+                  }
+                  if (inviteMode === "csv") return inviteParsedEmails.length === 0;
+                  return true;
+                })()}
                 onClick={async () => {
-                  if (!inviteEmail.trim()) return;
-                  setInviteMsg('Sending invite...');
+                  // Collect emails based on current mode
+                  let emailsToSend = [];
+                  if (inviteMode === "individual") {
+                    if (!inviteEmail.trim()) return;
+                    emailsToSend = [inviteEmail.trim()];
+                  } else if (inviteMode === "multiple") {
+                    emailsToSend = inviteMultipleEmails.split(/[\n,;]+/).map(e => e.trim()).filter(e => e && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e));
+                    if (emailsToSend.length === 0) { setInviteMsg('❌ No valid emails found'); return; }
+                  } else if (inviteMode === "csv") {
+                    emailsToSend = inviteParsedEmails;
+                    if (emailsToSend.length === 0) { setInviteMsg('❌ Upload a CSV first'); return; }
+                  }
+
+                  setInviteMsg(`Sending invite${emailsToSend.length > 1 ? `s to ${emailsToSend.length} candidates` : ''}...`);
                   try {
                     const token = localStorage.getItem('token');
                     const payload = {
-                      candidate_email: inviteEmail,
                       role_id: inviteRole,
                       difficulty: inviteDiff
                     };
+                    if (emailsToSend.length === 1) {
+                      payload.candidate_email = emailsToSend[0];
+                    } else {
+                      payload.candidate_emails = emailsToSend;
+                    }
                     if (inviteAssessmentId) payload.assessment_id = parseInt(inviteAssessmentId);
                     const res = await fetch('https://threatready-db.onrender.com/api/b2b/invite', {
                       method: 'POST',
@@ -3985,16 +4344,26 @@ export default function ThreatReady() {
                     });
                     const data = await res.json();
                     if (data.candidate || data.candidates) {
-                      setInviteMsg('✅ Invite sent to ' + inviteEmail);
+                      const sentCount = data.candidates ? data.candidates.length : 1;
+                      setInviteMsg(`✅ Invite${sentCount > 1 ? `s` : ''} sent to ${sentCount} candidate${sentCount > 1 ? 's' : ''}`);
+                      // Clear form
                       setInviteEmail('');
+                      setInviteMultipleEmails('');
+                      setInviteCsvFile(null);
+                      setInviteParsedEmails([]);
                       loadB2bData();
-                      setTimeout(() => setInviteMsg(''), 3000);
+                      setTimeout(() => setInviteMsg(''), 4000);
                     } else {
                       setInviteMsg('❌ ' + (data.error || 'Failed'));
                     }
                   } catch (e) { setInviteMsg('❌ ' + e.message); }
                 }}>
-                📧 Send Assessment Invite
+                📧 {inviteMode === "individual" ? "Send Assessment Invite" :
+                     inviteMode === "multiple" ? `Send Invites to All${(() => {
+                       const emails = inviteMultipleEmails.split(/[\n,;]+/).map(e => e.trim()).filter(e => e && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e));
+                       return emails.length > 0 ? ` (${emails.length})` : '';
+                     })()}` :
+                     `Send Invites to All${inviteParsedEmails.length > 0 ? ` (${inviteParsedEmails.length})` : ''}`}
               </button>
             </div>
 
