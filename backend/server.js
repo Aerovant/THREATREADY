@@ -2685,14 +2685,43 @@ app.get('/api/daily-challenge', auth, async (req, res) => {
     if (challenge.rows.length === 0) {
       const roles = ['cloud', 'devsecops', 'appsec', 'netsec', 'soc'];
       const role = roles[new Date().getDay() % roles.length];
-      const Anthropic = require('@anthropic-ai/sdk');
-      const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
-      const msg = await anthropic.messages.create({
-        model: MODEL_QUESTIONS,
-        max_tokens: 400,
-        messages: [{ role: 'user', content: `Generate a quick 2-minute cybersecurity daily challenge question for ${role} role. Respond ONLY in JSON: {"question":"the question text","role":"${role}","difficulty":"beginner","points":50,"hint":"one short hint"}` }]
-      });
-      const q = JSON.parse(msg.content[0].text.replace(/\`\`\`json|\`\`\`/g, '').trim());
+
+      // Fallback question (used if AI call or JSON parse fails)
+      const fallbackByRole = {
+        cloud: { question: 'What is the principle of least privilege in cloud IAM and why is it critical?', hint: 'Think about blast radius and over-permissioned roles.' },
+        devsecops: { question: 'Explain the purpose of SAST vs DAST in a CI/CD pipeline.', hint: 'One inspects code, the other runs it.' },
+        appsec: { question: 'What is OWASP A01: Broken Access Control and how would you prevent it?', hint: 'Think about authorization checks on every request.' },
+        netsec: { question: 'Describe how network segmentation reduces the impact of a breach.', hint: 'Think about lateral movement.' },
+        soc: { question: 'What is the MITRE ATT&CK framework and how does it help a SOC analyst?', hint: 'Think about tactics, techniques, and procedures.' }
+      };
+
+      let q = { ...fallbackByRole[role], role, difficulty: 'beginner', points: 50 };
+
+      // Try AI generation — fall back to hardcoded if anything fails
+      try {
+        const Anthropic = require('@anthropic-ai/sdk');
+        const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+        const msg = await anthropic.messages.create({
+          model: MODEL_QUESTIONS,
+          max_tokens: 400,
+          messages: [{ role: 'user', content: `Generate a quick 2-minute cybersecurity daily challenge question for ${role} role. Respond ONLY in JSON: {"question":"the question text","role":"${role}","difficulty":"beginner","points":50,"hint":"one short hint"}` }]
+        });
+        const raw = msg.content[0]?.text || '';
+        const cleaned = raw.replace(/```json|```/g, '').trim();
+        const parsed = JSON.parse(cleaned);
+        if (parsed.question && parsed.question.length > 10) {
+          q = {
+            question: parsed.question,
+            role: parsed.role || role,
+            difficulty: parsed.difficulty || 'beginner',
+            points: parsed.points || 50,
+            hint: parsed.hint || ''
+          };
+        }
+      } catch (aiErr) {
+        console.error('Daily challenge AI generation failed (using fallback):', aiErr.message);
+      }
+
       const inserted = await pool.query(
         `INSERT INTO daily_challenges (question, role_id, difficulty, points, hint, challenge_date, is_active, created_at)
          VALUES ($1,$2,$3,$4,$5,$6,true,NOW()) RETURNING *`,

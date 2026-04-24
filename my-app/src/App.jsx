@@ -77,8 +77,23 @@ const TOTAL_SC = Object.values(SCENARIOS).reduce((s, a) => s + a.length, 0);
 const CSS = `
 :root{--bg:#0a0e1a;--s1:#111827;--s2:#1a1f2e;--s3:#252b3b;--ac:#00e5ff;--ok:#00e096;--wn:#ffab40;--dn:#ff5252;--tx1:#e8eaf6;--tx2:#8890b0;--tx3:#5a6380;--bd:#1e2536}
 *{margin:0;padding:0;box-sizing:border-box}
-body{background:var(--bg);color:var(--tx1);font-family:'Inter','Segoe UI',system-ui,sans-serif;overflow-x:hidden}
+body{background:var(--bg);color:var(--tx1);font-family:'Inter','Segoe UI',system-ui,sans-serif;overflow-x:hidden;font-size:15px}
 .app{min-height:100vh;position:relative;overflow-x:hidden;width:100%}
+/* Readability: bump up very small fonts across the app */
+.lbl{font-size:13px !important;letter-spacing:1.5px}
+.tag{font-size:12px !important}
+.statlbl{font-size:12px !important}
+.diff{font-size:12px !important}
+.badge-card{font-size:12px !important}
+.nav-tab{font-size:14px !important}
+.sidebar-item{font-size:15px !important}
+.heatmap-cell{font-size:11px !important}
+.toast{font-size:14px !important}
+/* Scale up tiny inline fonts (8-11px) for readability — React outputs 'font-size: 8px' style */
+[style*="font-size: 8px"]{font-size:11px !important}
+[style*="font-size: 9px"]{font-size:11px !important}
+[style*="font-size: 10px"]{font-size:12px !important}
+[style*="font-size: 11px"]{font-size:13px !important}
 .gridbg{position:fixed;inset:0;background-image:linear-gradient(rgba(0,229,255,.03) 1px,transparent 1px),linear-gradient(90deg,rgba(0,229,255,.03) 1px,transparent 1px);background-size:60px 60px;pointer-events:none;z-index:0}
 .scanbar{position:fixed;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,transparent,var(--ac),transparent);animation:scan 4s infinite;z-index:100;opacity:.6}
 @keyframes scan{0%{transform:translateX(-100%)}100%{transform:translateX(100%)}}
@@ -409,17 +424,27 @@ function ArchDiagram({ nodes, edges, zoom = 1 }) {
           {edges?.map((e, i) => {
             const from = nodes.find(n => n.id === e.f), to = nodes.find(n => n.id === e.t);
             if (!from || !to) return null;
+            const mx = (from.x + to.x) / 2 + 50;
+            const my = (from.y + to.y) / 2 + 20;
+            const label = e.l || '';
+            // Approx label width: 6.5px per char + padding
+            const labelWidth = label.length * 6.5 + 12;
             return <g key={i}>
-              <line x1={from.x + 40} y1={from.y + 20} x2={to.x + 40} y2={to.y + 20} stroke={e.a ? "#ff525280" : "#ffffff20"} strokeWidth={e.a ? 2 : 1} markerEnd={e.a ? "url(#ah)" : ""} />
-              <text x={(from.x + to.x) / 2 + 40} y={(from.y + to.y) / 2 + 16} fill="#8890b0" fontSize="7" textAnchor="middle">{e.l}</text>
+              <line x1={from.x + 50} y1={from.y + 25} x2={to.x + 50} y2={to.y + 25} stroke={e.a ? "#ff525280" : "#ffffff20"} strokeWidth={e.a ? 2 : 1} markerEnd={e.a ? "url(#ah)" : ""} />
+              {label && (
+                <>
+                  <rect x={mx - labelWidth / 2} y={my - 11} width={labelWidth} height={15} rx={3} fill="#0a0e1a" stroke="#1e2536" strokeWidth={0.5} opacity={0.95} />
+                  <text x={mx} y={my} fill="#a8b0c8" fontSize="11" fontWeight="600" textAnchor="middle">{label}</text>
+                </>
+              )}
             </g>;
           })}
           {nodes.map(n => {
             const t = NT[n.t] || NT.compute;
             return <g key={n.id}>
-              <rect x={n.x} y={n.y} width={80} height={40} rx={6} fill={t.bg} stroke={t.bd} strokeWidth={1.5} />
-              <text x={n.x + 40} y={n.y + 16} fill="#fff" fontSize="12" textAnchor="middle">{t.ic}</text>
-              <text x={n.x + 40} y={n.y + 30} fill="#ccc" fontSize="7" textAnchor="middle">{n.l}</text>
+              <rect x={n.x} y={n.y} width={100} height={50} rx={6} fill={t.bg} stroke={t.bd} strokeWidth={1.5} />
+              <text x={n.x + 50} y={n.y + 20} fill="#fff" fontSize="16" textAnchor="middle">{t.ic}</text>
+              <text x={n.x + 50} y={n.y + 38} fill="#e8eaf6" fontSize="11" fontWeight="600" textAnchor="middle">{n.l}</text>
             </g>;
           })}
         </svg>
@@ -640,7 +665,7 @@ export default function ThreatReady() {
     return saved ? JSON.parse(saved) : [];
   });
   const [selectedRoles, setSelectedRoles] = useState([]);
-  const [isPaid, setIsPaid] = useState(false);
+  const [isPaid, setIsPaid] = useState(() => localStorage.getItem('isPaid') === 'true');
   const [freeAttempts, setFreeAttempts] = useState(2);
   // Per-role attempts tracking for free trial (2 attempts per role)
   const [roleAttempts, setRoleAttempts] = useState(() => {
@@ -671,8 +696,8 @@ export default function ThreatReady() {
   const [interviewPersona, setInterviewPersona] = useState('standard');
   const [leaderboard, setLeaderboard] = useState([]);
   const [myRank, setMyRank] = useState(null);
-  const [dailyChallenge, setDailyChallenge] = useState(null);
-  const [dailyAnswered, setDailyAnswered] = useState(false);
+  const [dailyChallenge, setDailyChallenge] = useState(null);  const [dailyAnswered, setDailyAnswered] = useState(false);
+  const [dailyChallengeError, setDailyChallengeError] = useState(false);
   const [dailyAnswer, setDailyAnswer] = useState('');
   const [dailyResult, setDailyResult] = useState(null);
   const [dailyLoading, setDailyLoading] = useState(false);
@@ -681,6 +706,17 @@ export default function ThreatReady() {
   const [unreadCount, setUnreadCount] = useState(0);
   const [showNotifs, setShowNotifs] = useState(false);
   const [scenarioHistory, setScenarioHistory] = useState([]);
+  // Local in-memory session history (works for free trial users who have no backend account)
+  // Persisted to localStorage so data survives refresh
+  const [localSessionHistory, setLocalSessionHistory] = useState(() => {
+    try {
+      const saved = localStorage.getItem('cyberprep_local_sessions');
+      return saved ? JSON.parse(saved) : [];
+    } catch { return []; }
+  });
+  useEffect(() => {
+    localStorage.setItem('cyberprep_local_sessions', JSON.stringify(localSessionHistory));
+  }, [localSessionHistory]);
   const [activeDifficulty, setActiveDifficulty] = useState(null);
   const [scenario, setScenario] = useState(null);
   const [currentQ, setCurrentQ] = useState(null);
@@ -725,9 +761,20 @@ export default function ThreatReady() {
   const [resumeAiData, setResumeAiData] = useState(null); // {skills, recommended_difficulty, weak_areas, recommended_roles}
   const [readiness, setReadiness] = useState(null); // {overall_readiness, technical, communication, decision, total_sessions, has_data}
   const [jdText, setJdText] = useState("");
-  const [xp, setXp] = useState(0);
-  const [streak, setStreak] = useState(0);
-  const [completedScenarios, setCompletedScenarios] = useState([]);
+  const [xp, setXp] = useState(() => parseInt(localStorage.getItem('cyberprep_xp') || '0'));
+  const [streak, setStreak] = useState(() => parseInt(localStorage.getItem('cyberprep_streak') || '0'));
+  const [completedScenarios, setCompletedScenarios] = useState(() => {
+    try {
+      const saved = localStorage.getItem('cyberprep_completed_scenarios');
+      return saved ? JSON.parse(saved) : [];
+    } catch { return []; }
+  });
+  // Persist stats to localStorage
+  useEffect(() => { localStorage.setItem('cyberprep_xp', String(xp)); }, [xp]);
+  useEffect(() => { localStorage.setItem('cyberprep_streak', String(streak)); }, [streak]);
+  useEffect(() => {
+    localStorage.setItem('cyberprep_completed_scenarios', JSON.stringify(completedScenarios));
+  }, [completedScenarios]);
 
   // ── AUTH STATE ──
   const [authEmail, setAuthEmail] = useState("");
@@ -735,6 +782,8 @@ export default function ThreatReady() {
   const [authName, setAuthName] = useState("");
   const [authError, setAuthError] = useState("");
   const [agreeTerms, setAgreeTerms] = useState(false);
+  const [showAuthPassword, setShowAuthPassword] = useState(false);
+  const [showNewPassword, setShowNewPassword] = useState(false);
 
   // ── DASHBOARD TABS ──
   const [dashTab, setDashTab] = useState(() => localStorage.getItem('cyberprep_tab') || "home");
@@ -824,14 +873,9 @@ export default function ThreatReady() {
       completed_at: c.completed_at
     }));
 
-  // ── SCORE HISTORY (mock) ──
-  const [scoreHistory] = useState([
-    { date: "Week 1", cloud: 5.2, devsecops: 4.8, appsec: 5.0 },
-    { date: "Week 2", cloud: 5.8, devsecops: 5.5, appsec: 5.3 },
-    { date: "Week 3", cloud: 6.5, devsecops: 6.0, appsec: 6.1 },
-    { date: "Week 4", cloud: 7.2, devsecops: 6.8, appsec: 6.5 },
-    { date: "Week 5", cloud: 7.8, devsecops: 7.2, appsec: 7.0 }
-  ]);
+  // ── SCORE HISTORY (computed from real session history in useEffect) ──
+  const [scoreHistory, setScoreHistory] = useState([]);
+  const [weaknessTracker, setWeaknessTracker] = useState([]);
 
   // ── BADGES ──
   // Badges are earned per role by completing assessments with Bronze+ score
@@ -846,15 +890,32 @@ export default function ThreatReady() {
     const token = localStorage.getItem('token');
     if (!token) return;
 
-    // Check subscription on restore
+// Check subscription on restore
     fetch('https://threatready-db.onrender.com/api/auth/me', {
       headers: { 'Authorization': `Bearer ${token}` }
     }).then(r => r.json()).then(data => {
-      if (data.user?.plan === 'paid' && data.user?.status === 'active') {
-        setIsPaid(true);
-        setSubscribedRoles(JSON.parse(data.user.subscribed_roles || '[]'));
+      // Safe parser: subscribed_roles may be a string OR already an array (jsonb)
+      const raw = data.user?.subscribed_roles;
+      let roles = [];
+      if (Array.isArray(raw)) roles = raw;
+      else if (typeof raw === 'string') {
+        try { const v = JSON.parse(raw); roles = Array.isArray(v) ? v : []; } catch (e) { roles = []; }
       }
-    }).catch(() => { });
+      const isActivePaid = data.user?.plan === 'paid' && data.user?.status === 'active';
+      if (isActivePaid && roles.length > 0) {
+        setIsPaid(true);
+        setSubscribedRoles(roles);
+        localStorage.setItem('subscribedRoles', JSON.stringify(roles));
+        localStorage.setItem('isPaid', 'true');
+      } else {
+        setIsPaid(false);
+        setSubscribedRoles([]);
+        localStorage.removeItem('subscribedRoles');
+        localStorage.removeItem('isPaid');
+      }
+    }).catch(err => {
+      console.log('Subscription refresh failed, keeping cached values:', err?.message);
+    });
 
     fetch('https://threatready-db.onrender.com/api/scores', {
 
@@ -939,56 +1000,127 @@ export default function ThreatReady() {
   // Load leaderboard, notifications, daily challenge, scenario history
   const loadDashboardExtras = async () => {
     const token = localStorage.getItem('token');
-    if (!token) return;
-    try {
-      const [lbRes, notifRes, dcRes, histRes] = await Promise.all([
-        fetch('https://threatready-db.onrender.com/api/leaderboard', { headers: { 'Authorization': `Bearer ${token}` } }),
-        fetch('https://threatready-db.onrender.com/api/notifications', { headers: { 'Authorization': `Bearer ${token}` } }),
-        fetch('https://threatready-db.onrender.com/api/daily-challenge', { headers: { 'Authorization': `Bearer ${token}` } }),
-        fetch('https://threatready-db.onrender.com/api/scenario-history', { headers: { 'Authorization': `Bearer ${token}` } })
-      ]);
-      const lb = await lbRes.json();
-      const notif = await notifRes.json();
-      const dc = await dcRes.json();
-      const hist = await histRes.json();
-      if (lb.leaderboard) { setLeaderboard(lb.leaderboard); setMyRank(lb.my_rank); }
-      if (notif.notifications) { setNotifications(notif.notifications); setUnreadCount(notif.unread_count || 0); }
-      if (dc.challenge) { setDailyChallenge(dc.challenge); setDailyAnswered(dc.already_answered); if (dc.response) setDailyResult(dc.response); }
-      if (hist.history) {
-        setScenarioHistory(hist.history.map(h => h.scenario_id));
-
-        // ═══════════════════════════════════════════════════════════════
-        // COMPUTE REAL BADGES from scenario history
-        // For each role the user has completed, pick the HIGHEST score
-        // and map it to a tier (Platinum/Gold/Silver/Bronze)
-        // ═══════════════════════════════════════════════════════════════
-        const bestByRole = {};
-        hist.history.forEach(h => {
-          const score = parseFloat(h.score) || 0;
-          if (score < 4) return; // No badge for "Not Ready" scores
-          if (!bestByRole[h.role_id] || score > bestByRole[h.role_id].score) {
-            bestByRole[h.role_id] = { score, completed_at: h.completed_at };
-          }
-        });
-
-        const computedBadges = Object.entries(bestByRole).map(([role_id, data]) => {
-          const tier = data.score >= 8 ? "platinum"
-                     : data.score >= 7 ? "gold"
-                     : data.score >= 6 ? "silver"
-                     : "bronze";
-          const roleName = ROLES.find(r => r.id === role_id)?.name || role_id;
-          const tierLabel = tier.charAt(0).toUpperCase() + tier.slice(1);
-          return {
-            role: role_id,
-            tier,
-            name: `${tierLabel} ${roleName}`,
-            earned: data.completed_at ? data.completed_at.substring(0, 10) : ''
-          };
-        });
-        setBadges(computedBadges);
+    // Only fetch backend data if logged in
+    if (token) {
+      try {
+        const [lbRes, notifRes, dcRes, histRes] = await Promise.all([
+          fetch('https://threatready-db.onrender.com/api/leaderboard', { headers: { 'Authorization': `Bearer ${token}` } }),
+          fetch('https://threatready-db.onrender.com/api/notifications', { headers: { 'Authorization': `Bearer ${token}` } }),
+          fetch('https://threatready-db.onrender.com/api/daily-challenge', { headers: { 'Authorization': `Bearer ${token}` } }),
+          fetch('https://threatready-db.onrender.com/api/scenario-history', { headers: { 'Authorization': `Bearer ${token}` } })
+        ]);
+        const lb = await lbRes.json();
+        const notif = await notifRes.json();
+        const dc = await dcRes.json();
+        const hist = await histRes.json();
+        if (lb.leaderboard) { setLeaderboard(lb.leaderboard); setMyRank(lb.my_rank); }
+        if (notif.notifications) { setNotifications(notif.notifications); setUnreadCount(notif.unread_count || 0); }
+        if (dc.challenge) {
+          setDailyChallenge(dc.challenge);
+          setDailyAnswered(dc.already_answered);
+          setDailyChallengeError(false);
+          if (dc.response) setDailyResult(dc.response);
+        } else if (dc.error || !dc.challenge) {
+          // Backend returned error or no challenge → show error state
+          setDailyChallengeError(true);
+        }
+        if (hist.history) {
+          setScenarioHistory(hist.history.map(h => h.scenario_id));
+        }
+      } catch (e) {
+        console.log('Dashboard extras load error:', e.message);
+        setDailyChallengeError(true); // Network/fetch failure
       }
-    } catch (e) { console.log('Dashboard extras load error:', e.message); }
+    }
   };
+
+  // ═══════════════════════════════════════════════════════════════
+  // COMPUTE STATS (badges, score trends, weakness tracker)
+  // Works for BOTH logged-in users (backend history) AND free trial users (local history)
+  // ═══════════════════════════════════════════════════════════════
+  useEffect(() => {
+    // Pick whichever history source has data — logged in users get backend, free trial get local
+    const token = localStorage.getItem('token');
+    let sourceHistory = [];
+
+    if (token && scenarioHistory.length > 0) {
+      // For logged-in users: fetch fresh history with full data
+      fetch('https://threatready-db.onrender.com/api/scenario-history', {
+        headers: { 'Authorization': `Bearer ${token}` }
+      }).then(r => r.json()).then(data => {
+        if (data.history) computeStats(data.history);
+      }).catch(() => computeStats(localSessionHistory));
+    } else {
+      // Free trial user OR logged-in with no history: use local
+      computeStats(localSessionHistory);
+    }
+
+    function computeStats(history) {
+      if (!history || history.length === 0) {
+        setBadges([]);
+        setScoreHistory([]);
+        setWeaknessTracker([]);
+        return;
+      }
+
+      // ── Badges ──
+      const bestByRole = {};
+      history.forEach(h => {
+        const score = parseFloat(h.score) || 0;
+        if (score < 4) return;
+        if (!bestByRole[h.role_id] || score > bestByRole[h.role_id].score) {
+          bestByRole[h.role_id] = { score, completed_at: h.completed_at };
+        }
+      });
+      const computedBadges = Object.entries(bestByRole).map(([role_id, data]) => {
+        const tier = data.score >= 8 ? "platinum"
+                   : data.score >= 7 ? "gold"
+                   : data.score >= 6 ? "silver"
+                   : "bronze";
+        const roleName = ROLES.find(r => r.id === role_id)?.name || role_id;
+        const tierLabel = tier.charAt(0).toUpperCase() + tier.slice(1);
+        return {
+          role: role_id, tier,
+          name: `${tierLabel} ${roleName}`,
+          earned: data.completed_at ? String(data.completed_at).substring(0, 10) : ''
+        };
+      });
+      setBadges(computedBadges);
+
+      // ── Score Trends ──
+      const sortedHistory = [...history].sort((a, b) =>
+        new Date(a.completed_at || 0) - new Date(b.completed_at || 0)
+      );
+      const trendsData = sortedHistory.map((h, i) => {
+        const point = { date: `Attempt ${i + 1}` };
+        point[h.role_id] = parseFloat(h.score) || 0;
+        return point;
+      });
+      setScoreHistory(trendsData);
+
+      // ── Weakness Tracker ──
+      const scoresByRole = {};
+      history.forEach(h => {
+        const score = parseFloat(h.score) || 0;
+        if (!scoresByRole[h.role_id]) scoresByRole[h.role_id] = [];
+        scoresByRole[h.role_id].push({ score, completed_at: h.completed_at });
+      });
+      const weaknesses = Object.entries(scoresByRole).map(([roleId, attempts]) => {
+        const avg = attempts.reduce((s, a) => s + a.score, 0) / attempts.length;
+        let trend = "→";
+        if (attempts.length >= 2) {
+          const sorted = [...attempts].sort((a, b) => new Date(a.completed_at || 0) - new Date(b.completed_at || 0));
+          const first = sorted[0].score;
+          const last = sorted[sorted.length - 1].score;
+          if (last > first + 0.5) trend = "↑";
+          else if (last < first - 0.5) trend = "↓";
+        }
+        const roleName = ROLES.find(r => r.id === roleId)?.name || roleId;
+        return { area: roleName, avg: Math.round(avg * 10) / 10, trend, attempts: attempts.length };
+      }).sort((a, b) => a.avg - b.avg);
+      setWeaknessTracker(weaknesses);
+    }
+  }, [localSessionHistory, scenarioHistory]);
 
   useEffect(() => {
     if (view === 'dashboard' || view === 'b2b-dashboard') {
@@ -1618,6 +1750,20 @@ export default function ThreatReady() {
       setXp(p => p + earned);
       setCompletedScenarios(p => [...new Set([...p, scenario.id])]);
       setStreak(p => p + 1);
+
+      // Save to local session history (works for free trial users without backend account)
+      setLocalSessionHistory(p => [...p, {
+        scenario_id: scenario.id,
+        role_id: activeRole,
+        score: score,
+        communication_score: Math.round(avg(newEvals, "communication_score") * 10) / 10,
+        depth_score: Math.round(avg(newEvals, "depth_score") * 10) / 10,
+        decision_score: Math.round(avg(newEvals, "decision_score") * 10) / 10,
+        completed_at: new Date().toISOString(),
+        difficulty: activeDifficulty,
+        badge: score >= 8 ? "Platinum" : score >= 7 ? "Gold" : score >= 6 ? "Silver" : score >= 4 ? "Bronze" : "Not Ready"
+      }]);
+
       setLoading(false);
       // Always show results page first — even for trial-exhausted users
       // They can then click "View Subscription Options" button to go to trial-complete popup
@@ -1779,11 +1925,16 @@ export default function ThreatReady() {
     localStorage.removeItem('cyberprep_freetrial');
     localStorage.removeItem('trialRoles');
     localStorage.removeItem('cyberprep_session_start');
+    localStorage.removeItem('cyberprep_xp');
+    localStorage.removeItem('cyberprep_streak');
+    localStorage.removeItem('cyberprep_completed_scenarios');
+    localStorage.removeItem('cyberprep_local_sessions');
     setUser(null); setUserType('b2c'); setSettingsName('');
     setResumeText(''); setTargetRole(''); setExperienceLevel('');
     setResumeAiData(null); setReadiness(null);
     setXp(0); setStreak(0); setCompletedScenarios([]);
-    setBadges([]);
+    setBadges([]); setScoreHistory([]); setWeaknessTracker([]);
+    setLocalSessionHistory([]);
     setIsPaid(false); setFreeAttempts(2); setRoleAttempts({});
     setSubscribedRoles([]); setTrialRoles([]);
     setView("landing");
@@ -2121,7 +2272,18 @@ export default function ThreatReady() {
   if (view === "auth") return (
     <div className="app"><style>{CSS}</style><div className="scanbar" /><div className="gridbg" />
       <ToastContainer />
-      <button className="home-btn" onClick={() => { setView("landing"); setAuthStep("form"); }}>← Back</button>
+      <button className="home-btn" onClick={() => {
+        // If user is in free trial, go back to dashboard instead of landing (preserves session)
+        const isFreeTrialUser = localStorage.getItem('cyberprep_freetrial') === 'true';
+        if (isFreeTrialUser) {
+          setView("dashboard");
+          setAuthStep("form");
+          setAuthError("");
+        } else {
+          setView("landing");
+          setAuthStep("form");
+        }
+      }}>← Back</button>
       <div className="page" style={{ display: "flex", alignItems: "center", justifyContent: "center", minHeight: "100vh" }}>
         <div className="card fadeUp" style={{ width: "100%", maxWidth: 420, padding: 36 }}>
 
@@ -2135,7 +2297,40 @@ export default function ThreatReady() {
             {authError && <div style={{ background: "rgba(255,82,82,.1)", border: "1px solid rgba(255,82,82,.3)", borderRadius: 8, padding: 10, fontSize: 11, color: "var(--dn)", marginBottom: 14 }}>{authError}</div>}
             {authMode === "signup" && <input className="input" placeholder="Full Name" value={authName} onChange={e => setAuthName(e.target.value)} style={{ marginBottom: 10 }} />}
             <input className="input" type="email" placeholder="Email" value={authEmail} onChange={e => setAuthEmail(e.target.value)} style={{ marginBottom: 10 }} />
-            <input className="input" type="password" placeholder="Password (min 8 characters)" value={authPassword} onChange={e => setAuthPassword(e.target.value)} style={{ marginBottom: 4 }} />
+            <div style={{ position: "relative", marginBottom: 4 }}>
+              <input
+                className="input"
+                type={showAuthPassword ? "text" : "password"}
+                placeholder="Password (min 8 characters)"
+                value={authPassword}
+                onChange={e => setAuthPassword(e.target.value)}
+                style={{ paddingRight: 44 }}
+              />
+              <button
+                type="button"
+                onClick={() => setShowAuthPassword(v => !v)}
+                aria-label={showAuthPassword ? "Hide password" : "Show password"}
+                style={{
+                  position: "absolute", right: 10, top: "50%", transform: "translateY(-50%)",
+                  background: "transparent", border: "none", cursor: "pointer",
+                  padding: 6, color: "var(--tx2)",
+                  display: "flex", alignItems: "center", justifyContent: "center"
+                }}>
+                {showAuthPassword ? (
+                  /* Eye with slash = hide */
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24" />
+                    <line x1="1" y1="1" x2="23" y2="23" />
+                  </svg>
+                ) : (
+                  /* Open eye = show */
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+                    <circle cx="12" cy="12" r="3" />
+                  </svg>
+                )}
+              </button>
+            </div>
             {authMode === "signup" && <PasswordStrength password={authPassword} />}
             {authMode === "signup" && (
               <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 11, color: "var(--tx2)", marginBottom: 14, cursor: "pointer" }}>
@@ -2371,10 +2566,38 @@ export default function ThreatReady() {
                 onChange={e => setForgotCode(e.target.value.replace(/\D/g, ""))}
                 style={{ marginBottom: 10, textAlign: "center", fontSize: 22, letterSpacing: 10, fontFamily: "monospace", fontWeight: 700 }}
               />
-              <input className="input" type="password" placeholder="New password (min 8 characters)"
-                value={newPassword} onChange={e => setNewPassword(e.target.value)}
-                style={{ marginBottom: 14 }}
-              />
+              <div style={{ position: "relative", marginBottom: 14 }}>
+                <input
+                  className="input"
+                  type={showNewPassword ? "text" : "password"}
+                  placeholder="New password (min 8 characters)"
+                  value={newPassword}
+                  onChange={e => setNewPassword(e.target.value)}
+                  style={{ paddingRight: 44 }}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowNewPassword(v => !v)}
+                  aria-label={showNewPassword ? "Hide password" : "Show password"}
+                  style={{
+                    position: "absolute", right: 10, top: "50%", transform: "translateY(-50%)",
+                    background: "transparent", border: "none", cursor: "pointer",
+                    padding: 6, color: "var(--tx2)",
+                    display: "flex", alignItems: "center", justifyContent: "center"
+                  }}>
+                  {showNewPassword ? (
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24" />
+                      <line x1="1" y1="1" x2="23" y2="23" />
+                    </svg>
+                  ) : (
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+                      <circle cx="12" cy="12" r="3" />
+                    </svg>
+                  )}
+                </button>
+              </div>
               <button className="btn bp" style={{ width: "100%", padding: 13 }}
                 disabled={forgotCode.length < 6 || newPassword.length < 8 || forgotLoading}
                 onClick={async () => {
@@ -2542,29 +2765,9 @@ export default function ThreatReady() {
           </div>
         </div>
 
-        {/* Attack Chain */}
-        <div style={{ marginBottom: 12 }}>
-          <button className="btn bs" style={{ fontSize: 10, padding: "4px 12px" }} onClick={() => setShowChain(!showChain)}>
-            {showChain ? "Hide" : "Show"} Attack Chain (MITRE)
-          </button>
-          {showChain && (
-            <div style={{ marginTop: 8 }}>
-              {scenario.ch?.map((c, i) => (
-                <div key={i} style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 4 }}>
-                  <span className="mono" style={{ fontSize: 8, color: "var(--dn)", minWidth: 70 }}>{c.m}</span>
-                  <span style={{ fontSize: 11, fontWeight: 600 }}>{c.s}:</span>
-                  <span style={{ fontSize: 10, color: "var(--tx2)" }}>{c.d}</span>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-
-
         {/* Current Question */}
 
 
-        <div className="card fadeUp" style={{ marginBottom: 14, padding: 18, borderColor: "var(--ac)", position: "relative" }}></div>
         <div className="card fadeUp" style={{ marginBottom: 14, padding: 18, borderColor: "var(--ac)", position: "relative" }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 8 }}>
             <div className="tag">{currentQ.ca}</div>
@@ -2977,16 +3180,18 @@ export default function ThreatReady() {
             </div>
 
             {/* Daily Challenge */}
-            <div className="card fadeUp" style={{ marginBottom: 16, padding: 16, borderColor: dailyAnswered ? "var(--ok)" : "var(--wn)", background: dailyAnswered ? "rgba(0,224,150,.03)" : "rgba(255,171,64,.03)" }}>
+            <div className="card fadeUp" style={{ marginBottom: 16, padding: 16, borderColor: dailyAnswered ? "var(--ok)" : dailyChallengeError ? "var(--dn)" : "var(--wn)", background: dailyAnswered ? "rgba(0,224,150,.03)" : dailyChallengeError ? "rgba(255,82,82,.03)" : "rgba(255,171,64,.03)" }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                 <div>
-                  <div style={{ fontSize: 12, fontWeight: 700, color: dailyAnswered ? "var(--ok)" : "var(--wn)" }}>
-                    {dailyAnswered ? "✅ Daily Challenge Complete!" : "🎯 Daily Challenge"}
+                  <div style={{ fontSize: 12, fontWeight: 700, color: dailyAnswered ? "var(--ok)" : dailyChallengeError ? "var(--dn)" : "var(--wn)" }}>
+                    {dailyAnswered ? "✅ Daily Challenge Complete!" : dailyChallengeError ? "⚠️ Daily Challenge Unavailable" : "🎯 Daily Challenge"}
                   </div>
                   <div style={{ fontSize: 11, color: "var(--tx2)", marginTop: 4 }}>
                     {dailyChallenge
                       ? `${dailyChallenge.role_id?.toUpperCase()} · ${dailyChallenge.difficulty} · +${dailyChallenge.points} XP`
-                      : "Loading today's challenge..."}
+                      : dailyChallengeError
+                        ? "Could not load today's challenge. Please try again."
+                        : "Loading today's challenge..."}
                   </div>
                   {dailyAnswered && dailyResult && (
                     <div style={{ fontSize: 10, color: "var(--ok)", marginTop: 2 }}>
@@ -2998,6 +3203,12 @@ export default function ThreatReady() {
                   <button className="btn bp" style={{ fontSize: 10, padding: "6px 14px" }}
                     onClick={() => setShowDailyModal(true)}>
                     Start →
+                  </button>
+                )}
+                {dailyChallengeError && (
+                  <button className="btn bs" style={{ fontSize: 10, padding: "6px 14px" }}
+                    onClick={() => { setDailyChallengeError(false); loadDashboardExtras(); }}>
+                    🔄 Retry
                   </button>
                 )}
               </div>
@@ -3144,7 +3355,7 @@ export default function ThreatReady() {
           {/* ── C2: SCORES & HISTORY ── */}
           {dashTab === "scores" && (<>
             <div style={{ opacity: !user ? 0.4 : 1, pointerEvents: !user ? "none" : "auto" }}>
-            {completedScenarios.length === 0 ? (
+            {(completedScenarios.length === 0 && localSessionHistory.length === 0) ? (
               <div className="card fadeUp" style={{ padding: 48, textAlign: "center" }}>
                 <div style={{ fontSize: 56, marginBottom: 16 }}>📊</div>
                 <h3 style={{ fontSize: 18, fontWeight: 800, marginBottom: 8 }}>No Scores Yet</h3>
@@ -3158,22 +3369,42 @@ export default function ThreatReady() {
             ) : (<>
               <div className="lbl" style={{ marginBottom: 12 }}>SCORE TRENDS</div>
               <div className="card fadeUp" style={{ padding: 16, marginBottom: 16 }}>
-                <ResponsiveContainer width="100%" height={200}>
-                  <LineChart data={scoreHistory}>
-                    <XAxis dataKey="date" tick={{ fill: "#8890b0", fontSize: 10 }} />
-                    <YAxis domain={[0, 10]} tick={{ fill: "#8890b0", fontSize: 10 }} />
-                    <Tooltip contentStyle={{ background: "#1a1f2e", border: "1px solid #252b3b", borderRadius: 8 }} />
-                    <Line type="monotone" dataKey="cloud" stroke="#00d4ff" strokeWidth={2} dot={{ r: 3 }} name="Cloud" />
-                    <Line type="monotone" dataKey="devsecops" stroke="#ff6b35" strokeWidth={2} dot={{ r: 3 }} name="DevSecOps" />
-                    <Line type="monotone" dataKey="appsec" stroke="#a855f7" strokeWidth={2} dot={{ r: 3 }} name="AppSec" />
-                  </LineChart>
-                </ResponsiveContainer>
+                {scoreHistory.length === 0 ? (
+                  <div style={{ textAlign: "center", padding: "40px 20px", color: "var(--tx3)", fontSize: 12 }}>
+                    No assessments completed yet. Your score trends will appear here after your first attempt.
+                  </div>
+                ) : (
+                  <ResponsiveContainer width="100%" height={200}>
+                    <LineChart data={scoreHistory}>
+                      <XAxis dataKey="date" tick={{ fill: "#8890b0", fontSize: 10 }} />
+                      <YAxis domain={[0, 10]} tick={{ fill: "#8890b0", fontSize: 10 }} />
+                      <Tooltip contentStyle={{ background: "#1a1f2e", border: "1px solid #252b3b", borderRadius: 8 }} />
+                      {(() => {
+                        // Dynamically build lines for each role the user has attempted
+                        const roleKeys = [...new Set(scoreHistory.flatMap(d => Object.keys(d).filter(k => k !== 'date')))];
+                        const colors = { cloud: "#00d4ff", devsecops: "#ff6b35", appsec: "#a855f7", netsec: "#00e096", dfir: "#ffab40", grc: "#ff5252", prodsec: "#ffc107", secarch: "#9c27b0", soc: "#2196f3", threat: "#e91e63", red: "#f44336", blue: "#4caf50" };
+                        return roleKeys.map(key => (
+                          <Line key={key} type="monotone" dataKey={key} stroke={colors[key] || "#00d4ff"} strokeWidth={2} dot={{ r: 4 }} name={ROLES.find(r => r.id === key)?.name || key} connectNulls />
+                        ));
+                      })()}
+                    </LineChart>
+                  </ResponsiveContainer>
+                )}
+                {scoreHistory.length === 1 && (
+                  <div style={{ fontSize: 10, color: "var(--tx3)", marginTop: 8, textAlign: "center" }}>
+                    💡 Complete more assessments to see trends over time
+                  </div>
+                )}
               </div>
               <div className="lbl" style={{ marginBottom: 8 }}>WEAKNESS TRACKER</div>
               <div className="card fadeUp" style={{ padding: 16 }}>
-                {[{ area: "Incident Response", avg: 5.2, trend: "↓" }, { area: "Detection Engineering", avg: 5.8, trend: "↑" }, { area: "IAM Security", avg: 7.5, trend: "→" }].map((w, i) => (
-                  <div key={i} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 0", borderBottom: i < 2 ? "1px solid var(--bd)" : "none" }}>
-                    <span style={{ fontSize: 12 }}>{w.area}</span>
+                {weaknessTracker.length === 0 ? (
+                  <div style={{ textAlign: "center", padding: "20px 10px", color: "var(--tx3)", fontSize: 12 }}>
+                    Complete assessments across different roles to see your strengths and weaknesses.
+                  </div>
+                ) : weaknessTracker.map((w, i) => (
+                  <div key={i} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 0", borderBottom: i < weaknessTracker.length - 1 ? "1px solid var(--bd)" : "none" }}>
+                    <span style={{ fontSize: 12 }}>{w.area} <span style={{ fontSize: 9, color: "var(--tx3)" }}>({w.attempts} attempt{w.attempts !== 1 ? "s" : ""})</span></span>
                     <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
                       <span className="mono" style={{ fontSize: 12, color: w.avg >= 7 ? "var(--ok)" : w.avg >= 5 ? "var(--wn)" : "var(--dn)" }}>{w.avg}/10</span>
                       <span style={{ fontSize: 14 }}>{w.trend}</span>
@@ -3451,12 +3682,22 @@ export default function ThreatReady() {
                     ))}
                   </div>
 
-                  <button className="btn bp" style={{ width: "100%", padding: 14, fontSize: 14 }}
+                  <button
+                    className="btn bp"
+                    disabled={!activeRole}
+                    title={!activeRole ? "Please select a role first" : ""}
+                    style={{
+                      width: "100%",
+                      padding: 14,
+                      fontSize: 14,
+                      cursor: !activeRole ? "not-allowed" : "pointer",
+                      opacity: !activeRole ? 0.5 : 1
+                    }}
                     onClick={() => {
                       if (!activeRole) { showToast('Please select a role first', 'warning'); return; }
                       setView("difficulty");
                     }}>
-                    Start {interviewPersona.charAt(0).toUpperCase() + interviewPersona.slice(1)} Interview →
+                    {!activeRole ? "Select a role to continue" : `Start ${interviewPersona.charAt(0).toUpperCase() + interviewPersona.slice(1)} Interview →`}
                   </button>
                 </div>
 
