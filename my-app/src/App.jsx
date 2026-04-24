@@ -858,6 +858,23 @@ export default function ThreatReady() {
   const [slackWebhook, setSlackWebhook] = useState('');
   const [zapierWebhook, setZapierWebhook] = useState('');
   const [integrationMsg, setIntegrationMsg] = useState('');
+
+  // ═══════════════════════════════════════════════════════════════
+  // B2B HR SUBSCRIPTION STATE (separate from B2C isPaid)
+  // ═══════════════════════════════════════════════════════════════
+  const [isHrPaid, setIsHrPaid] = useState(() => localStorage.getItem('cyberprep_hr_paid') === 'true');
+  const [showHrSubscribeModal, setShowHrSubscribeModal] = useState(false);
+  const [hrBillingPeriod, setHrBillingPeriod] = useState('monthly'); // 'monthly' or 'yearly'
+  const [hrModalCompanyName, setHrModalCompanyName] = useState('');
+  const [hrModalTeamSize, setHrModalTeamSize] = useState('11-50');
+
+  // HR pricing tiers (PLACEHOLDER — adjust later)
+  const HR_PRICING = {
+    '1-10':    { monthly: 4999,  yearly: 47990,  label: '1-10 engineers' },
+    '11-50':   { monthly: 19999, yearly: 191990, label: '11-50 engineers' },
+    '51-100':  { monthly: 49999, yearly: 479990, label: '51-100 engineers' },
+    '100+':    { monthly: 0,     yearly: 0,      label: '100+ engineers (Contact Sales)', contactSales: true }
+  };
   const [newAssessJD, setNewAssessJD] = useState('');
   const [jdAnalysis, setJdAnalysis] = useState(null);
   const [jdAnalyzing, setJdAnalyzing] = useState(false);
@@ -912,6 +929,11 @@ export default function ThreatReady() {
         setSubscribedRoles([]);
         localStorage.removeItem('subscribedRoles');
         localStorage.removeItem('isPaid');
+      }
+      // HR subscription (separate from B2C)
+      if (data.user?.hr_subscription_active === true || data.user?.hr_paid === true) {
+        setIsHrPaid(true);
+        localStorage.setItem('cyberprep_hr_paid', 'true');
       }
     }).catch(err => {
       console.log('Subscription refresh failed, keeping cached values:', err?.message);
@@ -1929,6 +1951,7 @@ export default function ThreatReady() {
     localStorage.removeItem('cyberprep_streak');
     localStorage.removeItem('cyberprep_completed_scenarios');
     localStorage.removeItem('cyberprep_local_sessions');
+    localStorage.removeItem('cyberprep_hr_paid');
     setUser(null); setUserType('b2c'); setSettingsName('');
     setResumeText(''); setTargetRole(''); setExperienceLevel('');
     setResumeAiData(null); setReadiness(null);
@@ -1937,6 +1960,7 @@ export default function ThreatReady() {
     setLocalSessionHistory([]);
     setIsPaid(false); setFreeAttempts(2); setRoleAttempts({});
     setSubscribedRoles([]); setTrialRoles([]);
+    setIsHrPaid(false);
     setView("landing");
   };
   const logout = () => showConfirm('Are you sure you want to logout?', doLogout);
@@ -4261,11 +4285,26 @@ export default function ThreatReady() {
             <div>
               <h2 style={{ fontSize: 22, fontWeight: 800 }}>{companyName || user?.name || 'Hiring Dashboard'}</h2>
               <div style={{ fontSize: 12, color: "var(--tx2)", marginTop: 3 }}>
-                {isPaid ? `${subscribedRoles.length} track${subscribedRoles.length !== 1 ? "s" : ""}` : `Free trial · ${subscribedRoles.reduce((s, rid) => s + getRemainingAttempts(rid), 0)} attempts left`}
+                {isHrPaid
+                  ? `✓ Active subscription · ${teamSize} engineers`
+                  : `Free trial · ${subscribedRoles.reduce((s, rid) => s + getRemainingAttempts(rid), 0)} attempts left`}
                 {" · "}{candidates.length} candidates · {assessments.length} assessments
               </div>
             </div>
             <div style={{ display: "flex", gap: 6, alignItems: "center", position: "relative" }}>
+              {/* ═══ Subscribe to Unlock button (only for free trial HR users) ═══ */}
+              {!isHrPaid && (
+                <button
+                  className="btn bp"
+                  style={{ padding: "6px 14px", fontSize: 11, fontWeight: 700, marginRight: 4 }}
+                  onClick={() => {
+                    setHrModalCompanyName(companyName || '');
+                    setHrModalTeamSize(teamSize || '11-50');
+                    setShowHrSubscribeModal(true);
+                  }}>
+                  🔓 Subscribe to Unlock More Features
+                </button>
+              )}
               <span className="tag" style={{ padding: "5px 12px" }}>⚡ {xp} XP</span>
 
               {/* Notification Bell */}
@@ -4341,6 +4380,9 @@ export default function ThreatReady() {
               </div>
             ))}
           </div>
+
+          {/* ═══ FADE OVERLAY for free trial HR users ═══ */}
+          <div style={{ opacity: isHrPaid ? 1 : 0.4, pointerEvents: isHrPaid ? "auto" : "none", transition: "opacity 0.3s" }}>
 
           {/* ── B1: HOME ── */}
           {b2bTab === "overview" && (<>
@@ -5657,6 +5699,223 @@ ${evals.map((ev, i) => {
               )}
             </div>
           </>)}
+
+          {/* ═══ CLOSE fade overlay wrapper ═══ */}
+          </div>
+
+          {/* ═══════════════════════════════════════════════════════════════ */}
+          {/* HR SUBSCRIBE MODAL */}
+          {/* ═══════════════════════════════════════════════════════════════ */}
+          {showHrSubscribeModal && (
+            <div style={{
+              position: "fixed", inset: 0, background: "rgba(0,0,0,0.8)", zIndex: 9999,
+              display: "flex", alignItems: "center", justifyContent: "center",
+              backdropFilter: "blur(6px)", padding: 20
+            }} onClick={() => setShowHrSubscribeModal(false)}>
+              <div onClick={e => e.stopPropagation()} style={{
+                background: "#0f1420", border: "1px solid var(--ac)", borderRadius: 14,
+                padding: 28, maxWidth: 540, width: "100%",
+                boxShadow: "0 20px 60px rgba(0,0,0,.9), 0 0 40px rgba(0,229,255,0.2)"
+              }}>
+                {/* Header */}
+                <div style={{ textAlign: "center", marginBottom: 20 }}>
+                  <div style={{ fontSize: 32, marginBottom: 8 }}>🚀</div>
+                  <h2 style={{ fontSize: 20, fontWeight: 800, marginBottom: 6 }}>Unlock Full HR Suite</h2>
+                  <p style={{ fontSize: 12, color: "var(--tx2)" }}>
+                    Create unlimited assessments, invite candidates, access team skill analytics and more.
+                  </p>
+                </div>
+
+                {/* Company Name */}
+                <div style={{ marginBottom: 14 }}>
+                  <div style={{ fontSize: 11, color: "var(--tx3)", marginBottom: 6, fontWeight: 600 }}>COMPANY NAME</div>
+                  <input
+                    className="input"
+                    placeholder="e.g. Acme Security Inc."
+                    value={hrModalCompanyName}
+                    onChange={e => setHrModalCompanyName(e.target.value)}
+                  />
+                </div>
+
+                {/* Team Size */}
+                <div style={{ marginBottom: 14 }}>
+                  <div style={{ fontSize: 11, color: "var(--tx3)", marginBottom: 6, fontWeight: 600 }}>TEAM SIZE</div>
+                  <select
+                    className="input"
+                    value={hrModalTeamSize}
+                    onChange={e => setHrModalTeamSize(e.target.value)}>
+                    {Object.entries(HR_PRICING).map(([key, v]) => (
+                      <option key={key} value={key}>{v.label}</option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Billing Period Toggle */}
+                <div style={{ marginBottom: 16 }}>
+                  <div style={{ fontSize: 11, color: "var(--tx3)", marginBottom: 6, fontWeight: 600 }}>BILLING CYCLE</div>
+                  <div style={{ display: "flex", gap: 8 }}>
+                    <button
+                      className={`btn ${hrBillingPeriod === "monthly" ? "bp" : "bs"}`}
+                      style={{ flex: 1, padding: "8px 14px", fontSize: 11 }}
+                      onClick={() => setHrBillingPeriod("monthly")}>
+                      Monthly
+                    </button>
+                    <button
+                      className={`btn ${hrBillingPeriod === "yearly" ? "bp" : "bs"}`}
+                      style={{ flex: 1, padding: "8px 14px", fontSize: 11 }}
+                      onClick={() => setHrBillingPeriod("yearly")}>
+                      Yearly <span style={{ fontSize: 9, color: "var(--ok)" }}>· SAVE 20%</span>
+                    </button>
+                  </div>
+                </div>
+
+                {/* Price Display */}
+                {(() => {
+                  const tier = HR_PRICING[hrModalTeamSize];
+                  if (!tier) return null;
+                  if (tier.contactSales) {
+                    return (
+                      <div style={{ padding: 16, background: "rgba(255,171,64,.06)", border: "1px solid rgba(255,171,64,.3)", borderRadius: 10, marginBottom: 16, textAlign: "center" }}>
+                        <div style={{ fontSize: 14, fontWeight: 700, color: "var(--wn)", marginBottom: 4 }}>Contact Sales</div>
+                        <div style={{ fontSize: 10, color: "var(--tx3)" }}>We'll reach out with a custom quote for enterprise teams</div>
+                      </div>
+                    );
+                  }
+                  const price = hrBillingPeriod === "yearly" ? tier.yearly : tier.monthly;
+                  const monthlyEquiv = hrBillingPeriod === "yearly" ? Math.round(tier.yearly / 12) : tier.monthly;
+                  return (
+                    <div style={{ padding: 16, background: "rgba(0,229,255,.05)", border: "1px solid var(--ac)", borderRadius: 10, marginBottom: 16, textAlign: "center" }}>
+                      <div className="mono" style={{ fontSize: 24, fontWeight: 800, color: "var(--ac)" }}>
+                        ₹{price.toLocaleString('en-IN')}
+                        <span style={{ fontSize: 12, color: "var(--tx2)", fontWeight: 600 }}>/{hrBillingPeriod === "yearly" ? "yr" : "mo"}</span>
+                      </div>
+                      {hrBillingPeriod === "yearly" && (
+                        <div style={{ fontSize: 10, color: "var(--ok)", marginTop: 4 }}>
+                          That's ₹{monthlyEquiv.toLocaleString('en-IN')}/month effective
+                        </div>
+                      )}
+                    </div>
+                  );
+                })()}
+
+                {/* Feature list */}
+                <div style={{ marginBottom: 16, padding: "10px 12px", background: "rgba(0,224,150,.04)", border: "1px solid rgba(0,224,150,.2)", borderRadius: 8 }}>
+                  <div style={{ fontSize: 10, color: "var(--ok)", fontWeight: 700, marginBottom: 6 }}>INCLUDED</div>
+                  <div style={{ fontSize: 11, color: "var(--tx2)", lineHeight: 1.9 }}>
+                    ✓ Unlimited candidate assessments<br/>
+                    ✓ Bulk invites (CSV + paste multiple)<br/>
+                    ✓ Team skill heatmap &amp; benchmarks<br/>
+                    ✓ Full reports &amp; PDF exports<br/>
+                    ✓ Integrations (Slack, Zapier)
+                  </div>
+                </div>
+
+                {/* Action buttons */}
+                <div style={{ display: "flex", gap: 8 }}>
+                  <button className="btn bs" style={{ flex: 1, padding: 12 }} onClick={() => setShowHrSubscribeModal(false)}>
+                    Cancel
+                  </button>
+                  <button
+                    className="btn bp"
+                    style={{ flex: 2, padding: 12, fontWeight: 700 }}
+                    disabled={!hrModalCompanyName.trim()}
+                    onClick={async () => {
+                      const tier = HR_PRICING[hrModalTeamSize];
+                      if (!tier) return;
+
+                      // Save company info to Settings-backed state for display
+                      setCompanyName(hrModalCompanyName.trim());
+                      setTeamSize(hrModalTeamSize);
+
+                      // Contact Sales path
+                      if (tier.contactSales) {
+                        showToast('Thanks! Our team will reach out to ' + (user?.email || 'you') + ' within 24 hours.', 'info');
+                        setShowHrSubscribeModal(false);
+                        // Optional: call backend to notify sales
+                        try {
+                          const token = localStorage.getItem('token');
+                          await fetch('https://threatready-db.onrender.com/api/feedback', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json', ...(token ? { 'Authorization': `Bearer ${token}` } : {}) },
+                            body: JSON.stringify({ message: `[HR ENTERPRISE LEAD] Company: ${hrModalCompanyName}, Team size: 100+, Contact: ${user?.email || 'N/A'}` })
+                          });
+                        } catch(e) {}
+                        return;
+                      }
+
+                      // Razorpay payment path
+                      const price = hrBillingPeriod === "yearly" ? tier.yearly : tier.monthly;
+                      try {
+                        const token = localStorage.getItem('token');
+                        const res = await fetch('https://threatready-db.onrender.com/api/payment/create-order', {
+                          method: 'POST',
+                          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                          body: JSON.stringify({
+                            hr_subscription: true,
+                            company_name: hrModalCompanyName.trim(),
+                            team_size: hrModalTeamSize,
+                            billing_period: hrBillingPeriod,
+                            amount_override: price
+                          })
+                        });
+                        const order = await res.json();
+                        if (!res.ok) { showToast(order.error || 'Payment error', 'error'); return; }
+
+                        const options = {
+                          key: order.key_id,
+                          amount: order.amount || (price * 100),
+                          currency: order.currency || 'INR',
+                          name: 'ThreatReady HR',
+                          description: `${hrModalCompanyName} · ${tier.label} · ${hrBillingPeriod}`,
+                          order_id: order.order_id,
+                          handler: async (response) => {
+                            const verifyRes = await fetch('https://threatready-db.onrender.com/api/payment/verify', {
+                              method: 'POST',
+                              headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                              body: JSON.stringify({
+                                razorpay_order_id: response.razorpay_order_id,
+                                razorpay_payment_id: response.razorpay_payment_id,
+                                razorpay_signature: response.razorpay_signature,
+                                hr_subscription: true,
+                                company_name: hrModalCompanyName.trim(),
+                                team_size: hrModalTeamSize,
+                                billing_period: hrBillingPeriod
+                              })
+                            });
+                            const verifyData = await verifyRes.json();
+                            if (verifyData.success) {
+                              setIsHrPaid(true);
+                              localStorage.setItem('cyberprep_hr_paid', 'true');
+                              setShowHrSubscribeModal(false);
+                              showToast('🎉 Subscription activated! All HR features unlocked.', 'success');
+                            } else {
+                              showToast('Payment verification failed. Contact support.', 'error');
+                            }
+                          },
+                          prefill: {
+                            name: hrModalCompanyName.trim() || user?.name || '',
+                            email: user?.email || '',
+                            contact: ''
+                          },
+                          remember_customer: false,
+                          theme: { color: '#00e5ff' }
+                        };
+                        const rzp = new window.Razorpay(options);
+                        rzp.open();
+                      } catch (e) {
+                        showToast('Payment failed: ' + e.message, 'error');
+                      }
+                    }}>
+                    {HR_PRICING[hrModalTeamSize]?.contactSales ? '📧 Contact Sales' : '🔒 Subscribe & Pay'}
+                  </button>
+                </div>
+
+                <div style={{ fontSize: 9, color: "var(--tx3)", textAlign: "center", marginTop: 10 }}>
+                  Secure payment via Razorpay · Cancel anytime
+                </div>
+              </div>
+            </div>
+          )}
 
         </div></div>
       </div>

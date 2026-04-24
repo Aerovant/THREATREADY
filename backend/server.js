@@ -142,8 +142,20 @@ app.post('/api/auth/login', async (req, res) => {
 // ═══════════════════════════════════════════════════════════════
 app.get('/api/auth/me', auth, async (req, res) => {
   try {
+    // Ensure HR subscription columns exist (safe migration)
+    try {
+      await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS hr_subscription_active BOOLEAN DEFAULT false`);
+      await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS hr_company_name TEXT`);
+      await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS hr_team_size VARCHAR(20)`);
+      await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS hr_billing_period VARCHAR(20)`);
+      await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS hr_subscribed_at TIMESTAMP`);
+      await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS hr_subscription_end TIMESTAMP`);
+    } catch (migErr) { /* columns already exist */ }
+
     const result = await pool.query(
       `SELECT u.id, u.name, u.email, u.created_at,
+              u.hr_subscription_active, u.hr_company_name, u.hr_team_size,
+              u.hr_billing_period, u.hr_subscribed_at, u.hr_subscription_end,
               s.plan, s.status, s.trial_end, s.subscribed_roles,
               s.billing_period, s.end_date
        FROM users u
@@ -159,10 +171,21 @@ app.get('/api/auth/me', auth, async (req, res) => {
       await pool.query("ALTER TABLE payments ADD COLUMN IF NOT EXISTS billing_period VARCHAR(10) DEFAULT 'monthly'");
     } catch (migErr) { /* columns already exist */ }
 
+    // Check HR subscription expiry
+    const userRow = result.rows[0];
+    if (userRow.hr_subscription_active && userRow.hr_subscription_end) {
+      const endDate = new Date(userRow.hr_subscription_end);
+      if (endDate < new Date()) {
+        // Expired — deactivate
+        await pool.query(`UPDATE users SET hr_subscription_active = false WHERE id = $1`, [req.user.id]);
+        userRow.hr_subscription_active = false;
+      }
+    }
+
     const stats = await pool.query('SELECT * FROM user_stats WHERE user_id = $1', [req.user.id]);
 
     res.json({
-      user: result.rows[0],
+      user: userRow,
       stats: stats.rows[0] || { total_xp: 0, streak: 0, completed_scenarios: '[]' }
     });
   } catch (e) {
@@ -196,7 +219,49 @@ const calculatePrice = (roleCount, billingPeriod = 'monthly') => {
 app.post('/api/payment/create-order', auth, async (req, res) => {
   console.log('--- PAYMENT ORDER ---');
   try {
-    const { roles, billing_period = 'monthly' } = req.body;
+    const { roles, billing_period = 'monthly', hr_subscription, company_name, team_size, amount_override } = req.body;
+
+    // ═══════════════════════════════════════════════════════════════
+    // HR SUBSCRIPTION FLOW (B2B) — separate from B2C role-based pricing
+    // ═══════════════════════════════════════════════════════════════
+    if (hr_subscription) {
+      if (!company_name || !team_size) {
+        return res.status(400).json({ error: 'Company name and team size are required' });
+      }
+      if (!amount_override || amount_override <= 0) {
+        return res.status(400).json({ error: 'Invalid HR subscription amount' });
+      }
+      const hrAmount = amount_override * 100; // Razorpay uses paise
+
+      const order = await razorpay.orders.create({
+        amount: hrAmount,
+        currency: 'INR',
+        receipt: `hr_${req.user.id}_${Date.now()}`,
+        notes: {
+          user_id: String(req.user.id),
+          hr_subscription: 'true',
+          company_name: String(company_name).substring(0, 50),
+          team_size: String(team_size),
+          billing_period
+        }
+      });
+
+      console.log('HR Order created:', order.id, 'Amount: INR', amount_override, 'Team:', team_size, 'Period:', billing_period);
+      return res.json({
+        order_id: order.id,
+        amount: order.amount,
+        currency: order.currency,
+        key_id: process.env.RAZORPAY_KEY_ID,
+        hr_subscription: true,
+        company_name,
+        team_size,
+        billing_period
+      });
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    // B2C ROLE-BASED FLOW (existing behavior, unchanged)
+    // ═══════════════════════════════════════════════════════════════
     if (!roles || !roles.length) {
       return res.status(400).json({ error: 'Select at least one role' });
     }
@@ -229,19 +294,98 @@ app.post('/api/payment/create-order', auth, async (req, res) => {
 app.post('/api/payment/verify', auth, async (req, res) => {
   console.log('--- PAYMENT VERIFY ---');
   try {
-    const { razorpay_order_id, razorpay_payment_id, razorpay_signature, roles, billing_period = 'monthly' } = req.body;
+    const { razorpay_order_id, razorpay_payment_id, razorpay_signature, roles, billing_period = 'monthly', hr_subscription, company_name, team_size } = req.body;
 
     // ─── Basic input validation ───
     if (!razorpay_order_id || !razorpay_payment_id || !razorpay_signature) {
       console.error('Missing Razorpay fields:', { razorpay_order_id, razorpay_payment_id, razorpay_signature });
       return res.status(400).json({ error: 'Missing payment fields from gateway' });
     }
-    if (!roles || !roles.length) {
-      return res.status(400).json({ error: 'No roles in verification request' });
-    }
     if (!process.env.RAZORPAY_KEY_SECRET) {
       console.error('CRITICAL: RAZORPAY_KEY_SECRET env var missing on server!');
       return res.status(500).json({ error: 'Server misconfigured — contact support' });
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    // HR SUBSCRIPTION VERIFICATION (B2B)
+    // ═══════════════════════════════════════════════════════════════
+    if (hr_subscription) {
+      if (!company_name || !team_size) {
+        return res.status(400).json({ error: 'Missing HR subscription data' });
+      }
+
+      const expectedSig = crypto
+        .createHmac('sha256', process.env.RAZORPAY_KEY_SECRET)
+        .update(`${razorpay_order_id}|${razorpay_payment_id}`)
+        .digest('hex');
+
+      console.log('=== HR PAYMENT VERIFY ===');
+      console.log('Company:', company_name, '· Team:', team_size, '· Period:', billing_period);
+      console.log('Match?:', expectedSig === razorpay_signature);
+
+      if (expectedSig !== razorpay_signature) {
+        console.error('HR signature mismatch for user', req.user.id, 'order', razorpay_order_id);
+        return res.status(400).json({
+          error: 'Payment verification failed — signature mismatch. Your card was charged; contact support with order id ' + razorpay_order_id
+        });
+      }
+
+      // Ensure HR subscription columns exist on users table
+      await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS hr_subscription_active BOOLEAN DEFAULT false`).catch(()=>{});
+      await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS hr_company_name TEXT`).catch(()=>{});
+      await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS hr_team_size VARCHAR(20)`).catch(()=>{});
+      await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS hr_billing_period VARCHAR(20)`).catch(()=>{});
+      await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS hr_subscribed_at TIMESTAMP`).catch(()=>{});
+      await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS hr_subscription_end TIMESTAMP`).catch(()=>{});
+
+      // Compute end date based on billing period
+      const endDate = new Date();
+      if (billing_period === 'yearly') {
+        endDate.setFullYear(endDate.getFullYear() + 1);
+      } else {
+        endDate.setMonth(endDate.getMonth() + 1);
+      }
+
+      // Update user with HR subscription info
+      await pool.query(
+        `UPDATE users
+         SET hr_subscription_active = true,
+             hr_company_name = $1,
+             hr_team_size = $2,
+             hr_billing_period = $3,
+             hr_subscribed_at = NOW(),
+             hr_subscription_end = $4
+         WHERE id = $5`,
+        [company_name, team_size, billing_period, endDate, req.user.id]
+      );
+
+      // Log payment record
+      try {
+        await pool.query(
+          `INSERT INTO payments (user_id, razorpay_order_id, razorpay_payment_id, amount, currency, status, roles, billing_period, created_at)
+           VALUES ($1, $2, $3, 0, 'INR', 'captured', $4, $5, NOW())`,
+          [req.user.id, razorpay_order_id, razorpay_payment_id, JSON.stringify(['hr_subscription_' + team_size]), billing_period]
+        );
+      } catch (logErr) {
+        console.error('Could not log HR payment row (non-fatal):', logErr.message);
+      }
+
+      console.log('HR SUBSCRIPTION ACTIVATED for user:', req.user.id, 'until', endDate.toISOString().split('T')[0]);
+      return res.json({
+        success: true,
+        hr_subscription: true,
+        company_name,
+        team_size,
+        billing_period,
+        valid_until: endDate
+      });
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    // B2C ROLE-BASED VERIFICATION (existing behavior, unchanged)
+    // ═══════════════════════════════════════════════════════════════
+    if (!roles || !roles.length) {
+      return res.status(400).json({ error: 'No roles in verification request' });
     }
 
     // ─── Compute expected signature ───
