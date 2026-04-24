@@ -159,32 +159,10 @@ app.get('/api/auth/me', auth, async (req, res) => {
       await pool.query("ALTER TABLE payments ADD COLUMN IF NOT EXISTS billing_period VARCHAR(10) DEFAULT 'monthly'");
     } catch (migErr) { /* columns already exist */ }
 
-    // ─── Auto-expire: if end_date has passed, mark subscription expired ───
-    const sub = result.rows[0];
-    if (sub.plan === 'paid' && sub.status === 'active' && sub.end_date) {
-      const now = new Date();
-      const endDate = new Date(sub.end_date);
-      if (now > endDate) {
-        try {
-          await pool.query(
-            `UPDATE subscriptions SET status = 'expired' WHERE user_id = $1`,
-            [req.user.id]
-          );
-          console.log(`Subscription expired for user ${req.user.id} (end_date ${endDate.toISOString().split('T')[0]} < now)`);
-        } catch (expErr) {
-          console.error('Expiry update failed:', expErr.message);
-        }
-        // Reflect expiry in the response so frontend revokes access immediately
-        sub.status = 'expired';
-        sub.plan = 'free';
-        sub.subscribed_roles = '[]';
-      }
-    }
-
     const stats = await pool.query('SELECT * FROM user_stats WHERE user_id = $1', [req.user.id]);
 
     res.json({
-      user: sub,
+      user: result.rows[0],
       stats: stats.rows[0] || { total_xp: 0, streak: 0, completed_scenarios: '[]' }
     });
   } catch (e) {
