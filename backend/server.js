@@ -231,17 +231,71 @@ app.post('/api/payment/verify', auth, async (req, res) => {
   try {
     const { razorpay_order_id, razorpay_payment_id, razorpay_signature, roles, billing_period = 'monthly' } = req.body;
 
+    // ─── Basic input validation ───
+    if (!razorpay_order_id || !razorpay_payment_id || !razorpay_signature) {
+      console.error('Missing Razorpay fields:', { razorpay_order_id, razorpay_payment_id, razorpay_signature });
+      return res.status(400).json({ error: 'Missing payment fields from gateway' });
+    }
+    if (!roles || !roles.length) {
+      return res.status(400).json({ error: 'No roles in verification request' });
+    }
+    if (!process.env.RAZORPAY_KEY_SECRET) {
+      console.error('CRITICAL: RAZORPAY_KEY_SECRET env var missing on server!');
+      return res.status(500).json({ error: 'Server misconfigured — contact support' });
+    }
+
+    // ─── Compute expected signature ───
     const expectedSignature = crypto
       .createHmac('sha256', process.env.RAZORPAY_KEY_SECRET)
       .update(`${razorpay_order_id}|${razorpay_payment_id}`)
       .digest('hex');
 
+    // ─── Debug logging (safe — shows prefixes only) ───
+    console.log('=== PAYMENT VERIFY DEBUG ===');
+    console.log('KEY_ID prefix:', process.env.RAZORPAY_KEY_ID?.substring(0, 12));
+    console.log('SECRET length:', process.env.RAZORPAY_KEY_SECRET?.length);
+    console.log('Order ID:', razorpay_order_id);
+    console.log('Payment ID:', razorpay_payment_id);
+    console.log('Received sig:', razorpay_signature?.substring(0, 16) + '...');
+    console.log('Computed sig:', expectedSignature.substring(0, 16) + '...');
+    console.log('Match?:', expectedSignature === razorpay_signature);
+
+    const amountPaise = calculatePrice(roles.length, billing_period) * 100;
+
+    // ─── Signature mismatch → log the attempt, reject ───
     if (expectedSignature !== razorpay_signature) {
-      console.log('Signature mismatch!');
-      return res.status(400).json({ error: 'Payment verification failed' });
+      console.error('Signature mismatch for user', req.user.id, 'order', razorpay_order_id);
+      try {
+        await pool.query(
+          `INSERT INTO payments (user_id, razorpay_order_id, razorpay_payment_id, amount, currency, status, roles, billing_period, created_at)
+           VALUES ($1, $2, $3, $4, 'INR', 'verification_failed', $5, $6, NOW())`,
+          [req.user.id, razorpay_order_id, razorpay_payment_id, amountPaise, JSON.stringify(roles), billing_period]
+        );
+      } catch (logErr) {
+        console.error('Could not log failed verification:', logErr.message);
+      }
+      return res.status(400).json({ error: 'Payment verification failed — signature mismatch. Your card was charged; contact support with order id ' + razorpay_order_id });
     }
 
-    // Set end date based on billing period
+    // ─── Signature OK. Record the payment FIRST (most critical — never lose a paid payment) ───
+    let paymentRowId = null;
+    try {
+      const payRes = await pool.query(
+        `INSERT INTO payments (user_id, razorpay_order_id, razorpay_payment_id, amount, currency, status, payment_method, roles, billing_period, created_at)
+         VALUES ($1, $2, $3, $4, 'INR', 'captured', 'razorpay', $5, $6, NOW())
+         RETURNING id`,
+        [req.user.id, razorpay_order_id, razorpay_payment_id, amountPaise, JSON.stringify(roles), billing_period]
+      );
+      paymentRowId = payRes.rows[0]?.id;
+      console.log('Payment row saved, id:', paymentRowId);
+    } catch (dbErr) {
+      // DO NOT return error to user — they paid. Log loudly and keep going.
+      console.error('⚠️ PAYMENT CAPTURED BUT DB INSERT FAILED:', dbErr.message);
+      console.error('User:', req.user.id, 'Order:', razorpay_order_id, 'Payment:', razorpay_payment_id);
+      // TODO: alert admin via email/slack so payment can be reconciled manually
+    }
+
+    // ─── Compute subscription end date ───
     const endDate = new Date();
     if (billing_period === 'yearly') {
       endDate.setFullYear(endDate.getFullYear() + 1);
@@ -249,26 +303,29 @@ app.post('/api/payment/verify', auth, async (req, res) => {
       endDate.setMonth(endDate.getMonth() + 1);
     }
 
-    await pool.query(
-      `INSERT INTO subscriptions (user_id, plan, status, subscribed_roles, payment_id, start_date, end_date, billing_period, created_at)
-       VALUES ($1, 'paid', 'active', $2, $3, NOW(), $4, $5, NOW())
-       ON CONFLICT (user_id) DO UPDATE SET
-         plan = 'paid', status = 'active', subscribed_roles = $2,
-         payment_id = $3, end_date = $4, billing_period = $5`,
-      [req.user.id, JSON.stringify(roles), razorpay_payment_id, endDate, billing_period]
-    );
+    // ─── Activate / extend subscription ───
+    try {
+      await pool.query(
+        `INSERT INTO subscriptions (user_id, plan, status, subscribed_roles, payment_id, start_date, end_date, billing_period, created_at)
+         VALUES ($1, 'paid', 'active', $2, $3, NOW(), $4, $5, NOW())
+         ON CONFLICT (user_id) DO UPDATE SET
+           plan = 'paid', status = 'active', subscribed_roles = $2,
+           payment_id = $3, end_date = $4, billing_period = $5`,
+        [req.user.id, JSON.stringify(roles), razorpay_payment_id, endDate, billing_period]
+      );
+    } catch (subErr) {
+      console.error('⚠️ SUBSCRIPTION UPSERT FAILED (payment was captured):', subErr.message);
+      return res.status(500).json({
+        error: 'Payment received but subscription activation failed. Contact support with payment id ' + razorpay_payment_id,
+        payment_id: razorpay_payment_id
+      });
+    }
 
-    // Save payment record
-    await pool.query(
-      'INSERT INTO payments (user_id, razorpay_order_id, razorpay_payment_id, amount, status, roles, billing_period, created_at) VALUES ($1, $2, $3, $4, $5, $6, $7, NOW())',
-      [req.user.id, razorpay_order_id, razorpay_payment_id, calculatePrice(roles.length, billing_period) * 100, 'captured', JSON.stringify(roles), billing_period]
-    );
-
-    console.log('PAYMENT VERIFIED! Subscription activated for user:', req.user.id, 'Period:', billing_period, 'Until:', endDate.toISOString().split('T')[0]);
+    console.log('✅ PAYMENT VERIFIED! Subscription activated for user:', req.user.id, 'Period:', billing_period, 'Until:', endDate.toISOString().split('T')[0]);
     res.json({ success: true, subscribed_roles: roles, valid_until: endDate, billing_period });
   } catch (e) {
-    console.error('Payment verify error:', e.message);
-    res.status(500).json({ error: 'Payment verification error' });
+    console.error('Payment verify error:', e.message, e.stack);
+    res.status(500).json({ error: 'Payment verification error: ' + e.message });
   }
 });
 
