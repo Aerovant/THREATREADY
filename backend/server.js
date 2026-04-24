@@ -303,6 +303,38 @@ app.post('/api/payment/verify', auth, async (req, res) => {
       endDate.setMonth(endDate.getMonth() + 1);
     }
 
+    // ─── Merge newly purchased roles with any existing active roles ───
+    // Without this, paying for a 2nd role would wipe out the 1st.
+    let mergedRoles = [...roles];
+    try {
+      const existing = await pool.query(
+        'SELECT subscribed_roles, status, end_date FROM subscriptions WHERE user_id = $1',
+        [req.user.id]
+      );
+      if (existing.rows[0]) {
+        const row = existing.rows[0];
+        // Only merge if the existing subscription is still active (not expired)
+        const stillActive = row.status === 'active' &&
+                            row.end_date &&
+                            new Date(row.end_date) > new Date();
+        if (stillActive) {
+          let prevRoles = [];
+          try {
+            prevRoles = typeof row.subscribed_roles === 'string'
+              ? JSON.parse(row.subscribed_roles || '[]')
+              : (row.subscribed_roles || []);
+          } catch (e) { prevRoles = []; }
+          // Union: keep existing + add new, no duplicates
+          mergedRoles = [...new Set([...prevRoles, ...roles])];
+          console.log(`Merging roles. Existing: ${JSON.stringify(prevRoles)} + New: ${JSON.stringify(roles)} → ${JSON.stringify(mergedRoles)}`);
+        } else {
+          console.log('Previous subscription expired/inactive — starting fresh with new roles only');
+        }
+      }
+    } catch (mergeErr) {
+      console.error('Role merge lookup failed (using new roles only):', mergeErr.message);
+    }
+
     // ─── Activate / extend subscription ───
     try {
       await pool.query(
@@ -311,7 +343,7 @@ app.post('/api/payment/verify', auth, async (req, res) => {
          ON CONFLICT (user_id) DO UPDATE SET
            plan = 'paid', status = 'active', subscribed_roles = $2,
            payment_id = $3, end_date = $4, billing_period = $5`,
-        [req.user.id, JSON.stringify(roles), razorpay_payment_id, endDate, billing_period]
+        [req.user.id, JSON.stringify(mergedRoles), razorpay_payment_id, endDate, billing_period]
       );
     } catch (subErr) {
       console.error('⚠️ SUBSCRIPTION UPSERT FAILED (payment was captured):', subErr.message);
@@ -321,8 +353,8 @@ app.post('/api/payment/verify', auth, async (req, res) => {
       });
     }
 
-    console.log('✅ PAYMENT VERIFIED! Subscription activated for user:', req.user.id, 'Period:', billing_period, 'Until:', endDate.toISOString().split('T')[0]);
-    res.json({ success: true, subscribed_roles: roles, valid_until: endDate, billing_period });
+    console.log('✅ PAYMENT VERIFIED! Subscription activated for user:', req.user.id, 'Period:', billing_period, 'Until:', endDate.toISOString().split('T')[0], 'Total roles:', mergedRoles.length);
+    res.json({ success: true, subscribed_roles: mergedRoles, valid_until: endDate, billing_period });
   } catch (e) {
     console.error('Payment verify error:', e.message, e.stack);
     res.status(500).json({ error: 'Payment verification error: ' + e.message });
