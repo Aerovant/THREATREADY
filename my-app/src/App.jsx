@@ -1,7 +1,14 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { RadarChart, PolarGrid, PolarAngleAxis, Radar, ResponsiveContainer, LineChart, Line, XAxis, YAxis, Tooltip, BarChart, Bar } from "recharts";
 import { SCENARIOS } from './cyberprep-database.js';
-import.meta.env.VITE_ANTHROPIC_API_KEY
+
+// ═══════════════════════════════════════════════════════════════
+// BACKEND API URL — single source of truth
+// Override in production with VITE_API_URL env var on your host
+// ═══════════════════════════════════════════════════════════════
+const API = (typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.VITE_API_URL)
+  ? import.meta.env.VITE_API_URL.replace(/\/$/, '')
+  : `${API}`;
 
 /* ═══════════════════════════════════════════════════════════════
    CYBERPREP v4 — Attack Reasoning Lab (COMPLETE)
@@ -328,7 +335,7 @@ function FileUpload({ onUpload, label }) {
         const formData = new FormData();
         formData.append('resume', f);
         const token = localStorage.getItem('token');
-        const res = await fetch('https://threatready-db.onrender.com/api/resume/extract', {
+        const res = await fetch(`${API}/api/resume/extract`, {
           method: 'POST',
           headers: { 'Authorization': `Bearer ${token}` },
           body: formData
@@ -345,7 +352,7 @@ function FileUpload({ onUpload, label }) {
 
       // Send to backend for AI extraction
       const resumeToken = localStorage.getItem('token');
-      const resumeResp = await fetch("https://threatready-db.onrender.com/api/resume/parse-text", {
+      const resumeResp = await fetch(`${API}/api/resume/parse-text`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -846,17 +853,52 @@ export default function ThreatReady() {
     const token = localStorage.getItem('token');
     if (!token) return;
 
-    // Check subscription on restore
-    fetch('https://threatready-db.onrender.com/api/auth/me', {
+    // ─── Instant restore from localStorage (shows UI before network) ───
+    try {
+      const cachedRoles = localStorage.getItem('subscribedRoles');
+      const cachedIsPaid = localStorage.getItem('isPaid') === 'true';
+      if (cachedRoles) {
+        const parsed = JSON.parse(cachedRoles);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          setSubscribedRoles(parsed);
+          setIsPaid(cachedIsPaid);
+        }
+      }
+    } catch (e) { /* bad cache — ignore */ }
+
+    // ─── Safe parser (handles both jsonb-as-array and string cases) ───
+    const parseRoles = (raw) => {
+      if (!raw) return [];
+      if (Array.isArray(raw)) return raw;
+      try {
+        const v = JSON.parse(raw);
+        return Array.isArray(v) ? v : [];
+      } catch (e) { return []; }
+    };
+
+    // ─── Refresh subscription from backend (source of truth) ───
+    fetch(`${API}/api/auth/me`, {
       headers: { 'Authorization': `Bearer ${token}` }
     }).then(r => r.json()).then(data => {
-      if (data.user?.plan === 'paid' && data.user?.status === 'active') {
+      const isActivePaid = data.user?.plan === 'paid' && data.user?.status === 'active';
+      const roles = parseRoles(data.user?.subscribed_roles);
+      if (isActivePaid && roles.length > 0) {
         setIsPaid(true);
-        setSubscribedRoles(JSON.parse(data.user.subscribed_roles || '[]'));
+        setSubscribedRoles(roles);
+        localStorage.setItem('subscribedRoles', JSON.stringify(roles));
+        localStorage.setItem('isPaid', 'true');
+      } else {
+        // Server explicitly says not paid — clear stale cache
+        setIsPaid(false);
+        setSubscribedRoles([]);
+        localStorage.removeItem('subscribedRoles');
+        localStorage.removeItem('isPaid');
       }
-    }).catch(() => { });
+    }).catch(err => {
+      console.log('Subscription refresh failed (keeping cache):', err?.message);
+    });
 
-    fetch('https://threatready-db.onrender.com/api/scores', {
+    fetch(`${API}/api/scores`, {
 
       headers: { 'Authorization': `Bearer ${token}` }
     })
@@ -872,13 +914,25 @@ export default function ThreatReady() {
             setCompletedScenarios(sc);
           } catch (e) { }
         }
+        // ── Build badges from earned skill scores ──
+        if (Array.isArray(data.scores)) {
+          const earned = data.scores
+            .filter(s => s.badge_level && s.badge_level !== 'Not Ready')
+            .map(s => ({
+              role: s.role_id,
+              tier: String(s.badge_level).toLowerCase(),
+              name: `${(ROLES.find(r => r.id === s.role_id)?.name) || s.role_id} ${s.badge_level}`,
+              earned: s.updated_at ? String(s.updated_at).substring(0, 10) : null
+            }));
+          setBadges(earned);
+        }
       })
 
 
       .catch(err => console.log('Dashboard load error:', err));
 
     // Load profile data
-    fetch('https://threatready-db.onrender.com/api/profile', {
+    fetch(`${API}/api/profile`, {
       headers: { 'Authorization': `Bearer ${token}` }
     })
       .then(r => r.json())
@@ -890,7 +944,7 @@ export default function ThreatReady() {
       .catch(err => console.log('Profile load error:', err));
 
     // Load Interview Readiness Score (real, computed from completed sessions)
-    fetch('https://threatready-db.onrender.com/api/readiness', {
+    fetch(`${API}/api/readiness`, {
       headers: { 'Authorization': `Bearer ${token}` }
     })
       .then(r => r.json())
@@ -907,9 +961,9 @@ export default function ThreatReady() {
     setB2bLoading(true);
     try {
       const [sr, cr, ar] = await Promise.all([
-        fetch('https://threatready-db.onrender.com/api/b2b/stats', { headers: { 'Authorization': `Bearer ${token}` } }),
-        fetch('https://threatready-db.onrender.com/api/b2b/candidates', { headers: { 'Authorization': `Bearer ${token}` } }),
-        fetch('https://threatready-db.onrender.com/api/b2b/assessments', { headers: { 'Authorization': `Bearer ${token}` } })
+        fetch(`${API}/api/b2b/stats`, { headers: { 'Authorization': `Bearer ${token}` } }),
+        fetch(`${API}/api/b2b/candidates`, { headers: { 'Authorization': `Bearer ${token}` } }),
+        fetch(`${API}/api/b2b/assessments`, { headers: { 'Authorization': `Bearer ${token}` } })
       ]);
       const stats = await sr.json(); if (!stats.error) setB2bStats(stats);
       const cands = await cr.json(); if (cands.candidates) setCandidates(cands.candidates);
@@ -922,7 +976,7 @@ export default function ThreatReady() {
       loadB2bData();
       const token = localStorage.getItem('token');
       if (token) {
-        fetch('https://threatready-db.onrender.com/api/b2b/settings', {
+        fetch(`${API}/api/b2b/settings`, {
           headers: { 'Authorization': `Bearer ${token}` }
         }).then(r => r.json()).then(data => {
           if (data.settings) {
@@ -942,10 +996,10 @@ export default function ThreatReady() {
     if (!token) return;
     try {
       const [lbRes, notifRes, dcRes, histRes] = await Promise.all([
-        fetch('https://threatready-db.onrender.com/api/leaderboard', { headers: { 'Authorization': `Bearer ${token}` } }),
-        fetch('https://threatready-db.onrender.com/api/notifications', { headers: { 'Authorization': `Bearer ${token}` } }),
-        fetch('https://threatready-db.onrender.com/api/daily-challenge', { headers: { 'Authorization': `Bearer ${token}` } }),
-        fetch('https://threatready-db.onrender.com/api/scenario-history', { headers: { 'Authorization': `Bearer ${token}` } })
+        fetch(`${API}/api/leaderboard`, { headers: { 'Authorization': `Bearer ${token}` } }),
+        fetch(`${API}/api/notifications`, { headers: { 'Authorization': `Bearer ${token}` } }),
+        fetch(`${API}/api/daily-challenge`, { headers: { 'Authorization': `Bearer ${token}` } }),
+        fetch(`${API}/api/scenario-history`, { headers: { 'Authorization': `Bearer ${token}` } })
       ]);
       const lb = await lbRes.json();
       const notif = await notifRes.json();
@@ -996,7 +1050,7 @@ export default function ThreatReady() {
       // Load user settings (privacy preferences)
       const token = localStorage.getItem('token');
       if (token) {
-        fetch('https://threatready-db.onrender.com/api/settings', {
+        fetch(`${API}/api/settings`, {
           headers: { 'Authorization': `Bearer ${token}` }
         }).then(r => r.json()).then(data => {
           if (data.settings) {
@@ -1012,7 +1066,7 @@ export default function ThreatReady() {
       const interval = setInterval(() => {
         const t = localStorage.getItem('token');
         if (!t) return;
-        fetch('https://threatready-db.onrender.com/api/notifications', { headers: { 'Authorization': `Bearer ${t}` } })
+        fetch(`${API}/api/notifications`, { headers: { 'Authorization': `Bearer ${t}` } })
           .then(r => r.json())
           .then(data => {
             if (data.notifications) {
@@ -1041,7 +1095,7 @@ export default function ThreatReady() {
   // ── CANDIDATE ASSESSMENT LOADER ──
   useEffect(() => {
     if (view !== 'candidate-assess' || !candidateToken) return;
-    fetch(`https://threatready-db.onrender.com/api/candidate/assessment?token=${candidateToken}`)
+    fetch(`${API}/api/candidate/assessment?token=${candidateToken}`)
       .then(r => r.json())
       .then(data => {
         if (data.error === "already_completed") {
@@ -1195,7 +1249,7 @@ export default function ThreatReady() {
       if (!agreeTerms) { setAuthError("Please accept Terms and Privacy Policy"); return; }
 
       try {
-        const res = await fetch("https://threatready-db.onrender.com/api/auth/signup", {
+        const res = await fetch(`${API}/api/auth/signup`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ name: authName, email: authEmail, password: authPassword })
@@ -1205,7 +1259,7 @@ export default function ThreatReady() {
 
         // Signup success — send OTP immediately
         try {
-          await fetch("https://threatready-db.onrender.com/api/auth/send-otp", {
+          await fetch(`${API}/api/auth/send-otp`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ email: authEmail })
@@ -1228,7 +1282,7 @@ export default function ThreatReady() {
       if (!authEmail || !authPassword) { setAuthError("Email and password required"); return; }
 
       try {
-        const res = await fetch("https://threatready-db.onrender.com/api/auth/login", {
+        const res = await fetch(`${API}/api/auth/login`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ email: authEmail, password: authPassword })
@@ -1260,17 +1314,27 @@ export default function ThreatReady() {
         setSettingsName(data.user.name || '');
 
         // Check subscription status
-        fetch('https://threatready-db.onrender.com/api/auth/me', {
+        fetch(`${API}/api/auth/me`, {
           headers: { 'Authorization': `Bearer ${data.token}` }
         }).then(r => r.json()).then(meData => {
           if (meData.user?.plan === 'paid' && meData.user?.status === 'active') {
 
             setIsPaid(true);
             setUser(data.user);
-            setIsPaid(true); // ← ADD THIS
             setSettingsName(data.user.name || '');
 
-            setSubscribedRoles(JSON.parse(meData.user.subscribed_roles || '[]'));
+            // Safe parser — handles both jsonb-as-array and string cases
+            const raw = meData.user.subscribed_roles;
+            let roles = [];
+            if (Array.isArray(raw)) roles = raw;
+            else if (typeof raw === 'string') {
+              try { const v = JSON.parse(raw); roles = Array.isArray(v) ? v : []; } catch (e) { roles = []; }
+            }
+            setSubscribedRoles(roles);
+            if (roles.length > 0) {
+              localStorage.setItem('subscribedRoles', JSON.stringify(roles));
+              localStorage.setItem('isPaid', 'true');
+            }
           } else {
             setIsPaid(false);
             setFreeAttempts(2);
@@ -1278,16 +1342,24 @@ export default function ThreatReady() {
         }).catch(() => { });
 
         // After login, load subscription data
-        const meRes = await fetch("https://threatready-db.onrender.com/api/auth/me", {
+        const meRes = await fetch(`${API}/api/auth/me`, {
           headers: { "Authorization": `Bearer ${data.token}` }
         });
         const meData = await meRes.json();
         if (meData.user?.subscribed_roles) {
-          const roles = typeof meData.user.subscribed_roles === 'string'
-            ? JSON.parse(meData.user.subscribed_roles)
-            : meData.user.subscribed_roles || [];
+          // Safe parser — handles both jsonb-as-array and string cases
+          const raw = meData.user.subscribed_roles;
+          let roles = [];
+          if (Array.isArray(raw)) roles = raw;
+          else if (typeof raw === 'string') {
+            try { const v = JSON.parse(raw); roles = Array.isArray(v) ? v : []; } catch (e) { roles = []; }
+          }
           setSubscribedRoles(roles);
           setIsPaid(roles.length > 0);
+          if (roles.length > 0) {
+            localStorage.setItem('subscribedRoles', JSON.stringify(roles));
+            localStorage.setItem('isPaid', 'true');
+          }
         }
         setSettingsName(data.user.name || '');
 
@@ -1311,7 +1383,7 @@ export default function ThreatReady() {
   const verifyEmail = async () => {
     // Send OTP immediately after signup - no detect step needed
     try {
-      await fetch("https://threatready-db.onrender.com/api/auth/send-otp", {
+      await fetch(`${API}/api/auth/send-otp`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email: authEmail })
@@ -1330,7 +1402,7 @@ export default function ThreatReady() {
   localStorage.setItem('cyberprep_usertype', type);
   // Send OTP and go to verify
   try {
-    await fetch("https://threatready-db.onrender.com/api/auth/send-otp", {
+    await fetch(`${API}/api/auth/send-otp`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ email: authEmail })
@@ -1364,7 +1436,7 @@ export default function ThreatReady() {
     try {
       const token = localStorage.getItem('token');
       if (token) {
-        const res = await fetch('https://threatready-db.onrender.com/api/session/start', {
+        const res = await fetch(`${API}/api/session/start`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -1497,7 +1569,7 @@ export default function ThreatReady() {
       // Use window.__sessionId as fallback in case React state hasn't updated yet
       const sid = sessionId || window.__sessionId || null;
       console.log('[EVAL] session_id:', sid, 'question_id:', question.id);
-      const r = await fetch("https://threatready-db.onrender.com/api/evaluate", {
+      const r = await fetch(`${API}/api/evaluate`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -1627,7 +1699,7 @@ export default function ThreatReady() {
       try {
         const token = localStorage.getItem('token');
         // Save scenario history
-        fetch('https://threatready-db.onrender.com/api/scenario-history', {
+        fetch(`${API}/api/scenario-history`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
           body: JSON.stringify({ scenario_id: scenario.id, role_id: activeRole, score })
@@ -1635,7 +1707,7 @@ export default function ThreatReady() {
         const finalSessionId = sessionId || window.__sessionId;
         if (token && finalSessionId) {
           console.log('[SESSION COMPLETE] session_id:', finalSessionId, 'score:', score);
-          await fetch('https://threatready-db.onrender.com/api/session/complete', {
+          await fetch(`${API}/api/session/complete`, {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
@@ -1664,7 +1736,7 @@ export default function ThreatReady() {
     if (!ans || !ans.trim()) return;
     setDemoLoading(true);
     try {
-      const r = await fetch("https://threatready-db.onrender.com/api/demo/evaluate", {
+      const r = await fetch(`${API}/api/demo/evaluate`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ question: demoQ && demoQ.q, answer: ans })
@@ -1691,7 +1763,7 @@ export default function ThreatReady() {
     if (!user) { setAuthMode('signup'); setView('auth'); showToast('Create an account to subscribe', 'info'); return; }
     try {
       const token = localStorage.getItem('token');
-      const res = await fetch('https://threatready-db.onrender.com/api/payment/create-order', {
+      const res = await fetch(`${API}/api/payment/create-order`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
         body: JSON.stringify({ roles: selectedRoles, billing_period: billingPeriod })
@@ -1707,7 +1779,7 @@ export default function ThreatReady() {
         description: `${selectedRoles.length} Role${selectedRoles.length > 1 ? 's' : ''} · ${billingPeriod}`,
         order_id: order.order_id,
         handler: async (response) => {
-          const verifyRes = await fetch('https://threatready-db.onrender.com/api/payment/verify', {
+          const verifyRes = await fetch(`${API}/api/payment/verify`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
             body: JSON.stringify({
@@ -1720,11 +1792,18 @@ export default function ThreatReady() {
           });
           const verifyData = await verifyRes.json();
           if (verifyData.success) {
-            const allRoles = [...new Set([...subscribedRoles, ...selectedRoles])];
+            // Prefer server's authoritative role list (includes merged roles from DB)
+            const serverRoles = Array.isArray(verifyData.subscribed_roles) ? verifyData.subscribed_roles : null;
+            const allRoles = serverRoles && serverRoles.length > 0
+              ? serverRoles
+              : [...new Set([...subscribedRoles, ...selectedRoles])];
             setSubscribedRoles(allRoles);
             setIsPaid(true);
             setFreeAttempts(0);
             setSelectedRoles([]);
+            // Cache for refresh-resilience
+            localStorage.setItem('subscribedRoles', JSON.stringify(allRoles));
+            localStorage.setItem('isPaid', 'true');
             setView("dashboard");
             setDashTab("home");
             showToast(`Payment successful! All levels unlocked for ${allRoles.length} role${allRoles.length > 1 ? 's' : ''}.`, 'success');
@@ -1774,6 +1853,7 @@ export default function ThreatReady() {
     localStorage.removeItem('cyberprep_tab');
     localStorage.removeItem('cyberprep_b2btab');
     localStorage.removeItem('subscribedRoles');
+    localStorage.removeItem('isPaid');
     localStorage.removeItem('freeAttempts');
     localStorage.removeItem('roleAttempts');
     localStorage.removeItem('cyberprep_freetrial');
@@ -2148,11 +2228,11 @@ export default function ThreatReady() {
               {authMode === "login" ? "Sign In" : "Create Account"}
             </button>
             <div style={{ display: "flex", gap: 8, marginTop: 14 }}>
-              <button className="btn bs" style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }} onClick={() => window.location.href = "https://threatready-db.onrender.com/auth/google"}>
+              <button className="btn bs" style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }} onClick={() => window.location.href = `${API}/auth/google`}>
                 <svg width="16" height="16" viewBox="0 0 48 48">
                   <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z" /><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z" /><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z" /><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z" /></svg> Google</button>
 
-              <button className="btn bs" style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }} onClick={() => window.location.href = "https://threatready-db.onrender.com/auth/github?prompt=login"}>
+              <button className="btn bs" style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }} onClick={() => window.location.href = `${API}/auth/github?prompt=login`}>
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="white">
                   <path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z" /></svg> GitHub</button>
 
@@ -2201,7 +2281,7 @@ export default function ThreatReady() {
                 onClick={async () => {
                   setOtpError("");
                   try {
-                    const res = await fetch("https://threatready-db.onrender.com/api/auth/verify-otp", {
+                    const res = await fetch(`${API}/api/auth/verify-otp`, {
                       method: "POST",
                       headers: { "Content-Type": "application/json" },
                       body: JSON.stringify({ email: authEmail, otp: otpCode })
@@ -2229,7 +2309,7 @@ export default function ThreatReady() {
                 onClick={async () => {
                   setOtpError("");
                   setOtpCode("");
-                  await fetch("https://threatready-db.onrender.com/api/auth/send-otp", {
+                  await fetch(`${API}/api/auth/send-otp`, {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({ email: authEmail })
@@ -2321,7 +2401,7 @@ export default function ThreatReady() {
                   setForgotLoading(true);
                   setForgotMsg("");
                   try {
-                    const res = await fetch("https://threatready-db.onrender.com/api/auth/forgot-password", {
+                    const res = await fetch(`${API}/api/auth/forgot-password`, {
                       method: "POST",
                       headers: { "Content-Type": "application/json" },
                       body: JSON.stringify({ email: forgotEmail.trim() })
@@ -2381,7 +2461,7 @@ export default function ThreatReady() {
                   setForgotLoading(true);
                   setForgotMsg("");
                   try {
-                    const res = await fetch("https://threatready-db.onrender.com/api/auth/reset-password", {
+                    const res = await fetch(`${API}/api/auth/reset-password`, {
                       method: "POST",
                       headers: { "Content-Type": "application/json" },
                       body: JSON.stringify({ email: forgotEmail, code: forgotCode, new_password: newPassword })
@@ -2917,7 +2997,7 @@ export default function ThreatReady() {
                     setShowNotifs(p => !p);
                     if (unreadCount > 0) {
                       const token = localStorage.getItem('token');
-                      await fetch('https://threatready-db.onrender.com/api/notifications/read', { method: 'POST', headers: { 'Authorization': `Bearer ${token}` } });
+                      await fetch(`${API}/api/notifications/read`, { method: 'POST', headers: { 'Authorization': `Bearer ${token}` } });
                       setUnreadCount(0);
                       setNotifications(p => p.map(n => ({ ...n, is_read: true })));
                     }
@@ -3038,7 +3118,7 @@ export default function ThreatReady() {
                           setDailyLoading(true);
                           try {
                             const token = localStorage.getItem('token');
-                            const res = await fetch('https://threatready-db.onrender.com/api/daily-challenge/submit', {
+                            const res = await fetch(`${API}/api/daily-challenge/submit`, {
                               method: 'POST',
                               headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
                               body: JSON.stringify({ challenge_id: dailyChallenge.id, answer: dailyAnswer })
@@ -3238,7 +3318,7 @@ export default function ThreatReady() {
                 onClick={async () => {
                   try {
                     const token = localStorage.getItem('token');
-                    const res = await fetch('https://threatready-db.onrender.com/api/resume/upload', {
+                    const res = await fetch(`${API}/api/resume/upload`, {
                       method: 'POST',
                       headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
                       body: JSON.stringify({ resume_text: resumeText })
@@ -3319,7 +3399,7 @@ export default function ThreatReady() {
                 onClick={async () => {
                   try {
                     const token = localStorage.getItem('token');
-                    const res = await fetch('https://threatready-db.onrender.com/api/profile/goals', {
+                    const res = await fetch(`${API}/api/profile/goals`, {
                       method: 'POST',
                       headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
                       body: JSON.stringify({ target_role: targetRole, experience_level: experienceLevel })
@@ -3621,7 +3701,7 @@ export default function ThreatReady() {
               <button className="btn bp" style={{ fontSize: 11 }}
                 onClick={async () => {
                   const token = localStorage.getItem('token');
-                  const res = await fetch('https://threatready-db.onrender.com/api/settings/profile', {
+                  const res = await fetch(`${API}/api/settings/profile`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
                     body: JSON.stringify({ name: settingsName || user?.name })
@@ -3647,7 +3727,7 @@ export default function ThreatReady() {
                     setter(e.target.checked);
                     const token = localStorage.getItem('token');
                     try {
-                      const res = await fetch('https://threatready-db.onrender.com/api/settings/privacy', {
+                      const res = await fetch(`${API}/api/settings/privacy`, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
                         body: JSON.stringify({
@@ -3669,7 +3749,7 @@ export default function ThreatReady() {
                 showToast('Generating your report...', 'info');
                 try {
                   const token = localStorage.getItem('token');
-                  const res = await fetch('https://threatready-db.onrender.com/api/settings/export', {
+                  const res = await fetch(`${API}/api/settings/export`, {
                     headers: { 'Authorization': `Bearer ${token}` }
                   });
                   const d = await res.json();
@@ -3780,7 +3860,7 @@ export default function ThreatReady() {
                   showToast('Report ready — use Print → Save as PDF', 'success');
                 } catch (e) { showToast('Report failed: ' + e.message, 'error'); }
               }}>📊 Download My Report (PDF)</button>
-              <button className="btn bdn" style={{ fontSize: 11 }} onClick={() => showConfirm('Delete your account permanently? All data will be lost.', async () => { const token = localStorage.getItem('token'); const res = await fetch('https://threatready-db.onrender.com/api/settings/delete-account', { method: 'DELETE', headers: { 'Authorization': `Bearer ${token}` } }); if (res.ok) { localStorage.clear(); setUser(null); setView('landing'); showToast('Account deleted.', 'info'); } })}>🗑️ Delete Account</button>
+              <button className="btn bdn" style={{ fontSize: 11 }} onClick={() => showConfirm('Delete your account permanently? All data will be lost.', async () => { const token = localStorage.getItem('token'); const res = await fetch(`${API}/api/settings/delete-account`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${token}` } }); if (res.ok) { localStorage.clear(); setUser(null); setView('landing'); showToast('Account deleted.', 'info'); } })}>🗑️ Delete Account</button>
             </div>
             
             </div>
@@ -3851,7 +3931,7 @@ export default function ThreatReady() {
                         const token = localStorage.getItem('token');
                         const headers = { 'Content-Type': 'application/json' };
                         if (token) headers['Authorization'] = `Bearer ${token}`;
-                        await fetch('https://threatready-db.onrender.com/api/feedback', {
+                        await fetch(`${API}/api/feedback`, {
                           method: 'POST',
                           headers,
                           body: JSON.stringify({ message: finalMessage })
@@ -4034,7 +4114,7 @@ export default function ThreatReady() {
                     setShowNotifs(p => !p);
                     if (unreadCount > 0) {
                       const token = localStorage.getItem('token');
-                      await fetch('https://threatready-db.onrender.com/api/notifications/read', { method: 'POST', headers: { 'Authorization': `Bearer ${token}` } });
+                      await fetch(`${API}/api/notifications/read`, { method: 'POST', headers: { 'Authorization': `Bearer ${token}` } });
                       setUnreadCount(0);
                     }
                   }}>
@@ -4337,7 +4417,7 @@ export default function ThreatReady() {
                       payload.candidate_emails = emailsToSend;
                     }
                     if (inviteAssessmentId) payload.assessment_id = parseInt(inviteAssessmentId);
-                    const res = await fetch('https://threatready-db.onrender.com/api/b2b/invite', {
+                    const res = await fetch(`${API}/api/b2b/invite`, {
                       method: 'POST',
                       headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
                       body: JSON.stringify(payload)
@@ -4384,7 +4464,7 @@ export default function ThreatReady() {
                         showToast(`Generating ${selectedCompleted.length} PDF(s)...`, 'info');
                         for (const c of selectedCompleted) {
                           try {
-                            const res = await fetch(`https://threatready-db.onrender.com/api/b2b/candidates/${c.id}/report`, {
+                            const res = await fetch(`${API}/api/b2b/candidates/${c.id}/report`, {
                               headers: { 'Authorization': `Bearer ${token}` }
                             });
                             const data = await res.json();
@@ -4500,7 +4580,7 @@ ${evals.map((ev, i) => {
                         showConfirm(`Delete ${selectedCandidates.length} selected candidate(s)?`, async () => {
                           const token = localStorage.getItem('token');
                           await Promise.all(selectedCandidates.map(id =>
-                            fetch(`https://threatready-db.onrender.com/api/b2b/candidates/${id}`, {
+                            fetch(`${API}/api/b2b/candidates/${id}`, {
                               method: 'DELETE', headers: { 'Authorization': `Bearer ${token}` }
                             })
                           ));
@@ -4574,7 +4654,7 @@ ${evals.map((ev, i) => {
                           onClick={async () => {
                             try {
                               const token = localStorage.getItem('token');
-                              const res = await fetch(`https://threatready-db.onrender.com/api/b2b/candidates/${c.id}/report`, {
+                              const res = await fetch(`${API}/api/b2b/candidates/${c.id}/report`, {
                                 headers: { 'Authorization': `Bearer ${token}` }
                               });
                               const data = await res.json();
@@ -4587,7 +4667,7 @@ ${evals.map((ev, i) => {
                           onClick={async () => {
                             try {
                               const token = localStorage.getItem('token');
-                              const res = await fetch(`https://threatready-db.onrender.com/api/b2b/candidates/${c.id}/report`, {
+                              const res = await fetch(`${API}/api/b2b/candidates/${c.id}/report`, {
                                 headers: { 'Authorization': `Bearer ${token}` }
                               });
                               const data = await res.json();
@@ -4729,7 +4809,7 @@ ${evals.map((ev, i) => {
                       onClick={() => {
                         showConfirm(`Delete ${c.candidate_name || c.candidate_email}? This cannot be undone.`, async () => {
                           const token = localStorage.getItem('token');
-                          const res = await fetch(`https://threatready-db.onrender.com/api/b2b/candidates/${c.id}`, {
+                          const res = await fetch(`${API}/api/b2b/candidates/${c.id}`, {
                             method: 'DELETE', headers: { 'Authorization': `Bearer ${token}` }
                           });
                           const data = await res.json();
@@ -5041,7 +5121,7 @@ ${evals.map((ev, i) => {
                     setJdAnalyzing(true); setJdAnalysis(null);
                     try {
                       const token = localStorage.getItem('token');
-                      const res = await fetch('https://threatready-db.onrender.com/api/b2b/analyze-jd', {
+                      const res = await fetch(`${API}/api/b2b/analyze-jd`, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
                         body: JSON.stringify({ jd_text: newAssessJD })
@@ -5135,7 +5215,7 @@ ${evals.map((ev, i) => {
                   setAssessMsg('Creating assessment with ' + newAssessQuestionCount + ' questions...');
                   try {
                     const token = localStorage.getItem('token');
-                    const res = await fetch('https://threatready-db.onrender.com/api/b2b/assessments', {
+                    const res = await fetch(`${API}/api/b2b/assessments`, {
                       method: 'POST',
                       headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
                       body: JSON.stringify({
@@ -5219,7 +5299,7 @@ ${evals.map((ev, i) => {
                     <button className="btn bs" style={{ fontSize: 9, padding: "4px 8px" }}
                       onClick={async () => {
                         const token = localStorage.getItem('token');
-                        const res = await fetch(`https://threatready-db.onrender.com/api/b2b/assessments/${a.id}/duplicate`, {
+                        const res = await fetch(`${API}/api/b2b/assessments/${a.id}/duplicate`, {
                           method: 'POST', headers: { 'Authorization': `Bearer ${token}` }
                         });
                         const data = await res.json();
@@ -5238,7 +5318,7 @@ ${evals.map((ev, i) => {
                       onClick={() => {
                         showConfirm(`Delete "${a.name}"? This cannot be undone.`, async () => {
                           const token = localStorage.getItem('token');
-                          const res = await fetch(`https://threatready-db.onrender.com/api/b2b/assessments/${a.id}`, {
+                          const res = await fetch(`${API}/api/b2b/assessments/${a.id}`, {
                             method: 'DELETE', headers: { 'Authorization': `Bearer ${token}` }
                           });
                           const data = await res.json();
@@ -5274,7 +5354,7 @@ ${evals.map((ev, i) => {
                   setCompanySettingsMsg('Saving...');
                   try {
                     const token = localStorage.getItem('token');
-                    const res = await fetch('https://threatready-db.onrender.com/api/b2b/settings', {
+                    const res = await fetch(`${API}/api/b2b/settings`, {
                       method: 'POST',
                       headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
                       body: JSON.stringify({ company_name: companyName, team_size: teamSize })
@@ -5310,7 +5390,7 @@ ${evals.map((ev, i) => {
                     setIntegrationMsg('Saving...');
                     try {
                       const token = localStorage.getItem('token');
-                      const res = await fetch('https://threatready-db.onrender.com/api/b2b/settings', { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` }, body: JSON.stringify({ slack_webhook: slackWebhook }) });
+                      const res = await fetch(`${API}/api/b2b/settings`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` }, body: JSON.stringify({ slack_webhook: slackWebhook }) });
                       const data = await res.json();
                       if (data.success) { setIntegrationMsg('✅ Slack webhook saved!'); setTimeout(() => setIntegrationMsg(''), 3000); }
                       else setIntegrationMsg('❌ ' + (data.error || 'Failed'));
@@ -5331,7 +5411,7 @@ ${evals.map((ev, i) => {
                     setIntegrationMsg('Saving...');
                     try {
                       const token = localStorage.getItem('token');
-                      const res = await fetch('https://threatready-db.onrender.com/api/b2b/settings', { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` }, body: JSON.stringify({ zapier_webhook: zapierWebhook }) });
+                      const res = await fetch(`${API}/api/b2b/settings`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` }, body: JSON.stringify({ zapier_webhook: zapierWebhook }) });
                       const data = await res.json();
                       if (data.success) { setIntegrationMsg('✅ Zapier webhook saved!'); setTimeout(() => setIntegrationMsg(''), 3000); }
                       else setIntegrationMsg('❌ ' + (data.error || 'Failed'));
@@ -5400,7 +5480,7 @@ ${evals.map((ev, i) => {
                         const token = localStorage.getItem('token');
                         const headers = { 'Content-Type': 'application/json' };
                         if (token) headers['Authorization'] = `Bearer ${token}`;
-                        await fetch('https://threatready-db.onrender.com/api/feedback', {
+                        await fetch(`${API}/api/feedback`, {
                           method: 'POST',
                           headers,
                           body: JSON.stringify({ message: feedbackText })
@@ -5640,7 +5720,7 @@ ${evals.map((ev, i) => {
                           answer: candidateAnswers[i] || "",
                           category: q.category || "Security"
                         }));
-                        const res = await fetch("https://threatready-db.onrender.com/api/candidate/submit", {
+                        const res = await fetch(`${API}/api/candidate/submit`, {
                           method: "POST",
                           headers: { "Content-Type": "application/json" },
                           body: JSON.stringify({ token: candidateToken, answers, role_id: candidateAssessData.candidate.role_id, difficulty: candidateAssessData.candidate.difficulty })
