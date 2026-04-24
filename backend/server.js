@@ -1292,17 +1292,25 @@ app.post('/api/evaluate', async (req, res) => {
     const isJunk = trimmedAnswer.length < 5;
 
     // Rule 3: Common "I don't know" responses
+    // Note: idkPatterns test against cleanedAnswer (lowercase, no punctuation/apostrophes)
+    // So "I don't know" becomes "i dont know" — patterns must reflect that
     const idkPatterns = [
-      /^(i\s*)?(don'?t|do not)\s*know/,
-      /^(no\s*idea|idk|dunno|nope|no)$/,
-      /^(n\/?a|none|nothing|skip|pass)$/,
-      /^(i\s*am\s*not\s*sure|not\s*sure)$/
+      /^(i\s*)?(dont|do not)\s*know/,           // "I don't know", "i dont know", "dont know", "do not know"
+      /^(i\s*)?(dont|do not)\s*(understand|get\s*it)/, // "I don't understand", "dont get it"
+      /^(i\s*)?(have\s*)?(no\s*idea)/,           // "no idea", "I have no idea"
+      /^(idk|dunno|nope|no)$/,                    // single-word
+      /^(n\/?a|na|none|nothing|skip|pass|null)$/, // "N/A" → "na" after cleaning
+      /^(i\s*am\s*not\s*sure|not\s*sure|unsure|im\s*not\s*sure)$/,
+      /^(cant\s*answer|can\s*not\s*answer)/,      // "can't answer"
+      /^(dont\s*know)/,                            // starts with "dont know"
+      /^sorry/,                                    // "sorry..."
+      /^(tbh|honestly)\s*(i\s*)?(dont|do not)/    // "tbh I don't..."
     ];
     const isIDK = idkPatterns.some(p => p.test(cleanedAnswer));
 
     // Rule 4: Random characters / keyboard mashing (asdf, qwerty, aaaaa)
     const isRandomChars = /^([a-z])\1{2,}$/.test(cleanedAnswer) || // aaaa, bbbb
-                          /^(asdf|qwerty|test|abcd|1234|xyz|hello|hi)+$/i.test(cleanedAnswer);
+                          /^(asdf|qwerty|test|abcd|1234|xyz|hello|hi|haha|lol)+$/i.test(cleanedAnswer);
 
     if (isTooShort || isJunk || isIDK || isRandomChars) {
       console.log('GARBAGE ANSWER DETECTED — auto-scoring 0, generating model answer');
