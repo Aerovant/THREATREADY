@@ -1750,7 +1750,7 @@ app.post('/api/feedback', async (req, res) => {
       const safeMessage = String(message).replace(/</g, '&lt;').replace(/>/g, '&gt;');
       resendClient.emails.send({
         from: 'ThreatReady <noreply@threatready.io>',
-        to: 'aerovanttechnologies@gmail.com',
+        to: 'admin@aerovanttech.com',
         subject: `📬 New Feedback — ${userType}`,
         html: `
           <div style="font-family:sans-serif;max-width:560px;margin:0 auto;background:#0a0e1a;color:#e8eaf6;padding:32px;border-radius:12px">

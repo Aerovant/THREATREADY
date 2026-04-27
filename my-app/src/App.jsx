@@ -276,6 +276,7 @@ function useVoice() {
   const recRef = useRef(null);
   const finalTranscriptRef = useRef("");
   const manuallyStopped = useRef(false);
+  const processedFinalsRef = useRef(new Set());  // Track unique final segments to avoid duplicates on mobile
 
   const startRecognition = useCallback(() => {
     if (manuallyStopped.current) return;
@@ -293,8 +294,24 @@ function useVoice() {
       let interim = "";
       for (let i = e.resultIndex; i < e.results.length; i++) {
         const text = e.results[i][0].transcript;
+        const trimmed = text.trim();
         if (e.results[i].isFinal) {
-          finalTranscriptRef.current += text + ' ';
+          // MOBILE FIX: Mobile Chrome sometimes re-emits the same final segment
+          // when recognition auto-restarts. Dedupe by tracking processed finals.
+          if (!trimmed) continue;
+
+          // Skip if already processed this exact text recently
+          const key = trimmed.toLowerCase();
+          if (processedFinalsRef.current.has(key)) continue;
+          processedFinalsRef.current.add(key);
+
+          // Keep set bounded (last 50 segments)
+          if (processedFinalsRef.current.size > 50) {
+            const arr = Array.from(processedFinalsRef.current);
+            processedFinalsRef.current = new Set(arr.slice(-30));
+          }
+
+          finalTranscriptRef.current += trimmed + ' ';
         } else {
           interim += text;
         }
@@ -338,6 +355,7 @@ function useVoice() {
 
   const start = useCallback(() => {
     manuallyStopped.current = false;
+    processedFinalsRef.current = new Set();  // Reset dedup tracker on fresh start
     setRec(true);
     startRecognition();
   }, [startRecognition]);
@@ -354,6 +372,7 @@ function useVoice() {
   const reset = useCallback(() => {
     manuallyStopped.current = true;
     finalTranscriptRef.current = "";
+    processedFinalsRef.current = new Set();
     setTr("");
     setRec(false);
     if (recRef.current) {
@@ -3608,7 +3627,7 @@ export default function ThreatReady() {
             <div>
               <h2 style={{ fontSize: 22, fontWeight: 800 }}>Welcome, {user?.name || "Agent"}</h2>
               <div style={{ fontSize: 14, color: "var(--tx2)", marginTop: 4, fontWeight: 500 }}>
-                {isPaid ? `${subscribedRoles.length} tracks` : `Free trial · ${subscribedRoles.reduce((s, rid) => s + getRemainingAttempts(rid), 0)} attempts left`} · {completedScenarios.length} completed · {streak} day streak
+                {isPaid ? `${subscribedRoles.length} tracks` : `Free trial · ${Math.max(0, 2 - getTotalUsedAttempts())} attempts left`} · {completedScenarios.length} completed · {streak} day streak
               </div>
             </div>
             <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
@@ -4327,7 +4346,10 @@ export default function ThreatReady() {
             <div className="rgrid">
               {ROLES.map((r, i) => {
                 const sel = selectedRoles.includes(r.id);
-                const subscribed = subscribedRoles.includes(r.id);
+                // Only treat role as "subscribed" (ACTIVE) if user is actually PAID
+                // Free trial users have roles in subscribedRoles but they're not actually paid for
+                const subscribed = isPaid && subscribedRoles.includes(r.id);
+                const inFreeTrial = !isPaid && subscribedRoles.includes(r.id);
                 const monthlyPrice = r.price;
                 const yearlyPrice = Math.round(r.price * 12 * 0.8);
                 const savings = r.price * 12 - yearlyPrice;
@@ -4335,7 +4357,7 @@ export default function ThreatReady() {
                   <div key={r.id} className={`sub-card fadeUp ${sel || subscribed ? "sel" : ""}`}
                     style={{
                       animationDelay: `${i * .03}s`,
-                      borderColor: subscribed ? "var(--ok)" : sel ? r.color : undefined,
+                      borderColor: subscribed ? "var(--ok)" : inFreeTrial ? "var(--wn)" : sel ? r.color : undefined,
                       cursor: subscribed ? "default" : "pointer",
                       opacity: subscribed ? 1 : 1,
                       pointerEvents: subscribed ? "none" : "auto"
@@ -4346,19 +4368,27 @@ export default function ThreatReady() {
                         ACTIVE
                       </div>
                     )}
-                    {sel && !subscribed && (
+                    {inFreeTrial && (
+                      <div style={{ position: "absolute", top: 8, right: 8, fontSize: 8, color: "var(--wn)", fontWeight: 800, background: "rgba(255,171,64,.1)", padding: "2px 7px", borderRadius: 10, border: "1px solid rgba(255,171,64,.3)" }}>
+                        FREE TRIAL
+                      </div>
+                    )}
+                    {sel && !subscribed && !inFreeTrial && (
                       <div style={{ position: "absolute", top: 10, right: 10, width: 20, height: 20, borderRadius: "50%", background: "var(--ac)", color: "#000", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12, fontWeight: 700 }}>✓</div>
                     )}
                     <div style={{ fontSize: 28, marginBottom: 6 }}>{r.icon}</div>
                     <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 4 }}>{r.name}</div>
-                    <div className="mono" style={{ fontSize: 15, fontWeight: 700, color: subscribed ? "var(--ok)" : sel ? r.color : "var(--tx2)" }}>
+                    <div className="mono" style={{ fontSize: 15, fontWeight: 700, color: subscribed ? "var(--ok)" : inFreeTrial ? "var(--wn)" : sel ? r.color : "var(--tx2)" }}>
                       {billingPeriod === "yearly" ? `₹${yearlyPrice}/yr` : `₹${monthlyPrice}/mo`}
                     </div>
-                    {billingPeriod === "yearly" && !subscribed && (
+                    {billingPeriod === "yearly" && !subscribed && !inFreeTrial && (
                       <div style={{ fontSize: 11, color: "var(--ok)", marginTop: 2 }}>Save ₹{savings}/yr</div>
                     )}
                     {subscribed && (
                       <div style={{ fontSize: 11, color: "var(--ok)", marginTop: 2 }}>🔓 All levels unlocked</div>
+                    )}
+                    {inFreeTrial && (
+                      <div style={{ fontSize: 11, color: "var(--wn)", marginTop: 2 }}>🔒 Beginner only · Subscribe to unlock</div>
                     )}
                   </div>
                 );
@@ -4685,7 +4715,8 @@ export default function ThreatReady() {
       { id: "teamskills", label: "🏢 Team Skills" },
 
       { id: "library", label: "📚 Library" },
-      { id: "settings", label: "⚙️ Settings" }
+      { id: "settings", label: "⚙️ Settings" },
+      { id: "help", label: "❓ Help" }
     ];
 
     return (
@@ -4816,10 +4847,10 @@ export default function ThreatReady() {
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }} className="fadeUp">
             <div>
               <h2 style={{ fontSize: 22, fontWeight: 800 }}>{companyName || user?.name || 'Hiring Dashboard'}</h2>
-              <div style={{ fontSize: 12, color: "var(--tx2)", marginTop: 3 }}>
+              <div style={{ fontSize: 13, color: "var(--tx2)", marginTop: 4, fontWeight: 500 }}>
                 {isHrPaid
                   ? `✓ ${HR_PRICING[teamSize]?.planName || 'Active subscription'} · ${teamSize} people`
-                  : `Free trial · ${subscribedRoles.reduce((s, rid) => s + getRemainingAttempts(rid), 0)} attempts left`}
+                  : `🔓 Free Plan · Subscribe to unlock`}
                 {" · "}{candidates.length} candidates · {assessments.length} assessments
               </div>
             </div>
@@ -4837,7 +4868,6 @@ export default function ThreatReady() {
                   🔓 Subscribe to Unlock More Features
                 </button>
               )}
-              <span className="tag" style={{ padding: "5px 12px" }}>⚡ {xp} XP</span>
 
               {/* Notification Bell */}
               <div style={{ position: "relative" }}>
@@ -4913,8 +4943,12 @@ export default function ThreatReady() {
             ))}
           </div>
 
-          {/* ═══ FADE OVERLAY for free trial HR users ═══ */}
-          <div style={{ opacity: isHrPaid ? 1 : 0.4, pointerEvents: isHrPaid ? "auto" : "none", transition: "opacity 0.3s" }}>
+          {/* ═══ FADE OVERLAY for free trial HR users (Help tab is always accessible) ═══ */}
+          <div style={{
+            opacity: (isHrPaid || b2bTab === "help") ? 1 : 0.4,
+            pointerEvents: (isHrPaid || b2bTab === "help") ? "auto" : "none",
+            transition: "opacity 0.3s"
+          }}>
 
           {/* ── B1: HOME ── */}
           {b2bTab === "overview" && (<>
@@ -6227,6 +6261,11 @@ ${evals.map((ev, i) => {
                   </button>
                 </>
               )}
+
+              {/* Contact email */}
+              <div style={{ marginTop: 16, paddingTop: 14, borderTop: "1px solid var(--bd)", fontSize: 13, color: "var(--tx2)" }}>
+                Or email us directly at: <a href="mailto:admin@aerovanttech.com" style={{ color: "var(--ac)", textDecoration: "none", fontWeight: 600 }}>admin@aerovanttech.com</a>
+              </div>
             </div>
           </>)}
 
@@ -6240,40 +6279,41 @@ ${evals.map((ev, i) => {
             <div style={{
               position: "fixed", inset: 0, background: "rgba(0,0,0,0.8)", zIndex: 9999,
               display: "flex", alignItems: "center", justifyContent: "center",
-              backdropFilter: "blur(6px)", padding: 20
+              backdropFilter: "blur(6px)", padding: 16
             }} onClick={() => setShowHrSubscribeModal(false)}>
               <div onClick={e => e.stopPropagation()} style={{
                 background: "#0f1420", border: "1px solid var(--ac)", borderRadius: 14,
-                padding: 28, maxWidth: 540, width: "100%",
+                padding: "20px 24px", maxWidth: 480, width: "100%",
                 boxShadow: "0 20px 60px rgba(0,0,0,.9), 0 0 40px rgba(0,229,255,0.2)"
               }}>
                 {/* Header */}
-                <div style={{ textAlign: "center", marginBottom: 20 }}>
-                  <div style={{ fontSize: 32, marginBottom: 8 }}>🚀</div>
-                  <h2 style={{ fontSize: 20, fontWeight: 800, marginBottom: 6 }}>Unlock Full HR Suite</h2>
-                  <p style={{ fontSize: 12, color: "var(--tx2)" }}>
-                    Create unlimited assessments, invite candidates, access team skill analytics and more.
+                <div style={{ textAlign: "center", marginBottom: 14 }}>
+                  <div style={{ fontSize: 16, fontWeight: 800, marginBottom: 4 }}>🚀 Unlock Full HR Suite</div>
+                  <p style={{ fontSize: 12, color: "var(--tx2)", lineHeight: 1.4 }}>
+                    Unlimited assessments, candidate invites, team analytics
                   </p>
                 </div>
 
                 {/* Company Name */}
-                <div style={{ marginBottom: 14 }}>
-                  <div style={{ fontSize: 13, color: "var(--tx2)", marginBottom: 6, fontWeight: 600 }}>COMPANY NAME</div>
+                <div style={{ marginBottom: 10 }}>
+                  <div style={{ fontSize: 11, color: "var(--tx2)", marginBottom: 4, fontWeight: 600, letterSpacing: 0.5 }}>COMPANY NAME</div>
                   <input
                     className="input"
                     placeholder="e.g. Acme Security Inc."
                     value={hrModalCompanyName}
                     onChange={e => setHrModalCompanyName(e.target.value)}
+                    style={{ fontSize: 13, padding: "8px 12px" }}
                   />
                 </div>
 
                 {/* Team Size */}
-                <div style={{ marginBottom: 14 }}>
-                  <div style={{ fontSize: 13, color: "var(--tx2)", marginBottom: 6, fontWeight: 600 }}>TEAM SIZE</div>
+                <div style={{ marginBottom: 10 }}>
+                  <div style={{ fontSize: 11, color: "var(--tx2)", marginBottom: 4, fontWeight: 600, letterSpacing: 0.5 }}>TEAM SIZE</div>
                   <select
                     className="input"
                     value={hrModalTeamSize}
-                    onChange={e => setHrModalTeamSize(e.target.value)}>
+                    onChange={e => setHrModalTeamSize(e.target.value)}
+                    style={{ fontSize: 13, padding: "8px 12px" }}>
                     {Object.entries(HR_PRICING).map(([key, v]) => (
                       <option key={key} value={key}>{v.label}</option>
                     ))}
@@ -6281,20 +6321,20 @@ ${evals.map((ev, i) => {
                 </div>
 
                 {/* Billing Period Toggle */}
-                <div style={{ marginBottom: 16 }}>
-                  <div style={{ fontSize: 13, color: "var(--tx2)", marginBottom: 6, fontWeight: 600 }}>BILLING CYCLE</div>
+                <div style={{ marginBottom: 10 }}>
+                  <div style={{ fontSize: 11, color: "var(--tx2)", marginBottom: 4, fontWeight: 600, letterSpacing: 0.5 }}>BILLING CYCLE</div>
                   <div style={{ display: "flex", gap: 8 }}>
                     <button
                       className={`btn ${hrBillingPeriod === "monthly" ? "bp" : "bs"}`}
-                      style={{ flex: 1, padding: "8px 14px", fontSize: 13 }}
+                      style={{ flex: 1, padding: "7px 12px", fontSize: 12 }}
                       onClick={() => setHrBillingPeriod("monthly")}>
                       Monthly
                     </button>
                     <button
                       className={`btn ${hrBillingPeriod === "yearly" ? "bp" : "bs"}`}
-                      style={{ flex: 1, padding: "8px 14px", fontSize: 13 }}
+                      style={{ flex: 1, padding: "7px 12px", fontSize: 12 }}
                       onClick={() => setHrBillingPeriod("yearly")}>
-                      Yearly <span style={{ fontSize: 11, color: "var(--ok)" }}>· SAVE 20%</span>
+                      Yearly <span style={{ fontSize: 10, color: "var(--ok)" }}>· SAVE 20%</span>
                     </button>
                   </div>
                 </div>
@@ -6305,49 +6345,49 @@ ${evals.map((ev, i) => {
                   if (!tier) return null;
                   if (tier.contactSales) {
                     return (
-                      <div style={{ padding: 16, background: "rgba(255,171,64,.06)", border: "1px solid rgba(255,171,64,.3)", borderRadius: 10, marginBottom: 16, textAlign: "center" }}>
-                        <div style={{ fontSize: 14, fontWeight: 700, color: "var(--wn)", marginBottom: 4 }}>Contact Sales</div>
-                        <div style={{ fontSize: 12, color: "var(--tx2)" }}>We'll reach out with a custom quote for enterprise teams</div>
+                      <div style={{ padding: 10, background: "rgba(255,171,64,.06)", border: "1px solid rgba(255,171,64,.3)", borderRadius: 8, marginBottom: 10, textAlign: "center" }}>
+                        <div style={{ fontSize: 13, fontWeight: 700, color: "var(--wn)", marginBottom: 2 }}>Contact Sales</div>
+                        <div style={{ fontSize: 11, color: "var(--tx2)" }}>Custom quote for enterprise teams</div>
                       </div>
                     );
                   }
                   const price = hrBillingPeriod === "yearly" ? tier.yearly : tier.monthly;
                   const monthlyEquiv = hrBillingPeriod === "yearly" ? Math.round(tier.yearly / 12) : tier.monthly;
                   return (
-                    <div style={{ padding: 16, background: "rgba(0,229,255,.05)", border: "1px solid var(--ac)", borderRadius: 10, marginBottom: 16, textAlign: "center" }}>
-                      <div className="mono" style={{ fontSize: 24, fontWeight: 800, color: "var(--ac)" }}>
+                    <div style={{ padding: 10, background: "rgba(0,229,255,.05)", border: "1px solid var(--ac)", borderRadius: 8, marginBottom: 10, textAlign: "center" }}>
+                      <div className="mono" style={{ fontSize: 20, fontWeight: 800, color: "var(--ac)" }}>
                         ₹{price.toLocaleString('en-IN')}
-                        <span style={{ fontSize: 12, color: "var(--tx2)", fontWeight: 600 }}>/{hrBillingPeriod === "yearly" ? "yr" : "mo"}</span>
+                        <span style={{ fontSize: 11, color: "var(--tx2)", fontWeight: 600 }}>/{hrBillingPeriod === "yearly" ? "yr" : "mo"}</span>
                       </div>
                       {hrBillingPeriod === "yearly" && (
-                        <div style={{ fontSize: 12, color: "var(--ok)", marginTop: 4 }}>
-                          That's ₹{monthlyEquiv.toLocaleString('en-IN')}/month effective
+                        <div style={{ fontSize: 10, color: "var(--ok)", marginTop: 2 }}>
+                          ₹{monthlyEquiv.toLocaleString('en-IN')}/mo effective
                         </div>
                       )}
                     </div>
                   );
                 })()}
 
-                {/* Feature list */}
-                <div style={{ marginBottom: 16, padding: "10px 12px", background: "rgba(0,224,150,.04)", border: "1px solid rgba(0,224,150,.2)", borderRadius: 8 }}>
-                  <div style={{ fontSize: 12, color: "var(--ok)", fontWeight: 700, marginBottom: 6 }}>INCLUDED</div>
-                  <div style={{ fontSize: 13, color: "var(--tx2)", lineHeight: 1.9 }}>
-                    ✓ Unlimited candidate assessments<br/>
-                    ✓ Bulk invites (CSV + paste multiple)<br/>
-                    ✓ Team skill heatmap &amp; benchmarks<br/>
-                    ✓ Full reports &amp; PDF exports<br/>
-                    ✓ Integrations (Slack, Zapier)
+                {/* Feature list — 2 columns */}
+                <div style={{ marginBottom: 12, padding: "8px 12px", background: "rgba(0,224,150,.04)", border: "1px solid rgba(0,224,150,.2)", borderRadius: 8 }}>
+                  <div style={{ fontSize: 11, color: "var(--ok)", fontWeight: 700, marginBottom: 5, letterSpacing: 0.5 }}>INCLUDED</div>
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "3px 14px", fontSize: 11, color: "var(--tx2)", lineHeight: 1.4 }}>
+                    <div>✓ Unlimited assessments</div>
+                    <div>✓ Full reports & PDF exports</div>
+                    <div>✓ Bulk invites (CSV + paste)</div>
+                    <div>✓ Slack & Zapier integrations</div>
+                    <div>✓ Team skill heatmap</div>
                   </div>
                 </div>
 
                 {/* Action buttons */}
                 <div style={{ display: "flex", gap: 8 }}>
-                  <button className="btn bs" style={{ flex: 1, padding: 12 }} onClick={() => setShowHrSubscribeModal(false)}>
+                  <button className="btn bs" style={{ flex: 1, padding: "9px 12px", fontSize: 13 }} onClick={() => setShowHrSubscribeModal(false)}>
                     Cancel
                   </button>
                   <button
                     className="btn bp"
-                    style={{ flex: 2, padding: 12, fontWeight: 700 }}
+                    style={{ flex: 2, padding: "9px 12px", fontWeight: 700, fontSize: 13 }}
                     disabled={!hrModalCompanyName.trim()}
                     onClick={async () => {
                       const tier = HR_PRICING[hrModalTeamSize];
@@ -6440,7 +6480,7 @@ ${evals.map((ev, i) => {
                   </button>
                 </div>
 
-                <div style={{ fontSize: 11, color: "var(--tx2)", textAlign: "center", marginTop: 10 }}>
+                <div style={{ fontSize: 10, color: "var(--tx2)", textAlign: "center", marginTop: 8 }}>
                   Secure payment via Razorpay · Cancel anytime
                 </div>
               </div>
