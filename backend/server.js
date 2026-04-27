@@ -2734,30 +2734,29 @@ Respond ONLY in valid JSON with no markdown:
 // ═══════════════════════════════════════════════════════════════
 app.get('/api/leaderboard', auth, async (req, res) => {
   try {
-    // Get top 10 users by best score this week, only those who opted in
+    // Get top 10 users by best score this week from user_scenario_history
+    // (actual completed assessments, not the legacy sessions table)
     const result = await pool.query(`
       SELECT u.name, u.id,
-        MAX(s.overall_score) as best_score,
-        COUNT(s.id) as total_sessions,
-        MAX(ss.badge_level) as badge
+        MAX(h.score) as best_score,
+        COUNT(h.id) as total_sessions
       FROM users u
-      JOIN sessions s ON s.user_id = u.id
-      LEFT JOIN skill_scores ss ON ss.user_id = u.id
-      WHERE s.completed_at > NOW() - INTERVAL '7 days'
-        AND s.overall_score IS NOT NULL
+      JOIN user_scenario_history h ON h.user_id = u.id
+      WHERE h.completed_at > NOW() - INTERVAL '7 days'
+        AND h.score IS NOT NULL
       GROUP BY u.id, u.name
-      ORDER BY best_score DESC
+      ORDER BY best_score DESC NULLS LAST
       LIMIT 10
     `);
 
     // Find current user's rank
     const userRank = await pool.query(`
       SELECT rank FROM (
-        SELECT u.id, RANK() OVER (ORDER BY MAX(s.overall_score) DESC) as rank
+        SELECT u.id, RANK() OVER (ORDER BY MAX(h.score) DESC) as rank
         FROM users u
-        JOIN sessions s ON s.user_id = u.id
-        WHERE s.completed_at > NOW() - INTERVAL '7 days'
-          AND s.overall_score IS NOT NULL
+        JOIN user_scenario_history h ON h.user_id = u.id
+        WHERE h.completed_at > NOW() - INTERVAL '7 days'
+          AND h.score IS NOT NULL
         GROUP BY u.id
       ) ranked WHERE id = $1
     `, [req.user.id]);
