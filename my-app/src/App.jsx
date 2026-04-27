@@ -3370,7 +3370,9 @@ export default function ThreatReady() {
                       {p.badge && <span style={{ fontSize: 9, color: "var(--wn)" }}>{p.badge}</span>}
                     </div>
                     <div style={{ textAlign: "right" }}>
-                      <span className="mono" style={{ fontSize: 13, fontWeight: 700, color: p.best_score >= 7 ? "var(--ok)" : "var(--wn)" }}>{parseFloat(p.best_score).toFixed(1)}</span>
+                      <span className="mono" style={{ fontSize: 13, fontWeight: 700, color: (parseFloat(p.best_score) || 0) >= 7 ? "var(--ok)" : "var(--wn)" }}>
+                        {p.best_score != null && !isNaN(parseFloat(p.best_score)) ? parseFloat(p.best_score).toFixed(1) : "—"}
+                      </span>
                       <span style={{ fontSize: 9, color: "var(--tx3)" }}>/10</span>
                     </div>
                   </div>

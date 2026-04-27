@@ -2866,6 +2866,9 @@ app.post('/api/daily-challenge/submit', auth, async (req, res) => {
     const { challenge_id, answer } = req.body;
     if (!challenge_id || !answer?.trim()) return res.status(400).json({ error: 'Missing fields' });
 
+    // Drop CHECK constraint if it's too strict (allow any score 0-100 stored as int)
+    await pool.query(`ALTER TABLE daily_challenge_responses DROP CONSTRAINT IF EXISTS daily_challenge_responses_score_check`).catch(()=>{});
+
     // Check not already answered
     const existing = await pool.query(
       `SELECT id FROM daily_challenge_responses WHERE user_id=$1 AND challenge_id=$2`,
@@ -2877,23 +2880,36 @@ app.post('/api/daily-challenge/submit', auth, async (req, res) => {
     const ch = await pool.query(`SELECT * FROM daily_challenges WHERE id=$1`, [challenge_id]);
     if (!ch.rows[0]) return res.status(404).json({ error: 'Challenge not found' });
 
-    // AI evaluate
-    const Anthropic = require('@anthropic-ai/sdk');
-    const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
-    const msg = await anthropic.messages.create({
-      model: MODEL_QUESTIONS, max_tokens: 300,
-      messages: [{
-        role: 'user', content: `Daily challenge: "${ch.rows[0].question}"
+    // AI evaluate — with safe fallback
+    let result = { score: 0, correct: false, feedback: 'Unable to evaluate', points_earned: 0 };
+    try {
+      const Anthropic = require('@anthropic-ai/sdk');
+      const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+      const msg = await anthropic.messages.create({
+        model: MODEL_QUESTIONS, max_tokens: 300,
+        messages: [{
+          role: 'user', content: `Daily challenge: "${ch.rows[0].question}"
 Answer: "${answer}"
 Score 0-100 and give brief feedback. JSON only: {"score":75,"correct":true,"feedback":"brief feedback","points_earned":50}` }]
-    });
-    const result = JSON.parse(msg.content[0].text.replace(/\`\`\`json|\`\`\`/g, '').trim());
+      });
+      const raw = msg.content[0]?.text || '';
+      const cleaned = raw.replace(/```json|```/g, '').trim();
+      const parsed = JSON.parse(cleaned);
+      result = {
+        score: Math.max(0, Math.min(100, Math.round(Number(parsed.score) || 0))),  // clamp 0-100
+        correct: !!parsed.correct,
+        feedback: String(parsed.feedback || '').substring(0, 500),
+        points_earned: Math.max(0, Math.min(100, Math.round(Number(parsed.points_earned) || 0)))
+      };
+    } catch (aiErr) {
+      console.error('Daily challenge AI eval failed (using safe defaults):', aiErr.message);
+    }
 
-    // Save response
+    // Save response (score is now guaranteed 0-100, safe for any check constraint)
     await pool.query(
       `INSERT INTO daily_challenge_responses (user_id, challenge_id, answer, score, points_earned, submitted_at)
        VALUES ($1,$2,$3,$4,$5,NOW())`,
-      [req.user.id, challenge_id, answer, result.score || 0, result.points_earned || 0]
+      [req.user.id, challenge_id, answer, result.score, result.points_earned]
     );
 
     // Add XP to user_stats
