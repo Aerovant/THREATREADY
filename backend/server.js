@@ -2956,6 +2956,26 @@ async function createNotification(userId, title, message, type = 'info') {
 // ═══════════════════════════════════════════════════════════════
 app.get('/api/scenario-history', auth, async (req, res) => {
   try {
+    // Ensure table exists with all required columns (safe migration)
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS user_scenario_history (
+        id SERIAL PRIMARY KEY,
+        user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+        scenario_id VARCHAR(100),
+        role_id VARCHAR(100),
+        score NUMERIC(5,2),
+        completed_at TIMESTAMP DEFAULT NOW(),
+        UNIQUE(user_id, scenario_id)
+      )
+    `).catch(() => {});
+
+    // Add missing columns if they don't exist (idempotent)
+    await pool.query(`ALTER TABLE user_scenario_history ADD COLUMN IF NOT EXISTS id SERIAL PRIMARY KEY`).catch(() => {});
+    await pool.query(`ALTER TABLE user_scenario_history ADD COLUMN IF NOT EXISTS scenario_id VARCHAR(100)`).catch(() => {});
+    await pool.query(`ALTER TABLE user_scenario_history ADD COLUMN IF NOT EXISTS role_id VARCHAR(100)`).catch(() => {});
+    await pool.query(`ALTER TABLE user_scenario_history ADD COLUMN IF NOT EXISTS score NUMERIC(5,2)`).catch(() => {});
+    await pool.query(`ALTER TABLE user_scenario_history ADD COLUMN IF NOT EXISTS completed_at TIMESTAMP DEFAULT NOW()`).catch(() => {});
+
     const result = await pool.query(
       `SELECT scenario_id, role_id, score, completed_at FROM user_scenario_history
        WHERE user_id=$1 ORDER BY completed_at DESC`,
@@ -2963,13 +2983,29 @@ app.get('/api/scenario-history', auth, async (req, res) => {
     );
     res.json({ history: result.rows });
   } catch (e) {
-    res.status(500).json({ error: e.message });
+    console.error('Scenario history GET error:', e.message);
+    // Return empty array instead of 500 so frontend doesn't break
+    res.json({ history: [], error: e.message });
   }
 });
 
 app.post('/api/scenario-history', auth, async (req, res) => {
   try {
     const { scenario_id, role_id, score } = req.body;
+
+    // Ensure table exists (safe migration)
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS user_scenario_history (
+        id SERIAL PRIMARY KEY,
+        user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+        scenario_id VARCHAR(100),
+        role_id VARCHAR(100),
+        score NUMERIC(5,2),
+        completed_at TIMESTAMP DEFAULT NOW(),
+        UNIQUE(user_id, scenario_id)
+      )
+    `).catch(() => {});
+
     await pool.query(
       `INSERT INTO user_scenario_history (user_id, scenario_id, role_id, score, completed_at)
        VALUES ($1,$2,$3,$4,NOW())
@@ -2978,6 +3014,7 @@ app.post('/api/scenario-history', auth, async (req, res) => {
     );
     res.json({ success: true });
   } catch (e) {
+    console.error('Scenario history POST error:', e.message);
     res.status(500).json({ error: e.message });
   }
 });
