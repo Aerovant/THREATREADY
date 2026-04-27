@@ -665,7 +665,14 @@ export default function ThreatReady() {
     return saved ? JSON.parse(saved) : [];
   });
   const [selectedRoles, setSelectedRoles] = useState([]);
-  const [isPaid, setIsPaid] = useState(() => localStorage.getItem('isPaid') === 'true');
+  const [isPaid, setIsPaid] = useState(() => {
+    // If user is on free trial, they're NEVER paid (regardless of stale localStorage)
+    if (localStorage.getItem('cyberprep_freetrial') === 'true') {
+      localStorage.removeItem('isPaid'); // clean up stale flag
+      return false;
+    }
+    return localStorage.getItem('isPaid') === 'true';
+  });
   const [freeAttempts, setFreeAttempts] = useState(2);
   // Per-role attempts tracking for free trial (2 attempts per role)
   const [roleAttempts, setRoleAttempts] = useState(() => {
@@ -784,6 +791,7 @@ export default function ThreatReady() {
   const [agreeTerms, setAgreeTerms] = useState(false);
   const [showAuthPassword, setShowAuthPassword] = useState(false);
   const [showNewPassword, setShowNewPassword] = useState(false);
+  const [isAuthenticating, setIsAuthenticating] = useState(false);
 
   // ── DASHBOARD TABS ──
   const [dashTab, setDashTab] = useState(() => localStorage.getItem('cyberprep_tab') || "home");
@@ -963,13 +971,27 @@ export default function ThreatReady() {
 
       .catch(err => console.log('Dashboard load error:', err));
 
-    // Load profile data
+    // Load profile data (career goals only — resume is NOT auto-loaded for fresh start each session)
     fetch('https://threatready-db.onrender.com/api/profile', {
       headers: { 'Authorization': `Bearer ${token}` }
     })
       .then(r => r.json())
       .then(data => {
-        if (data.resume_text) setResumeText(data.resume_text);
+        // Skip auto-load of resume/career data if user just logged out (fresh start)
+        const justLoggedOut = localStorage.getItem('cyberprep_just_logged_out') === 'true';
+        if (justLoggedOut) {
+          localStorage.removeItem('cyberprep_just_logged_out');
+          // Keep frontend state empty - user can re-enter if they want
+          return;
+        }
+        // Only restore resume if user is in same session (not after logout)
+        // Check session_start - if recent, this is a refresh, not a fresh login
+        const sessionStart = parseInt(localStorage.getItem('cyberprep_session_start') || '0');
+        const sessionAge = Date.now() - sessionStart;
+        const isFreshLogin = sessionAge < 10000; // less than 10 seconds = fresh login
+        if (!isFreshLogin && data.resume_text) {
+          setResumeText(data.resume_text);
+        }
         if (data.user?.target_role) setTargetRole(data.user.target_role);
         if (data.user?.experience_level) setExperienceLevel(data.user.experience_level);
       })
@@ -1068,15 +1090,20 @@ export default function ThreatReady() {
     const token = localStorage.getItem('token');
     let sourceHistory = [];
 
-    if (token && scenarioHistory.length > 0) {
-      // For logged-in users: fetch fresh history with full data
+    if (token) {
+      // For logged-in users: ALWAYS fetch fresh history from backend
       fetch('https://threatready-db.onrender.com/api/scenario-history', {
         headers: { 'Authorization': `Bearer ${token}` }
       }).then(r => r.json()).then(data => {
-        if (data.history) computeStats(data.history);
+        if (data.history && data.history.length > 0) {
+          computeStats(data.history);
+        } else {
+          // Backend returned empty - fall back to local session history
+          computeStats(localSessionHistory);
+        }
       }).catch(() => computeStats(localSessionHistory));
     } else {
-      // Free trial user OR logged-in with no history: use local
+      // Free trial user (no token): use local session history
       computeStats(localSessionHistory);
     }
 
@@ -1145,7 +1172,7 @@ export default function ThreatReady() {
       }).sort((a, b) => a.avg - b.avg);
       setWeaknessTracker(weaknesses);
     }
-  }, [localSessionHistory, scenarioHistory]);
+  }, [localSessionHistory, scenarioHistory, user]);
 
   useEffect(() => {
     if (view === 'dashboard' || view === 'b2b-dashboard') {
@@ -1351,6 +1378,7 @@ export default function ThreatReady() {
       if (authPassword.length < 8) { setAuthError("Password must be at least 8 characters"); return; }
       if (!agreeTerms) { setAuthError("Please accept Terms and Privacy Policy"); return; }
 
+      setIsAuthenticating(true);
       try {
         const res = await fetch("https://threatready-db.onrender.com/api/auth/signup", {
           method: "POST",
@@ -1378,12 +1406,15 @@ export default function ThreatReady() {
 
       } catch (err) {
         setAuthError("Cannot connect to server.");
+      } finally {
+        setIsAuthenticating(false);
       }
 
     } else {
       // LOGIN
       if (!authEmail || !authPassword) { setAuthError("Email and password required"); return; }
 
+      setIsAuthenticating(true);
       try {
         const res = await fetch("https://threatready-db.onrender.com/api/auth/login", {
           method: "POST",
@@ -1420,13 +1451,11 @@ export default function ThreatReady() {
         fetch('https://threatready-db.onrender.com/api/auth/me', {
           headers: { 'Authorization': `Bearer ${data.token}` }
         }).then(r => r.json()).then(meData => {
+          // Only set isPaid TRUE if user actually has active paid plan (not free trial)
           if (meData.user?.plan === 'paid' && meData.user?.status === 'active') {
-
             setIsPaid(true);
             setUser(data.user);
-            setIsPaid(true); // ← ADD THIS
             setSettingsName(data.user.name || '');
-
             setSubscribedRoles(JSON.parse(meData.user.subscribed_roles || '[]'));
           } else {
             setIsPaid(false);
@@ -1444,7 +1473,15 @@ export default function ThreatReady() {
             ? JSON.parse(meData.user.subscribed_roles)
             : meData.user.subscribed_roles || [];
           setSubscribedRoles(roles);
-          setIsPaid(roles.length > 0);
+          // CRITICAL: Only set isPaid TRUE if user has paid plan (NOT just because they have roles)
+          // Free trial users also have roles in subscribed_roles, but they are NOT paid
+          const isActivelyPaid = meData.user?.plan === 'paid' && meData.user?.status === 'active';
+          setIsPaid(isActivelyPaid);
+          if (isActivelyPaid) {
+            localStorage.setItem('isPaid', 'true');
+          } else {
+            localStorage.removeItem('isPaid');
+          }
         }
         setSettingsName(data.user.name || '');
 
@@ -1457,6 +1494,8 @@ export default function ThreatReady() {
 
       } catch (err) {
         setAuthError("Cannot connect to server. Is backend running on port 4000?");
+      } finally {
+        setIsAuthenticating(false);
       }
     }
   };
@@ -1938,6 +1977,8 @@ export default function ThreatReady() {
 
   const HomeBtn = ({ label = "← Home" }) => <button className="home-btn" onClick={goHome}>{label}</button>;
   const doLogout = () => {
+    // Mark that user logged out → next login won't auto-load resume/career data
+    localStorage.setItem('cyberprep_just_logged_out', 'true');
     localStorage.removeItem('token');
     localStorage.removeItem('cyberprep_user');
     localStorage.removeItem('cyberprep_usertype');
@@ -2213,6 +2254,8 @@ export default function ThreatReady() {
                   localStorage.setItem('cyberprep_freetrial', 'true');
                   localStorage.setItem('cyberprep_usertype', 'b2c');
                   localStorage.setItem('cyberprep_session_start', Date.now().toString());
+                  // CRITICAL: Clear any leftover isPaid flag from previous sessions
+                  localStorage.removeItem('isPaid');
                   setView("dashboard");
                   setDashTab("home");
                   showToast("Free trial started! 2 total attempts on Beginner only.", "success");
@@ -2300,15 +2343,21 @@ export default function ThreatReady() {
     <div className="app"><style>{CSS}</style><div className="scanbar" /><div className="gridbg" />
       <ToastContainer />
       <button className="home-btn" onClick={() => {
-        // If user is in free trial, go back to dashboard instead of landing (preserves session)
+        // Go back to previous view (e.g., if came from difficulty page, return there)
+        const prevView = localStorage.getItem('cyberprep_prev_view');
         const isFreeTrialUser = localStorage.getItem('cyberprep_freetrial') === 'true';
-        if (isFreeTrialUser) {
+
+        setAuthStep("form");
+        setAuthError("");
+
+        if (prevView && prevView !== 'auth') {
+          // Return to whatever page user came from (e.g., difficulty)
+          setView(prevView);
+          localStorage.removeItem('cyberprep_prev_view');
+        } else if (isFreeTrialUser) {
           setView("dashboard");
-          setAuthStep("form");
-          setAuthError("");
         } else {
           setView("landing");
-          setAuthStep("form");
         }
       }}>← Back</button>
       <div className="page" style={{ display: "flex", alignItems: "center", justifyContent: "center", minHeight: "100vh" }}>
@@ -2366,8 +2415,38 @@ export default function ThreatReady() {
               </label>
             )}
             {authMode === "login" && <div style={{ textAlign: "right", marginBottom: 10 }}><span style={{ fontSize: 11, color: "var(--ac)", cursor: "pointer" }} onClick={() => { setAuthStep("forgot"); setForgotEmail(authEmail || ""); setForgotMsg(""); }}>Forgot Password?</span></div>}
-            <button className="btn bp" style={{ width: "100%", padding: 13, fontSize: 14 }} onClick={handleAuth}>
-              {authMode === "login" ? "Sign In" : "Create Account"}
+            <button
+              className="btn bp"
+              style={{
+                width: "100%",
+                padding: 13,
+                fontSize: 14,
+                opacity: isAuthenticating ? 0.7 : 1,
+                cursor: isAuthenticating ? "not-allowed" : "pointer",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                gap: 8
+              }}
+              onClick={handleAuth}
+              disabled={isAuthenticating}
+            >
+              {isAuthenticating ? (
+                <>
+                  <span style={{
+                    display: "inline-block",
+                    width: 14,
+                    height: 14,
+                    border: "2px solid rgba(0,0,0,0.3)",
+                    borderTopColor: "#000",
+                    borderRadius: "50%",
+                    animation: "spin 0.6s linear infinite"
+                  }} />
+                  {authMode === "login" ? "Signing in..." : "Creating account..."}
+                </>
+              ) : (
+                authMode === "login" ? "Sign In" : "Create Account"
+              )}
             </button>
             <div style={{ display: "flex", gap: 8, marginTop: 14 }}>
               <button className="btn bs" style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }} onClick={() => window.location.href = "https://threatready-db.onrender.com/auth/google"}>
@@ -2736,6 +2815,8 @@ export default function ThreatReady() {
                       onClick={(e) => {
                         e.stopPropagation();
                         if (!user) {
+                          // Save current view so Back button on auth page returns here
+                          localStorage.setItem('cyberprep_prev_view', 'difficulty');
                           // Free trial guest → send to signup
                           setAuthMode("signup");
                           setView("auth");

@@ -662,13 +662,32 @@ app.post('/api/session/complete', auth, async (req, res) => {
     );
     // Save to scenario history
     try {
+      // Ensure table exists
+      await pool.query(`
+        CREATE TABLE IF NOT EXISTS user_scenario_history (
+          id SERIAL PRIMARY KEY,
+          user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+          scenario_id VARCHAR(100),
+          role_id VARCHAR(100),
+          score NUMERIC(5,2),
+          completed_at TIMESTAMP DEFAULT NOW()
+        )
+      `).catch(() => {});
+
+      // DELETE-then-INSERT pattern (works without UNIQUE constraint)
+      await pool.query(
+        `DELETE FROM user_scenario_history WHERE user_id=$1 AND scenario_id=$2`,
+        [req.user.id, scenario_id]
+      );
       await pool.query(
         `INSERT INTO user_scenario_history (user_id, scenario_id, role_id, score, completed_at)
-         VALUES ($1,$2,$3,$4,NOW())
-         ON CONFLICT (user_id, scenario_id) DO UPDATE SET score=$4, completed_at=NOW()`,
+         VALUES ($1,$2,$3,$4,NOW())`,
         [req.user.id, scenario_id, role_id, overall_score]
       );
-    } catch (histErr) { console.log('History save:', histErr.message); }
+      console.log('Scenario history saved:', scenario_id, 'score:', overall_score);
+    } catch (histErr) {
+      console.log('History save failed:', histErr.message);
+    }
 
     console.log('SESSION COMPLETE! XP earned:', earned_xp, 'Badge:', badge);
     res.json({ success: true });
@@ -3001,15 +3020,18 @@ app.post('/api/scenario-history', auth, async (req, res) => {
         scenario_id VARCHAR(100),
         role_id VARCHAR(100),
         score NUMERIC(5,2),
-        completed_at TIMESTAMP DEFAULT NOW(),
-        UNIQUE(user_id, scenario_id)
+        completed_at TIMESTAMP DEFAULT NOW()
       )
     `).catch(() => {});
 
+    // DELETE-then-INSERT pattern (works without UNIQUE constraint)
+    await pool.query(
+      `DELETE FROM user_scenario_history WHERE user_id=$1 AND scenario_id=$2`,
+      [req.user.id, scenario_id]
+    );
     await pool.query(
       `INSERT INTO user_scenario_history (user_id, scenario_id, role_id, score, completed_at)
-       VALUES ($1,$2,$3,$4,NOW())
-       ON CONFLICT (user_id, scenario_id) DO UPDATE SET score=$4, completed_at=NOW()`,
+       VALUES ($1,$2,$3,$4,NOW())`,
       [req.user.id, scenario_id, role_id, score]
     );
     res.json({ success: true });
@@ -3352,6 +3374,50 @@ async function runMigrations() {
     await pool.query(`ALTER TABLE daily_challenges ADD COLUMN IF NOT EXISTS points INTEGER DEFAULT 50`);
     await pool.query(`ALTER TABLE daily_challenges ADD COLUMN IF NOT EXISTS is_active BOOLEAN DEFAULT true`);
     await pool.query(`ALTER TABLE daily_challenges ADD COLUMN IF NOT EXISTS challenge_date DATE`);
+
+    // Ensure user_scenario_history table exists with correct schema
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS user_scenario_history (
+        id SERIAL PRIMARY KEY,
+        user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+        scenario_id VARCHAR(100),
+        role_id VARCHAR(100),
+        score NUMERIC(5,2),
+        completed_at TIMESTAMP DEFAULT NOW()
+      )
+    `);
+
+    // BACKFILL: Copy any existing completed sessions into user_scenario_history
+    // This recovers data for users who completed assessments before this fix
+    try {
+      // Add role_id column to sessions if missing (for the backfill query)
+      await pool.query(`ALTER TABLE sessions ADD COLUMN IF NOT EXISTS role_id VARCHAR(100)`).catch(() => {});
+
+      const backfillResult = await pool.query(`
+        INSERT INTO user_scenario_history (user_id, scenario_id, role_id, score, completed_at)
+        SELECT s.user_id, s.scenario_id,
+               COALESCE(s.role_id, 'prodsec') as role_id,
+               s.overall_score as score,
+               s.completed_at
+        FROM sessions s
+        WHERE s.completed_at IS NOT NULL
+          AND s.overall_score IS NOT NULL
+          AND s.user_id IS NOT NULL
+          AND s.scenario_id IS NOT NULL
+          AND NOT EXISTS (
+            SELECT 1 FROM user_scenario_history h
+            WHERE h.user_id = s.user_id
+              AND h.scenario_id = s.scenario_id
+              AND h.completed_at = s.completed_at
+          )
+      `);
+      if (backfillResult.rowCount > 0) {
+        console.log(`✅ Backfilled ${backfillResult.rowCount} sessions into user_scenario_history`);
+      }
+    } catch (backfillErr) {
+      console.log('Backfill note:', backfillErr.message);
+    }
+
     console.log('✅ DB migrations complete');
   } catch(e) {
     console.log('Migration note:', e.message);
