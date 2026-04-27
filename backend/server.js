@@ -3147,20 +3147,39 @@ app.post('/api/auth/reset-password', async (req, res) => {
 app.post('/api/settings/profile', auth, async (req, res) => {
   console.log('--- SETTINGS: PROFILE UPDATE ---');
   try {
-    const { name } = req.body;
+    const { name, company_name, team_size } = req.body;
     if (!name?.trim()) return res.status(400).json({ error: 'Name required' });
 
+    // Ensure company_name and team_size columns exist (idempotent)
+    await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS company_name VARCHAR(255)`).catch(() => {});
+    await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS team_size VARCHAR(20)`).catch(() => {});
+
+    // Build dynamic update query based on provided fields
+    const fields = ['name = $1'];
+    const values = [name.trim()];
+    let idx = 2;
+
+    if (company_name !== undefined && company_name !== null) {
+      fields.push(`company_name = $${idx++}`);
+      values.push(String(company_name).trim().substring(0, 255));
+    }
+    if (team_size !== undefined && team_size !== null) {
+      fields.push(`team_size = $${idx++}`);
+      values.push(String(team_size).substring(0, 20));
+    }
+
+    values.push(req.user.id);
     await pool.query(
-      'UPDATE users SET name = $1 WHERE id = $2',
-      [name.trim(), req.user.id]
+      `UPDATE users SET ${fields.join(', ')} WHERE id = $${idx}`,
+      values
     );
 
     const updated = await pool.query(
-      'SELECT id, name, email, user_type FROM users WHERE id = $1',
+      'SELECT id, name, email, user_type, company_name, team_size FROM users WHERE id = $1',
       [req.user.id]
     );
 
-    console.log('Profile updated for user:', req.user.id);
+    console.log('Profile updated for user:', req.user.id, 'Company:', company_name, 'Team:', team_size);
     res.json({ success: true, user: updated.rows[0] });
   } catch (e) {
     console.error('Settings profile error:', e.message);

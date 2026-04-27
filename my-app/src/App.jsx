@@ -75,7 +75,7 @@ const DEMO_QUESTIONS = [
 const TOTAL_SC = Object.values(SCENARIOS).reduce((s, a) => s + a.length, 0);
 // ── CSS ──
 const CSS = `
-:root{--bg:#0a0e1a;--s1:#111827;--s2:#1a1f2e;--s3:#252b3b;--ac:#00e5ff;--ok:#00e096;--wn:#ffab40;--dn:#ff5252;--tx1:#e8eaf6;--tx2:#8890b0;--tx3:#5a6380;--bd:#1e2536}
+:root{--bg:#0a0e1a;--s1:#111827;--s2:#1a1f2e;--s3:#252b3b;--ac:#00e5ff;--ok:#00e096;--wn:#ffab40;--dn:#ff5252;--tx1:#e8eaf6;--tx2:#b8c0dc;--tx3:#9098b8;--bd:#1e2536}
 *{margin:0;padding:0;box-sizing:border-box}
 body{background:var(--bg);color:var(--tx1);font-family:'Inter','Segoe UI',system-ui,sans-serif;overflow-x:hidden;font-size:15px}
 .app{min-height:100vh;position:relative;overflow-x:hidden;width:100%}
@@ -274,18 +274,101 @@ function useVoice() {
   const [recording, setRec] = useState(false);
   const [transcript, setTr] = useState("");
   const recRef = useRef(null);
-  const start = useCallback(() => {
+  const finalTranscriptRef = useRef("");
+  const manuallyStopped = useRef(false);
+
+  const startRecognition = useCallback(() => {
+    if (manuallyStopped.current) return;
+
+    const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SR) { console.log("Speech recognition not supported"); return; }
+
+    const r = new SR();
+    r.continuous = true;
+    r.interimResults = true;
+    r.lang = 'en-US';  // Explicit language for better accuracy
+    r.maxAlternatives = 1;
+
+    r.onresult = (e) => {
+      let interim = "";
+      for (let i = e.resultIndex; i < e.results.length; i++) {
+        const text = e.results[i][0].transcript;
+        if (e.results[i].isFinal) {
+          finalTranscriptRef.current += text + ' ';
+        } else {
+          interim += text;
+        }
+      }
+      setTr(finalTranscriptRef.current + interim);
+    };
+
+    r.onend = () => {
+      // Auto-restart on silence (browsers auto-stop after ~10sec of silence)
+      // Only restart if user hasn't manually clicked stop
+      if (!manuallyStopped.current) {
+        setTimeout(() => {
+          if (!manuallyStopped.current) {
+            startRecognition();
+          }
+        }, 100);
+      } else {
+        setRec(false);
+        recRef.current = null;
+      }
+    };
+
+    r.onerror = (e) => {
+      console.log("Speech error:", e.error);
+      // Permission denied or service unavailable - stop completely
+      if (e.error === 'not-allowed' || e.error === 'service-not-allowed') {
+        manuallyStopped.current = true;
+        setRec(false);
+        recRef.current = null;
+      }
+      // For 'no-speech', 'aborted', or 'network' - let onend handle restart
+    };
+
     try {
-      const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-      if (!SR) return;
-      const r = new SR(); r.continuous = true; r.interimResults = true;
-      r.onresult = e => { let t = ""; for (let i = 0; i < e.results.length; i++) t += e.results[i][0].transcript; setTr(t); };
-      r.start(); recRef.current = r; setRec(true);
-    } catch (e) { console.log("Voice not supported"); }
+      r.start();
+      recRef.current = r;
+    } catch (err) {
+      console.log("Failed to start recognition:", err.message);
+    }
   }, []);
-  const stop = useCallback(() => { recRef.current?.stop(); setRec(false); }, []);
-  const reset = useCallback(() => { setTr(""); setRec(false); }, []);
-  return { recording, transcript, start, stop, reset };
+
+  const start = useCallback(() => {
+    manuallyStopped.current = false;
+    setRec(true);
+    startRecognition();
+  }, [startRecognition]);
+
+  const stop = useCallback(() => {
+    manuallyStopped.current = true;
+    setRec(false);
+    if (recRef.current) {
+      try { recRef.current.stop(); } catch (e) {}
+      recRef.current = null;
+    }
+  }, []);
+
+  const reset = useCallback(() => {
+    manuallyStopped.current = true;
+    finalTranscriptRef.current = "";
+    setTr("");
+    setRec(false);
+    if (recRef.current) {
+      try { recRef.current.stop(); } catch (e) {}
+      recRef.current = null;
+    }
+  }, []);
+
+  // Allow user to manually edit the transcript (fix recognition errors)
+  const setTranscript = useCallback((text) => {
+    finalTranscriptRef.current = text + ' ';  // sync internal ref so voice continues from edit point
+    setTr(text);
+  }, []);
+
+  return { recording, transcript, start, stop, reset, setTranscript };
 }
 
 // ── DISABLE COPY PASTE ──
@@ -384,13 +467,13 @@ function FileUpload({ onUpload, label }) {
     <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 8 }}>
       <button
         className="btn bs"
-        style={{ fontSize: 10, padding: "6px 12px" }}
+        style={{ fontSize: 12, padding: "6px 12px" }}
         disabled={uploading}
         onClick={() => ref.current?.click()}
       >
         {uploading ? '⏳ Analyzing...' : `📎 ${label || "Upload File"}`}
       </button>
-      <span style={{ fontSize: 9, color: "var(--tx3)" }}>PDF · TXT · DOC</span>
+      <span style={{ fontSize: 12, color: "var(--tx2)", fontWeight: 600 }}>PDF · TXT · DOC</span>
       <input ref={ref} type="file" accept=".pdf,.txt,.doc,.docx" style={{ display: "none" }} onChange={handle} />
     </div>
   );
@@ -409,10 +492,10 @@ function ArchDiagram({ nodes, edges, zoom = 1 }) {
   return (
     <div style={{ position: "relative", marginBottom: 12 }}>
       <div style={{ display: "flex", gap: 4, marginBottom: 6 }}>
-        <button className="btn bs" style={{ padding: "2px 8px", fontSize: 10 }} onClick={() => setZ(p => Math.min(2, p + 0.2))}>+</button>
-        <button className="btn bs" style={{ padding: "2px 8px", fontSize: 10 }} onClick={() => setZ(p => Math.max(0.5, p - 0.2))}>-</button>
-        <button className="btn bs" style={{ padding: "2px 8px", fontSize: 10 }} onClick={() => { setZ(1); setPan({ x: 0, y: 0 }); }}>Reset</button>
-        <span style={{ fontSize: 9, color: "var(--tx3)", marginLeft: 4 }}>{Math.round(z * 100)}%</span>
+        <button className="btn bs" style={{ padding: "2px 8px", fontSize: 12 }} onClick={() => setZ(p => Math.min(2, p + 0.2))}>+</button>
+        <button className="btn bs" style={{ padding: "2px 8px", fontSize: 12 }} onClick={() => setZ(p => Math.max(0.5, p - 0.2))}>-</button>
+        <button className="btn bs" style={{ padding: "2px 8px", fontSize: 12 }} onClick={() => { setZ(1); setPan({ x: 0, y: 0 }); }}>Reset</button>
+        <span style={{ fontSize: 11, color: "var(--tx2)", marginLeft: 4 }}>{Math.round(z * 100)}%</span>
       </div>
       <div style={{ overflow: "hidden", borderRadius: 10, background: "var(--s2)", border: "1px solid var(--bd)", cursor: "grab" }}
         onMouseDown={e => { dragging.current = true; lastPos.current = { x: e.clientX, y: e.clientY }; }}
@@ -421,24 +504,23 @@ function ArchDiagram({ nodes, edges, zoom = 1 }) {
         onMouseLeave={() => { dragging.current = false; }}>
         <svg viewBox={`0 0 ${maxX} ${maxY}`} style={{ width: "100%", height: 200, transform: `scale(${z}) translate(${pan.x / z}px, ${pan.y / z}px)`, transformOrigin: "center" }}>
           <defs><marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 Z" fill="#ff5252" /></marker></defs>
+
+          {/* PASS 1: Draw edge lines (connecting nodes) */}
           {edges?.map((e, i) => {
             const from = nodes.find(n => n.id === e.f), to = nodes.find(n => n.id === e.t);
             if (!from || !to) return null;
-            const mx = (from.x + to.x) / 2 + 50;
-            const my = (from.y + to.y) / 2 + 20;
-            const label = e.l || '';
-            // Approx label width: 6.5px per char + padding
-            const labelWidth = label.length * 6.5 + 12;
-            return <g key={i}>
-              <line x1={from.x + 50} y1={from.y + 25} x2={to.x + 50} y2={to.y + 25} stroke={e.a ? "#ff525280" : "#ffffff20"} strokeWidth={e.a ? 2 : 1} markerEnd={e.a ? "url(#ah)" : ""} />
-              {label && (
-                <>
-                  <rect x={mx - labelWidth / 2} y={my - 11} width={labelWidth} height={15} rx={3} fill="#0a0e1a" stroke="#1e2536" strokeWidth={0.5} opacity={0.95} />
-                  <text x={mx} y={my} fill="#a8b0c8" fontSize="11" fontWeight="600" textAnchor="middle">{label}</text>
-                </>
-              )}
-            </g>;
+            return (
+              <line key={`line-${i}`}
+                x1={from.x + 50} y1={from.y + 25}
+                x2={to.x + 50} y2={to.y + 25}
+                stroke={e.a ? "#ff5252b0" : "#ffffff30"}
+                strokeWidth={e.a ? 2 : 1}
+                markerEnd={e.a ? "url(#ah)" : ""}
+              />
+            );
           })}
+
+          {/* PASS 2: Draw nodes (boxes with icon and label) */}
           {nodes.map(n => {
             const t = NT[n.t] || NT.compute;
             return <g key={n.id}>
@@ -446,6 +528,65 @@ function ArchDiagram({ nodes, edges, zoom = 1 }) {
               <text x={n.x + 50} y={n.y + 20} fill="#fff" fontSize="16" textAnchor="middle">{t.ic}</text>
               <text x={n.x + 50} y={n.y + 38} fill="#e8eaf6" fontSize="11" fontWeight="600" textAnchor="middle">{n.l}</text>
             </g>;
+          })}
+
+          {/* PASS 3: Draw edge LABELS LAST — text only with outline, no box */}
+          {edges?.map((e, i) => {
+            const from = nodes.find(n => n.id === e.f), to = nodes.find(n => n.id === e.t);
+            if (!from || !to) return null;
+            const label = e.l || '';
+            if (!label) return null;
+
+            // Node centers
+            const fromCx = from.x + 50;
+            const fromCy = from.y + 25;
+            const toCx = to.x + 50;
+            const toCy = to.y + 25;
+
+            // Midpoint of the connecting line
+            const mx = (fromCx + toCx) / 2;
+            const my = (fromCy + toCy) / 2;
+
+            // Calculate perpendicular offset to push label OFF the line and away from boxes
+            const dx = toCx - fromCx;
+            const dy = toCy - fromCy;
+            const len = Math.sqrt(dx * dx + dy * dy) || 1;
+
+            // Perpendicular unit vector (90° rotation)
+            let perpX = -dy / len;
+            let perpY = dx / len;
+
+            // Always position label "above" the line in screen coordinates
+            if (perpY > 0) {
+              perpX = -perpX;
+              perpY = -perpY;
+            }
+
+            // Offset distance — push label away from line
+            const offsetDistance = 18;
+            const labelX = mx + perpX * offsetDistance;
+            const labelY = my + perpY * offsetDistance;
+
+            return (
+              <text
+                key={`label-${i}`}
+                x={labelX}
+                y={labelY}
+                fill="#ffffff"
+                fontSize="11"
+                fontWeight="700"
+                textAnchor="middle"
+                dominantBaseline="middle"
+                style={{
+                  paintOrder: 'stroke',
+                  stroke: '#0a0e1a',
+                  strokeWidth: '4px',
+                  strokeLinejoin: 'round',
+                  pointerEvents: 'none',
+                  userSelect: 'none'
+                }}
+              >{label}</text>
+            );
           })}
         </svg>
       </div>
@@ -464,7 +605,7 @@ function PasswordStrength({ password }) {
       <div className="strength-bar" style={{ width: "100%", background: "var(--s3)" }}>
         <div className="strength-bar" style={{ width: `${score * 20}%`, background: level.c }} />
       </div>
-      <div style={{ fontSize: 9, color: level.c, marginTop: 3 }}>{level.l}</div>
+      <div style={{ fontSize: 11, color: level.c, marginTop: 3 }}>{level.l}</div>
     </div>
   );
 }
@@ -545,7 +686,7 @@ function AIAvatar({ isSpeaking, isMuted, qIndex }) {
               ))
             ) : (
               // Idle state
-              <div style={{ fontSize: 9, color: "#5a6380", letterSpacing: 1 }}>
+              <div style={{ fontSize: 11, color: "#5a6380", letterSpacing: 1 }}>
                 {isMuted ? "MUTED" : "READY"}
               </div>
             )}
@@ -740,6 +881,7 @@ export default function ThreatReady() {
   // Tab switch / focus loss tracking (anti-cheating)
   const [tabSwitchCount, setTabSwitchCount] = useState(0);
   const [showTabWarning, setShowTabWarning] = useState(false);
+  const [showEjectedModal, setShowEjectedModal] = useState(false);
   const timerRef = useRef(null);
   const voice = useVoice();
 
@@ -977,29 +1119,18 @@ export default function ThreatReady() {
 
       .catch(err => console.log('Dashboard load error:', err));
 
-    // Load profile data (career goals only — resume is NOT auto-loaded for fresh start each session)
+    // Load profile data — RESUME IS NEVER AUTO-LOADED
+    // User must re-upload or re-enter resume each session for fresh start
+    // (Career goals like target_role/experience_level are still auto-loaded since they're profile setup)
     fetch('https://threatready-db.onrender.com/api/profile', {
       headers: { 'Authorization': `Bearer ${token}` }
     })
       .then(r => r.json())
       .then(data => {
-        // Skip auto-load of resume/career data if user just logged out (fresh start)
-        const justLoggedOut = localStorage.getItem('cyberprep_just_logged_out') === 'true';
-        if (justLoggedOut) {
-          localStorage.removeItem('cyberprep_just_logged_out');
-          // Keep frontend state empty - user can re-enter if they want
-          return;
-        }
-        // Only restore resume if user is in same session (not after logout)
-        // Check session_start - if recent, this is a refresh, not a fresh login
-        const sessionStart = parseInt(localStorage.getItem('cyberprep_session_start') || '0');
-        const sessionAge = Date.now() - sessionStart;
-        const isFreshLogin = sessionAge < 10000; // less than 10 seconds = fresh login
-        if (!isFreshLogin && data.resume_text) {
-          setResumeText(data.resume_text);
-        }
+        // Only restore career goals — resume stays empty for fresh experience
         if (data.user?.target_role) setTargetRole(data.user.target_role);
         if (data.user?.experience_level) setExperienceLevel(data.user.experience_level);
+        // Resume is intentionally NOT loaded — keeps Profile tab clean on each login
       })
       .catch(err => console.log('Profile load error:', err));
 
@@ -1356,9 +1487,21 @@ export default function ThreatReady() {
         // User switched tabs or minimized the window
         setTabSwitchCount(prev => {
           const newCount = prev + 1;
-          // Show warning modal on every tab switch
-          setShowTabWarning(true);
-          showToast(`⚠️ Tab switch detected! (${newCount}/3) — please stay on this tab`, "error");
+          if (newCount >= 4) {
+            // 4th tab switch → eject from attempt
+            setShowEjectedModal(true);
+            // Auto-redirect to dashboard after showing modal
+            setTimeout(() => {
+              setShowEjectedModal(false);
+              setShowTabWarning(false);
+              setView('dashboard');
+              setTabSwitchCount(0);
+            }, 4000);
+          } else {
+            // 1st, 2nd, 3rd tab switch → just warning
+            setShowTabWarning(true);
+            showToast(`⚠️ Tab switch detected! (${newCount}/3) — One more switch will exit your attempt`, "error");
+          }
           return newCount;
         });
       }
@@ -1414,6 +1557,7 @@ export default function ThreatReady() {
     if (view !== "interview") {
       setTabSwitchCount(0);
       setShowTabWarning(false);
+      setShowEjectedModal(false);
     }
   }, [view]);
 
@@ -1464,16 +1608,8 @@ export default function ThreatReady() {
         const data = await res.json();
         if (!res.ok) { setAuthError(data.error || "Signup failed"); return; }
 
-        // Signup success — send OTP immediately
-        try {
-          await fetch("https://threatready-db.onrender.com/api/auth/send-otp", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ email: authEmail })
-          });
-        } catch (otpErr) {
-          console.log('OTP send error:', otpErr.message);
-        }
+        // OTP will be sent when user picks user type (Hiring/Preparing) — not here
+        // This avoids sending OTP twice
 
         // Go to hiring or preparing choice first
         const detectedType = detectUserType(authEmail, null);
@@ -1565,6 +1701,29 @@ export default function ThreatReady() {
         console.log('TYPE DETECTED:', type);
         setUserType(type);
         localStorage.setItem('cyberprep_usertype', type);
+
+        // If user signed up as B2B and entered company info, save it now
+        const pendingCompanyName = localStorage.getItem('cyberprep_company_name');
+        const pendingTeamSize = localStorage.getItem('cyberprep_team_size');
+        if (type === 'b2b' && pendingCompanyName && pendingTeamSize) {
+          try {
+            await fetch('https://threatready-db.onrender.com/api/settings/profile', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${data.token}` },
+              body: JSON.stringify({
+                name: data.user.name || '',
+                company_name: pendingCompanyName,
+                team_size: pendingTeamSize
+              })
+            });
+            setCompanyName(pendingCompanyName);
+            setTeamSize(pendingTeamSize);
+            localStorage.removeItem('cyberprep_company_name');
+            localStorage.removeItem('cyberprep_team_size');
+            console.log('HR company info saved on login:', pendingCompanyName, pendingTeamSize);
+          } catch (e) { console.log('Save company info failed:', e.message); }
+        }
+
         console.log('SETTING VIEW TO:', type === "b2b" ? "b2b-dashboard" : "dashboard");
         if (type === "b2b") { setView("b2b-dashboard"); } else { setView("dashboard"); }
 
@@ -1600,7 +1759,17 @@ export default function ThreatReady() {
  const confirmUserType = async (type) => {
   setUserType(type);
   localStorage.setItem('cyberprep_usertype', type);
-  // Send OTP and go to verify
+
+  if (type === 'b2b') {
+    // B2B Flow: Go to Company Name + Team Size step BEFORE sending OTP
+    // Pre-fill if we already have values
+    if (!hrModalCompanyName) setHrModalCompanyName(companyName || '');
+    if (!hrModalTeamSize) setHrModalTeamSize(teamSize || '5-10');
+    setAuthStep("company-info");
+    return;
+  }
+
+  // B2C Flow: Send OTP directly and go to verify
   try {
     await fetch("https://threatready-db.onrender.com/api/auth/send-otp", {
       method: "POST",
@@ -1612,6 +1781,35 @@ export default function ThreatReady() {
   setOtpError("");
   setAuthStep("verify");
 };
+
+  // ── CONFIRM COMPANY INFO (B2B step) ──
+  const confirmCompanyInfo = async () => {
+    if (!hrModalCompanyName.trim()) {
+      showToast('Please enter your company name', 'error');
+      return;
+    }
+    if (!hrModalTeamSize) {
+      showToast('Please select team size', 'error');
+      return;
+    }
+    // Save to state and localStorage so HR dashboard knows company info
+    setCompanyName(hrModalCompanyName);
+    setTeamSize(hrModalTeamSize);
+    localStorage.setItem('cyberprep_company_name', hrModalCompanyName);
+    localStorage.setItem('cyberprep_team_size', hrModalTeamSize);
+
+    // Send OTP and go to verify step
+    try {
+      await fetch("https://threatready-db.onrender.com/api/auth/send-otp", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: authEmail })
+      });
+    } catch(e) {}
+    setOtpCode("");
+    setOtpError("");
+    setAuthStep("verify");
+  };
 
   // ── SCENARIO LOGIC ──
 
@@ -2162,7 +2360,7 @@ export default function ThreatReady() {
             <div style={{ fontSize: 20, fontWeight: 800 }}>{hookSubline}</div>
             <div style={{ fontSize: 12, color: "var(--tx2)", marginTop: 4 }}>No signup required. Type or dictate your answer. Instant AI score.</div>
 
-            {/* <div style={{ fontSize: 10, color: "var(--dn)", marginTop: 6, fontWeight: 600 }}>
+            {/* <div style={{ fontSize: 12, color: "var(--dn)", marginTop: 6, fontWeight: 600 }}>
               ⚠️ This assessment is evaluated by AI
             </div> */}
 
@@ -2172,8 +2370,8 @@ export default function ThreatReady() {
               <div className="tag" style={{ marginBottom: 10 }}>{demoQ.ca}</div>
               <div style={{ fontSize: 13, fontWeight: 600, lineHeight: 1.6, marginBottom: 14 }}>{demoQ.q}</div>
               <div style={{ display: "flex", gap: 6, marginBottom: 10 }}>
-                <button className={`btn ${demoInputMode === "text" ? "bp" : "bs"}`} style={{ padding: "4px 12px", fontSize: 10 }} onClick={() => setDemoInputMode("text")}>✏️ Type</button>
-                <button className={`btn ${demoInputMode === "voice" ? "bp" : "bs"}`} style={{ padding: "4px 12px", fontSize: 10 }} onClick={() => setDemoInputMode("voice")}>🎤 Dictate</button>
+                <button className={`btn ${demoInputMode === "text" ? "bp" : "bs"}`} style={{ padding: "4px 12px", fontSize: 12 }} onClick={() => setDemoInputMode("text")}>✏️ Type</button>
+                <button className={`btn ${demoInputMode === "voice" ? "bp" : "bs"}`} style={{ padding: "4px 12px", fontSize: 12 }} onClick={() => setDemoInputMode("voice")}>🎤 Dictate</button>
               </div>
               {demoInputMode === "text" ? (
                 <NoPasteInput placeholder="Type your answer here..." value={demoAnswer} onChange={e => setDemoAnswer(e.target.value)} style={{ minHeight: 80, marginBottom: 12, fontSize: 13 }} />
@@ -2182,7 +2380,7 @@ export default function ThreatReady() {
                   <div className={`rec-ring ${demoVoice.recording ? "active" : ""}`}
                     onClick={demoVoice.recording ? demoVoice.stop : demoVoice.start}
                     style={{ margin: "0 auto 8px" }}>{demoVoice.recording ? "⏹" : "🎤"}</div>
-                  <div style={{ fontSize: 10, color: demoVoice.recording ? "var(--dn)" : "var(--tx3)" }}>
+                  <div style={{ fontSize: 12, color: demoVoice.recording ? "var(--dn)" : "var(--tx2)" }}>
                     {demoVoice.recording ? "Recording... tap to stop" : "Tap to start dictating"}
                   </div>
                   {demoVoice.transcript && <div style={{ marginTop: 10, padding: 10, background: "var(--s2)", borderRadius: 8, fontSize: 12, textAlign: "left", lineHeight: 1.6 }}>{demoVoice.transcript}</div>}
@@ -2199,7 +2397,7 @@ export default function ThreatReady() {
               <div className="mono" style={{ fontSize: 48, fontWeight: 700, color: demoScore.score >= 7 ? "var(--ok)" : demoScore.score >= 5 ? "var(--wn)" : "var(--dn)" }}>{demoScore.score}/10</div>
               <div className="tag" style={{ marginBottom: 8 }}>{demoScore.level}</div>
               <div style={{ fontSize: 12, color: "var(--tx2)", marginBottom: 14 }}>{demoScore.feedback}</div>
-              <div style={{ fontSize: 11, color: "var(--tx3)", marginBottom: 12 }}>Your full Skills Score (0-500) + benchmarking + role readiness badges require a free account.</div>
+              <div style={{ fontSize: 13, color: "var(--tx2)", marginBottom: 12 }}>Your full Skills Score (0-500) + benchmarking + role readiness badges require a free account.</div>
               <button className="btn bp" onClick={() => { setAuthMode("signup"); setView("auth"); }} style={{ padding: "10px 28px" }}>Create Free Account →</button>
             </div>
           )}
@@ -2212,17 +2410,17 @@ export default function ThreatReady() {
             ["🏗️ Real Architecture Reasoning", "Not theory. Not certifications. Real attack scenarios with real architectures."],
             ["📊 Team Skill Visibility", "CISOs see team gaps across security domains. Measurable improvement."]
           ].map(([t, d], i) => (
-            <div key={i} className="card fadeUp" style={{ padding: 16, animationDelay: `${i * .05}s` }}>
-              <div style={{ fontSize: 12, fontWeight: 700, color: "var(--ac)", marginBottom: 6 }}>{t}</div>
-              <div style={{ fontSize: 10, color: "var(--tx3)", lineHeight: 1.5 }}>{d}</div>
+            <div key={i} className="card fadeUp" style={{ padding: 18, animationDelay: `${i * .05}s` }}>
+              <div style={{ fontSize: 14, fontWeight: 700, color: "var(--ac)", marginBottom: 8 }}>{t}</div>
+              <div style={{ fontSize: 13, color: "var(--tx2)", lineHeight: 1.6 }}>{d}</div>
             </div>
           ))}
         </div>
 
         {/* TRUST SIGNALS */}
         <div style={{ textAlign: "center", marginTop: 28 }}>
-          <div className="mono" style={{ fontSize: 10, color: "var(--tx3)", letterSpacing: 2 }}>TRUSTED BY 500+ SECURITY ENGINEERS</div>
-          <div style={{ display: "flex", justifyContent: "center", gap: 16, marginTop: 8, fontSize: 10, color: "var(--tx3)", flexWrap: "wrap" }}>
+          <div className="mono" style={{ fontSize: 13, color: "var(--tx2)", letterSpacing: 2, fontWeight: 600 }}>TRUSTED BY 500+ SECURITY ENGINEERS</div>
+          <div style={{ display: "flex", justifyContent: "center", gap: 16, marginTop: 10, fontSize: 13, color: "var(--tx2)", flexWrap: "wrap", fontWeight: 500 }}>
             <span>Based on real CVEs</span><span>·</span>
             <span>MITRE ATT&CK mapped</span><span>·</span>
             <span>AI-powered evaluation</span><span>·</span>
@@ -2238,7 +2436,7 @@ export default function ThreatReady() {
               <div key={r.id} className="card card-glow fadeUp" style={{ animationDelay: `${i * .04}s`, textAlign: "center", padding: 16 }}>
                 <div style={{ fontSize: 28, marginBottom: 6 }}>{r.icon}</div>
                 <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 3 }}>{r.name}</div>
-                <div style={{ fontSize: 10, color: "var(--tx3)", lineHeight: 1.4 }}>{r.desc}</div>
+                <div style={{ fontSize: 13, color: "var(--tx2)", lineHeight: 1.5, fontWeight: 500 }}>{r.desc}</div>
               </div>
             ))}
           </div>
@@ -2271,7 +2469,7 @@ export default function ThreatReady() {
           <p style={{ fontSize: 13, color: "var(--tx2)", marginTop: 8, lineHeight: 1.7, maxWidth: 500, margin: "8px auto 0" }}>
             Pick 1 or 2 security roles. You'll get 2 beginner-level interview attempts — no credit card needed.
           </p>
-          <div style={{ background: "rgba(0,229,255,.06)", border: "1px solid rgba(0,229,255,.2)", borderRadius: 10, padding: "10px 16px", marginTop: 14, fontSize: 11, color: "var(--ac)", display: "inline-block" }}>
+          <div style={{ background: "rgba(0,229,255,.06)", border: "1px solid rgba(0,229,255,.2)", borderRadius: 10, padding: "10px 16px", marginTop: 14, fontSize: 13, color: "var(--ac)", display: "inline-block" }}>
             🎯 Beginner difficulty only &nbsp;·&nbsp; 2 total attempts &nbsp;·&nbsp; No signup to start
           </div>
         </div>
@@ -2293,8 +2491,8 @@ export default function ThreatReady() {
                 {sel && <div style={{ position: "absolute", top: 10, right: 10, width: 22, height: 22, borderRadius: "50%", background: r.color, color: "#000", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12, fontWeight: 700 }}>✓</div>}
                 <div style={{ fontSize: 32, marginBottom: 8 }}>{r.icon}</div>
                 <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 3 }}>{r.name}</div>
-                <div style={{ fontSize: 10, color: "var(--tx3)", lineHeight: 1.4, marginBottom: 10 }}>{r.desc}</div>
-                <div className="tag" style={{ fontSize: 9 }}>Beginner Free</div>
+                <div style={{ fontSize: 13, color: "var(--tx2)", lineHeight: 1.5, marginBottom: 10, fontWeight: 500 }}>{r.desc}</div>
+                <div className="tag" style={{ fontSize: 11 }}>Beginner Free</div>
               </div>
             );
           })}
@@ -2314,7 +2512,7 @@ export default function ThreatReady() {
                   );
                 })}
               </div>
-              <div style={{ fontSize: 11, color: "var(--tx3)", marginBottom: 16 }}>
+              <div style={{ fontSize: 13, color: "var(--tx2)", marginBottom: 16 }}>
                 {trialRoles.length} role{trialRoles.length > 1 ? "s" : ""} selected · Beginner difficulty · 2 total attempts
               </div>
               <button className="btn bp" style={{ width: "100%", padding: "14px 0", fontSize: 15 }}
@@ -2362,11 +2560,11 @@ export default function ThreatReady() {
 
           {results && (
             <div style={{ background: "var(--s2)", borderRadius: 12, padding: 16, marginBottom: 20 }}>
-              <div style={{ fontSize: 11, color: "var(--tx3)", marginBottom: 4 }}>Last Assessment Score</div>
+              <div style={{ fontSize: 13, color: "var(--tx2)", marginBottom: 4 }}>Last Assessment Score</div>
               <div className="mono" style={{ fontSize: 44, fontWeight: 700, color: results.overall_score >= 7 ? "var(--ok)" : results.overall_score >= 5 ? "var(--wn)" : "var(--dn)" }}>
-                {results.overall_score}<span style={{ fontSize: 18, color: "var(--tx3)" }}>/10</span>
+                {results.overall_score}<span style={{ fontSize: 18, color: "var(--tx2)" }}>/10</span>
               </div>
-              <div style={{ fontSize: 11, color: "var(--tx2)", marginTop: 4 }}>
+              <div style={{ fontSize: 13, color: "var(--tx2)", marginTop: 4 }}>
                 {results.badge} · {ROLES.find(r => r.id === activeRole)?.name || activeRole}
               </div>
             </div>
@@ -2385,7 +2583,7 @@ export default function ThreatReady() {
             ].map(([icon, text], i) => (
               <div key={i} style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 12px", background: "var(--s2)", borderRadius: 8 }}>
                 <span style={{ fontSize: 16 }}>{icon}</span>
-                <span style={{ fontSize: 11, fontWeight: 600 }}>{text}</span>
+                <span style={{ fontSize: 13, fontWeight: 600 }}>{text}</span>
               </div>
             ))}
           </div>
@@ -2444,9 +2642,9 @@ export default function ThreatReady() {
             <div style={{ textAlign: "center", marginBottom: 28 }}>
               <div style={{ fontSize: 28, marginBottom: 6 }}>🔐</div>
               <h2 style={{ fontSize: 22, fontWeight: 800 }}>{authMode === "login" ? "Welcome Back" : "Create Account"}</h2>
-              {authMode === "signup" && <p style={{ fontSize: 11, color: "var(--tx3)", marginTop: 6 }}>2 free attempts · No credit card required</p>}
+              {authMode === "signup" && <p style={{ fontSize: 13, color: "var(--tx2)", marginTop: 6 }}>2 free attempts · No credit card required</p>}
             </div>
-            {authError && <div style={{ background: "rgba(255,82,82,.1)", border: "1px solid rgba(255,82,82,.3)", borderRadius: 8, padding: 10, fontSize: 11, color: "var(--dn)", marginBottom: 14 }}>{authError}</div>}
+            {authError && <div style={{ background: "rgba(255,82,82,.1)", border: "1px solid rgba(255,82,82,.3)", borderRadius: 8, padding: 10, fontSize: 13, color: "var(--dn)", marginBottom: 14 }}>{authError}</div>}
             {authMode === "signup" && <input className="input" placeholder="Full Name" value={authName} onChange={e => setAuthName(e.target.value)} style={{ marginBottom: 10 }} />}
             <input className="input" type="email" placeholder="Email" value={authEmail} onChange={e => setAuthEmail(e.target.value)} style={{ marginBottom: 10 }} />
             <div style={{ position: "relative", marginBottom: 4 }}>
@@ -2485,12 +2683,12 @@ export default function ThreatReady() {
             </div>
             {authMode === "signup" && <PasswordStrength password={authPassword} />}
             {authMode === "signup" && (
-              <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 11, color: "var(--tx2)", marginBottom: 14, cursor: "pointer" }}>
+              <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, color: "var(--tx2)", marginBottom: 14, cursor: "pointer" }}>
                 <input type="checkbox" checked={agreeTerms} onChange={e => setAgreeTerms(e.target.checked)} />
                 I agree to the Terms of Service and Privacy Policy
               </label>
             )}
-            {authMode === "login" && <div style={{ textAlign: "right", marginBottom: 10 }}><span style={{ fontSize: 11, color: "var(--ac)", cursor: "pointer" }} onClick={() => { setAuthStep("forgot"); setForgotEmail(authEmail || ""); setForgotMsg(""); }}>Forgot Password?</span></div>}
+            {authMode === "login" && <div style={{ textAlign: "right", marginBottom: 10 }}><span style={{ fontSize: 13, color: "var(--ac)", cursor: "pointer" }} onClick={() => { setAuthStep("forgot"); setForgotEmail(authEmail || ""); setForgotMsg(""); }}>Forgot Password?</span></div>}
             <button
               className="btn bp"
               style={{
@@ -2551,12 +2749,12 @@ export default function ThreatReady() {
                 We sent a 6-digit code to{" "}
                 <span style={{ color: "var(--ac)", fontWeight: 600 }}>{authEmail}</span>
               </p>
-              <p style={{ fontSize: 11, color: "var(--tx3)", marginBottom: 20 }}>
+              <p style={{ fontSize: 13, color: "var(--tx2)", marginBottom: 20 }}>
                 Enter the code below. Expires in 15 minutes.
               </p>
 
               {otpError && (
-                <div style={{ background: "rgba(255,82,82,.1)", border: "1px solid rgba(255,82,82,.3)", borderRadius: 8, padding: 10, fontSize: 11, color: "var(--dn)", marginBottom: 14 }}>
+                <div style={{ background: "rgba(255,82,82,.1)", border: "1px solid rgba(255,82,82,.3)", borderRadius: 8, padding: 10, fontSize: 13, color: "var(--dn)", marginBottom: 14 }}>
                   {otpError}
                 </div>
               )}
@@ -2602,7 +2800,7 @@ export default function ThreatReady() {
 
               <button
                 className="btn bs"
-                style={{ width: "100%", padding: 10, fontSize: 11 }}
+                style={{ width: "100%", padding: 10, fontSize: 13 }}
                 onClick={async () => {
                   setOtpError("");
                   setOtpCode("");
@@ -2627,7 +2825,7 @@ export default function ThreatReady() {
               <h2 style={{ fontSize: 20, fontWeight: 800, marginBottom: 8 }}>
                 {userType === "b2b" ? "Looks Like You're Hiring" : "Ready to Prepare?"}
               </h2>
-              <p style={{ fontSize: 12, color: "var(--tx2)", marginBottom: 20 }}>
+              <p style={{ fontSize: 13, color: "var(--tx2)", marginBottom: 20 }}>
                 {userType === "b2b"
                   ? "We detected a company email. Are you here to assess candidates or teams?"
                   : "Are you preparing for security interviews?"}
@@ -2636,10 +2834,60 @@ export default function ThreatReady() {
                 <button className="btn bp" style={{ padding: 14 }} onClick={() => confirmUserType(userType)}>
                   {userType === "b2b" ? "Yes, I'm Hiring / Assessing →" : "Yes, I'm Preparing →"}
                 </button>
-                <button className="btn bs" style={{ padding: 12, fontSize: 12 }} onClick={() => confirmUserType(userType === "b2b" ? "b2c" : "b2b")}>
+                <button className="btn bs" style={{ padding: 12, fontSize: 13 }} onClick={() => confirmUserType(userType === "b2b" ? "b2c" : "b2b")}>
                   {userType === "b2b" ? "Actually, I'm a candidate preparing" : "Actually, I'm hiring / assessing"}
                 </button>
               </div>
+            </div>
+          )}
+
+          {/* STEP 3.5: COMPANY INFO (B2B only — between Hiring/Preparing and OTP) */}
+          {authStep === "company-info" && (
+            <div>
+              <div style={{ textAlign: "center", marginBottom: 20 }}>
+                <div style={{ fontSize: 40, marginBottom: 10 }}>🏢</div>
+                <h2 style={{ fontSize: 20, fontWeight: 800, marginBottom: 6 }}>Tell us about your team</h2>
+                <p style={{ fontSize: 13, color: "var(--tx2)" }}>
+                  This helps us set up your hiring dashboard
+                </p>
+              </div>
+
+              <div style={{ marginBottom: 14 }}>
+                <label style={{ fontSize: 13, fontWeight: 600, color: "var(--tx2)", display: "block", marginBottom: 6 }}>
+                  Company Name *
+                </label>
+                <input className="input"
+                  placeholder="e.g., Acme Corp"
+                  value={hrModalCompanyName}
+                  onChange={e => setHrModalCompanyName(e.target.value)}
+                  style={{ fontSize: 14, padding: "12px 14px" }}
+                />
+              </div>
+
+              <div style={{ marginBottom: 18 }}>
+                <label style={{ fontSize: 13, fontWeight: 600, color: "var(--tx2)", display: "block", marginBottom: 6 }}>
+                  Team Size *
+                </label>
+                <select className="input"
+                  value={hrModalTeamSize}
+                  onChange={e => setHrModalTeamSize(e.target.value)}
+                  style={{ fontSize: 14, padding: "12px 14px", cursor: "pointer" }}
+                >
+                  <option value="5-10">5-10 people (Team Starter)</option>
+                  <option value="11-50">11-50 people (Team Pro)</option>
+                  <option value="50+">50+ people (Enterprise)</option>
+                </select>
+              </div>
+
+              <button className="btn bp" style={{ width: "100%", padding: 14, fontSize: 14, fontWeight: 700 }}
+                onClick={confirmCompanyInfo}>
+                Continue → Send OTP
+              </button>
+
+              <button className="btn bs" style={{ width: "100%", padding: 10, fontSize: 12, marginTop: 10, color: "var(--tx2)" }}
+                onClick={() => setAuthStep("detect")}>
+                ← Back
+              </button>
             </div>
           )}
 
@@ -2649,7 +2897,7 @@ export default function ThreatReady() {
               <div style={{ textAlign: "center", marginBottom: 20 }}>
                 <div style={{ fontSize: 28, marginBottom: 6 }}>🎯</div>
                 <h2 style={{ fontSize: 20, fontWeight: 800 }}>Choose Your First Role</h2>
-                <p style={{ fontSize: 11, color: "var(--tx3)", marginTop: 4 }}>You have 2 free attempts across all roles</p>
+                <p style={{ fontSize: 13, color: "var(--tx2)", marginTop: 4 }}>You have 2 free attempts across all roles</p>
               </div>
               <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 8 }}>
                 {ROLES.map(r => (
@@ -2662,7 +2910,7 @@ export default function ThreatReady() {
                       else { setView("dashboard"); }
                     }}>
                     <div style={{ fontSize: 24 }}>{r.icon}</div>
-                    <div style={{ fontSize: 10, fontWeight: 700, marginTop: 4 }}>{r.name}</div>
+                    <div style={{ fontSize: 12, fontWeight: 700, marginTop: 4 }}>{r.name}</div>
                   </div>
                 ))}
               </div>
@@ -2858,7 +3106,7 @@ export default function ThreatReady() {
             <h2 style={{ fontSize: 24, fontWeight: 800, marginTop: 8 }}>{role?.name}</h2>
             <p style={{ fontSize: 12, color: "var(--tx2)", marginTop: 4 }}>Select difficulty level</p>
             {!isPaid && (
-              <div style={{ fontSize: 11, color: "var(--wn)", marginTop: 8 }}>
+              <div style={{ fontSize: 13, color: "var(--wn)", marginTop: 8 }}>
                 ⚠️ Free trial: {getRemainingAttempts(activeRole)} attempt{getRemainingAttempts(activeRole) !== 1 ? "s" : ""} remaining for {ROLES.find(r => r.id === activeRole)?.name} (Beginner only)
               </div>
             )}
@@ -2880,14 +3128,14 @@ export default function ThreatReady() {
                   }}>
                   <div style={{ fontSize: 32, marginBottom: 8 }}>{d.icon}</div>
                   <div style={{ fontSize: 15, fontWeight: 700, color: d.color, marginBottom: 4 }}>{d.name}</div>
-                  <div style={{ fontSize: 10, color: "var(--tx3)", marginBottom: 8 }}>{d.questions} adaptive questions · {d.time}</div>
-                  <div style={{ fontSize: 9, color: "var(--tx3)" }}>
+                  <div style={{ fontSize: 12, color: "var(--tx2)", marginBottom: 8 }}>{d.questions} adaptive questions · {d.time}</div>
+                  <div style={{ fontSize: 11, color: "var(--tx2)" }}>
                     Hints: {d.hints === true ? "Full" : d.hints === "reduced" ? "Reduced" : d.hints === "minimal" ? "Minimal" : "None"}
                   </div>
                   {locked && (
                     <button
                       className="btn bp"
-                      style={{ marginTop: 12, padding: "8px 18px", fontSize: 11, cursor: "pointer" }}
+                      style={{ marginTop: 12, padding: "8px 18px", fontSize: 13, cursor: "pointer" }}
                       onClick={(e) => {
                         e.stopPropagation();
                         if (!user) {
@@ -2906,9 +3154,9 @@ export default function ThreatReady() {
                       🔒 Subscribe to Unlock
                     </button>
                   )}
-                  {trialExhausted && <div style={{ fontSize: 10, color: "var(--dn)", marginTop: 8 }}>⚠️ No attempts left — subscribe</div>}
-                  {!locked && !trialExhausted && !isPaid && <div style={{ fontSize: 10, color: "var(--ok)", marginTop: 8 }}>🆓 {getRemainingAttempts(activeRole)} free attempt{getRemainingAttempts(activeRole) !== 1 ? "s" : ""} left</div>}
-                  {!locked && !trialExhausted && isPaid && <div style={{ fontSize: 10, color: "var(--ok)", marginTop: 8 }}>🔓 Unlocked</div>}
+                  {trialExhausted && <div style={{ fontSize: 12, color: "var(--dn)", marginTop: 8 }}>⚠️ No attempts left — subscribe</div>}
+                  {!locked && !trialExhausted && !isPaid && <div style={{ fontSize: 12, color: "var(--ok)", marginTop: 8 }}>🆓 {getRemainingAttempts(activeRole)} free attempt{getRemainingAttempts(activeRole) !== 1 ? "s" : ""} left</div>}
+                  {!locked && !trialExhausted && isPaid && <div style={{ fontSize: 12, color: "var(--ok)", marginTop: 8 }}>🔓 Unlocked</div>}
                 </div>
               );
             })}
@@ -2925,8 +3173,8 @@ export default function ThreatReady() {
   // ═══════════════════════════════════════════════════════════
   if (view === "interview" && scenario && currentQ) return (
     <div className="app"><style>{CSS}</style><div className="scanbar" /><div className="gridbg" />
-      {/* Tab Switch Warning Modal */}
-      {showTabWarning && (
+      {/* Tab Switch Warning Modal (1st, 2nd, 3rd switch) */}
+      {showTabWarning && !showEjectedModal && (
         <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.85)", zIndex: 99999, display: "flex", alignItems: "center", justifyContent: "center", backdropFilter: "blur(8px)" }}>
           <div style={{ background: "var(--bg)", border: "2px solid var(--dn)", borderRadius: 16, padding: 32, maxWidth: 480, width: "90%", textAlign: "center" }}>
             <div style={{ fontSize: 56, marginBottom: 12 }}>⚠️</div>
@@ -2934,21 +3182,41 @@ export default function ThreatReady() {
             <div style={{ fontSize: 12, color: "var(--tx2)", marginBottom: 16, lineHeight: 1.6 }}>
               You switched tabs or minimized the window during your attempt.
               <br />
-              <strong style={{ color: "var(--wn)" }}>Tab switches: {tabSwitchCount}/3</strong>
+              <strong style={{ color: "var(--wn)" }}>Warning {tabSwitchCount}/3</strong>
             </div>
             {tabSwitchCount >= 3 ? (
-              <div style={{ fontSize: 11, color: "var(--dn)", marginBottom: 16, padding: 10, background: "rgba(255,82,82,.1)", borderRadius: 8 }}>
-                ⚠️ Maximum warnings reached. Further tab switches may invalidate your assessment.
+              <div style={{ fontSize: 12, color: "var(--dn)", marginBottom: 16, padding: 12, background: "rgba(255,82,82,.15)", borderRadius: 8, fontWeight: 700 }}>
+                🚨 FINAL WARNING: One more tab switch and you will be EXITED from this attempt.
               </div>
             ) : (
-              <div style={{ fontSize: 11, color: "var(--tx3)", marginBottom: 16 }}>
-                Please stay on this tab. Repeated tab switches will be flagged.
+              <div style={{ fontSize: 13, color: "var(--tx2)", marginBottom: 16 }}>
+                Please stay on this tab. After 3 warnings, the next switch will exit your attempt.
               </div>
             )}
             <button className="btn bp" style={{ width: "100%", padding: 12 }}
               onClick={() => setShowTabWarning(false)}>
               I Understand · Continue
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* EJECTED Modal (4th tab switch — auto-exit) */}
+      {showEjectedModal && (
+        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.95)", zIndex: 99999, display: "flex", alignItems: "center", justifyContent: "center", backdropFilter: "blur(12px)" }}>
+          <div style={{ background: "var(--bg)", border: "3px solid var(--dn)", borderRadius: 16, padding: 36, maxWidth: 520, width: "90%", textAlign: "center", boxShadow: "0 0 60px rgba(255,82,82,.4)" }}>
+            <div style={{ fontSize: 72, marginBottom: 16 }}>🚫</div>
+            <div style={{ fontSize: 22, fontWeight: 800, marginBottom: 12, color: "var(--dn)" }}>Attempt Exited</div>
+            <div style={{ fontSize: 13, color: "var(--tx2)", marginBottom: 20, lineHeight: 1.7 }}>
+              You left the attempt window <strong style={{ color: "var(--dn)" }}>{tabSwitchCount} times</strong>.
+              <br /><br />
+              For test integrity, your attempt has been <strong style={{ color: "var(--dn)" }}>automatically ended</strong>.
+              <br /><br />
+              Please complete your attempts in a single focused session without switching tabs.
+            </div>
+            <div style={{ fontSize: 13, color: "var(--tx2)", padding: 10, background: "var(--s2)", borderRadius: 8 }}>
+              Returning to dashboard in a moment...
+            </div>
           </div>
         </div>
       )}
@@ -2970,7 +3238,7 @@ export default function ThreatReady() {
           </div>
           <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
               <span className="mono" style={{ fontSize: 15, fontWeight: 700, color: elapsed > 600 ? "var(--dn)" : "var(--ac)" }}>⏱ {fmt(elapsed)}</span>
-              <button className="btn bs" style={{ padding: "5px 16px", fontSize: 11, color: "var(--dn)", borderColor: "var(--dn)", fontWeight: 700 }} onClick={exitScenario}>Exit</button>
+              <button className="btn bs" style={{ padding: "5px 16px", fontSize: 13, color: "var(--dn)", borderColor: "var(--dn)", fontWeight: 700 }} onClick={exitScenario}>Exit</button>
             </div>
         </div>
 
@@ -2990,7 +3258,7 @@ export default function ThreatReady() {
             <div className="tag">{currentQ.ca}</div>
             <button
               className="btn bs"
-              style={{ padding: "3px 10px", fontSize: 10, marginLeft: 8 }}
+              style={{ padding: "3px 10px", fontSize: 12, marginLeft: 8 }}
 
               onClick={() => {
                 if (isMuted) {
@@ -3032,17 +3300,17 @@ export default function ThreatReady() {
             onContextMenu={e => e.preventDefault()}
           >{currentQ.t}</div>
           {showHint && currentQ.h && activeDifficulty === "beginner" && (
-            <div style={{ marginTop: 8, padding: 8, background: "rgba(0,229,255,.05)", borderRadius: 6, fontSize: 10, color: "var(--ac)" }}>💡 Hint: {currentQ.h}</div>
+            <div style={{ marginTop: 8, padding: 8, background: "rgba(0,229,255,.05)", borderRadius: 6, fontSize: 12, color: "var(--ac)" }}>💡 Hint: {currentQ.h}</div>
           )}
           {activeDifficulty === "beginner" && !showHint && currentQ.h && (
-            <button className="btn bs" style={{ marginTop: 8, fontSize: 9, padding: "3px 10px" }} onClick={() => setShowHint(true)}>Show Hint</button>
+            <button className="btn bs" style={{ marginTop: 8, fontSize: 11, padding: "3px 10px" }} onClick={() => setShowHint(true)}>Show Hint</button>
           )}
         </div>
 
         {/* Answer Input (No Copy-Paste) */}
         <div style={{ display: "flex", gap: 6, marginBottom: 10 }}>
-          <button className={`btn ${inputMode === "text" ? "bp" : "bs"}`} style={{ padding: "4px 12px", fontSize: 10 }} onClick={() => setInputMode("text")}>✏️ Type</button>
-          <button className={`btn ${inputMode === "voice" ? "bp" : "bs"}`} style={{ padding: "4px 12px", fontSize: 10 }} onClick={() => setInputMode("voice")}>🎤 Dictate</button>
+          <button className={`btn ${inputMode === "text" ? "bp" : "bs"}`} style={{ padding: "4px 12px", fontSize: 12 }} onClick={() => setInputMode("text")}>✏️ Type</button>
+          <button className={`btn ${inputMode === "voice" ? "bp" : "bs"}`} style={{ padding: "4px 12px", fontSize: 12 }} onClick={() => setInputMode("voice")}>🎤 Dictate</button>
         </div>
         {inputMode === "text" ? (
           <NoPasteInput placeholder="Type your answer... (copy-paste disabled)" value={answers[currentQ.id] || ""}
@@ -3053,10 +3321,22 @@ export default function ThreatReady() {
             <div className={`rec-ring ${voice.recording ? "active" : ""}`}
               onClick={voice.recording ? voice.stop : voice.start}
               style={{ margin: "0 auto 8px" }}>{voice.recording ? "⏹" : "🎤"}</div>
-            <div style={{ fontSize: 10, color: voice.recording ? "var(--dn)" : "var(--tx3)" }}>
-              {voice.recording ? "Recording... tap to stop" : "Tap to start dictating"}
+            <div style={{ fontSize: 12, color: voice.recording ? "var(--dn)" : "var(--tx2)" }}>
+              {voice.recording ? "🔴 Recording... will continue even if you pause" : "Tap to start dictating"}
             </div>
-            {voice.transcript && <div style={{ marginTop: 10, padding: 10, background: "var(--s2)", borderRadius: 8, fontSize: 12, textAlign: "left", lineHeight: 1.6 }}>{voice.transcript}</div>}
+            {(voice.transcript || voice.recording) && (
+              <div style={{ marginTop: 10 }}>
+                <div style={{ fontSize: 11, color: "var(--tx2)", marginBottom: 4, textAlign: "left" }}>
+                  💡 Tip: You can edit the text below to fix any recognition errors
+                </div>
+                <NoPasteInput
+                  value={voice.transcript}
+                  onChange={e => voice.setTranscript(e.target.value)}
+                  placeholder="Your dictated answer will appear here. Edit to fix errors..."
+                  style={{ minHeight: 80, padding: 10, background: "var(--s2)", borderRadius: 8, fontSize: 12, textAlign: "left", lineHeight: 1.6, width: "100%" }}
+                />
+              </div>
+            )}
           </div>
         )}
 
@@ -3080,7 +3360,7 @@ export default function ThreatReady() {
         <div className="card fadeUp" style={{ textAlign: "center", padding: 36, marginBottom: 20, borderColor: results.overall_score >= 7 ? "var(--ok)" : results.overall_score >= 5 ? "var(--wn)" : "var(--dn)" }}>
           <div className="lbl" style={{ marginBottom: 6 }}>ASSESSMENT COMPLETE · {(activeDifficulty || "").toUpperCase()}</div>
           <div className="mono" style={{ fontSize: 56, fontWeight: 700, color: results.overall_score >= 7 ? "var(--ok)" : results.overall_score >= 5 ? "var(--wn)" : "var(--dn)" }}>{results.overall_score}</div>
-          <div style={{ fontSize: 11, color: "var(--tx3)", marginBottom: 14 }}>out of 10 · {results.questions_asked} adaptive questions</div>
+          <div style={{ fontSize: 13, color: "var(--tx2)", marginBottom: 14 }}>out of 10 · {results.questions_asked} adaptive questions</div>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 12, marginBottom: 16 }}>
             {[["Technical Depth", `${results.depth}/10`], ["Communication", `${results.communication}/10`], ["Decision-Making", `${results.decision}/10`]].map(([l, v], i) => (
               <div key={i} className="statbox"><div className="statval" style={{ color: "var(--ac)", fontSize: 16 }}>{v}</div><div className="statlbl">{l}</div></div>
@@ -3088,7 +3368,7 @@ export default function ThreatReady() {
           </div>
           <div style={{ display: "flex", justifyContent: "center", gap: 20, flexWrap: "wrap", marginBottom: 16 }}>
             {[["Skills Score", `${results.skillsScore}/500`], ["Attack Thinking", `${results.attackScore}/100`], ["Percentile", `Top ${100 - results.percentile}%`], ["Duration", fmt(results.time)]].map(([l, v], i) => (
-              <div key={i}><div className="mono" style={{ fontSize: 14, fontWeight: 700, color: "var(--ac)" }}>{v}</div><div style={{ fontSize: 9, color: "var(--tx3)" }}>{l}</div></div>
+              <div key={i}><div className="mono" style={{ fontSize: 14, fontWeight: 700, color: "var(--ac)" }}>{v}</div><div style={{ fontSize: 11, color: "var(--tx2)" }}>{l}</div></div>
             ))}
           </div>
           <div className="badge-card" style={{ margin: "0 auto", maxWidth: 200, borderColor: results.badge === "Platinum" ? "#8b5cf6" : results.badge === "Gold" ? "#f59e0b" : results.badge === "Silver" ? "#94a3b8" : results.badge === "Bronze" ? "#cd7f32" : "var(--dn)", color: results.badge === "Platinum" ? "#8b5cf6" : results.badge === "Gold" ? "#f59e0b" : results.badge === "Silver" ? "#94a3b8" : results.badge === "Bronze" ? "#cd7f32" : "var(--dn)" }}>
@@ -3103,7 +3383,7 @@ export default function ThreatReady() {
           <ResponsiveContainer width="100%" height={220}>
             <RadarChart data={radarData}>
               <PolarGrid stroke="rgba(0,229,255,.15)" />
-              <PolarAngleAxis dataKey="s" tick={{ fill: "#8890b0", fontSize: 10 }} />
+              <PolarAngleAxis dataKey="s" tick={{ fill: "#8890b0", fontSize: 12 }} />
               <Radar name="Score" dataKey="v" stroke="#00e5ff" fill="#00e5ff" fillOpacity={0.15} />
             </RadarChart>
           </ResponsiveContainer>
@@ -3124,14 +3404,14 @@ export default function ThreatReady() {
               transition: "width 1s ease-out"
             }} />
           </div>
-          <div style={{ display: "flex", justifyContent: "space-between", marginTop: 6, fontSize: 10, color: "var(--tx3)" }}>
+          <div style={{ display: "flex", justifyContent: "space-between", marginTop: 6, fontSize: 12, color: "var(--tx2)" }}>
             <span>0%</span>
             <span>25%</span>
             <span>50%</span>
             <span>75%</span>
             <span>100%</span>
           </div>
-          <div style={{ fontSize: 11, color: "var(--tx2)", marginTop: 10, textAlign: "center" }}>
+          <div style={{ fontSize: 13, color: "var(--tx2)", marginTop: 10, textAlign: "center" }}>
             You scored better than {results.percentile}% of candidates at {activeDifficulty} level
           </div>
         </div>
@@ -3139,7 +3419,7 @@ export default function ThreatReady() {
         {/* Scoring Transparency */}
         <div className="card fadeUp" style={{ marginBottom: 16, padding: 16, borderColor: "var(--ac)", background: "rgba(0,229,255,.02)" }}>
           <div className="lbl" style={{ marginBottom: 8 }}>HOW YOUR SCORE WAS CALCULATED</div>
-          <div style={{ fontSize: 11, color: "var(--tx2)", lineHeight: 1.7 }}>
+          <div style={{ fontSize: 13, color: "var(--tx2)", lineHeight: 1.7 }}>
             Each question scored on 3 dimensions: Technical Depth (thoroughness), Communication Quality (clarity), and Decision-Making (soundness).
             Overall score = average across all 5 questions. Percentile calculated against all users at {activeDifficulty} difficulty.
             {activeDifficulty === "beginner" && " Beginner rubric: encouraging, credit for partial understanding."}
@@ -3160,23 +3440,23 @@ export default function ThreatReady() {
 
             {/* Question text */}
             {ev.question_text && (
-              <div style={{ fontSize: 11, fontWeight: 600, color: "var(--tx)", marginBottom: 8, lineHeight: 1.5 }}>
+              <div style={{ fontSize: 13, fontWeight: 600, color: "var(--tx)", marginBottom: 8, lineHeight: 1.5 }}>
                 {ev.question_text}
               </div>
             )}
 
-            <div style={{ fontSize: 11, marginBottom: 4 }}><span style={{ color: "var(--ok)" }}>✓</span> <span style={{ color: "var(--tx2)" }}>{ev.strengths}</span></div>
-            <div style={{ fontSize: 11, marginBottom: 8 }}><span style={{ color: "var(--dn)" }}>✗</span> <span style={{ color: "var(--tx2)" }}>{ev.weaknesses}</span></div>
+            <div style={{ fontSize: 13, marginBottom: 4 }}><span style={{ color: "var(--ok)" }}>✓</span> <span style={{ color: "var(--tx2)" }}>{ev.strengths}</span></div>
+            <div style={{ fontSize: 13, marginBottom: 8 }}><span style={{ color: "var(--dn)" }}>✗</span> <span style={{ color: "var(--tx2)" }}>{ev.weaknesses}</span></div>
 
             {/* Side-by-side: Your Answer vs Model Answer */}
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginTop: 8 }}>
               <div style={{ padding: 10, background: "rgba(255,171,64,.06)", border: "1px solid rgba(255,171,64,.2)", borderRadius: 6 }}>
-                <div className="mono" style={{ fontSize: 9, color: "var(--wn)", marginBottom: 4, fontWeight: 700, letterSpacing: 0.5 }}>YOUR ANSWER</div>
-                <div style={{ fontSize: 10, color: "var(--tx2)", lineHeight: 1.6, whiteSpace: "pre-wrap" }}>{ev.user_answer || "— (no answer recorded)"}</div>
+                <div className="mono" style={{ fontSize: 11, color: "var(--wn)", marginBottom: 4, fontWeight: 700, letterSpacing: 0.5 }}>YOUR ANSWER</div>
+                <div style={{ fontSize: 12, color: "var(--tx2)", lineHeight: 1.6, whiteSpace: "pre-wrap" }}>{ev.user_answer || "— (no answer recorded)"}</div>
               </div>
               <div style={{ padding: 10, background: "rgba(0,224,150,.06)", border: "1px solid rgba(0,224,150,.2)", borderRadius: 6 }}>
-                <div className="mono" style={{ fontSize: 9, color: "var(--ok)", marginBottom: 4, fontWeight: 700, letterSpacing: 0.5 }}>MODEL ANSWER</div>
-                <div style={{ fontSize: 10, color: "var(--tx2)", lineHeight: 1.6 }}>{ev.improved_answer || "—"}</div>
+                <div className="mono" style={{ fontSize: 11, color: "var(--ok)", marginBottom: 4, fontWeight: 700, letterSpacing: 0.5 }}>MODEL ANSWER</div>
+                <div style={{ fontSize: 12, color: "var(--tx2)", lineHeight: 1.6 }}>{ev.improved_answer || "—"}</div>
               </div>
             </div>
           </div>
@@ -3189,8 +3469,8 @@ export default function ThreatReady() {
             {results.evaluations.filter(e => e.score < 7).slice(0, 3).map((ev, i) => (
               <div key={i} style={{ marginBottom: 10 }}>
                 <div style={{ fontSize: 12, fontWeight: 600, color: "var(--wn)", marginBottom: 3 }}>Weak: {ev.category}</div>
-                <div style={{ fontSize: 11, color: "var(--tx2)" }}>{ev.weaknesses}</div>
-                <div style={{ fontSize: 10, color: "var(--ac)", marginTop: 4 }}>→ Try a {activeDifficulty === "beginner" ? "Beginner" : "harder"} scenario focusing on {ev.category}</div>
+                <div style={{ fontSize: 13, color: "var(--tx2)" }}>{ev.weaknesses}</div>
+                <div style={{ fontSize: 12, color: "var(--ac)", marginTop: 4 }}>→ Try a {activeDifficulty === "beginner" ? "Beginner" : "harder"} scenario focusing on {ev.category}</div>
               </div>
             ))}
           </div>
@@ -3199,16 +3479,16 @@ export default function ThreatReady() {
         {/* Interview Mode Callout */}
         <div className="card fadeUp" style={{ marginTop: 16, padding: 16, borderColor: "#8b5cf6", background: "rgba(139,92,246,.05)" }}>
           <div style={{ fontSize: 12, fontWeight: 700, color: "#8b5cf6", marginBottom: 4 }}>💎 Want real interview pressure?</div>
-          <div style={{ fontSize: 11, color: "var(--tx2)", marginBottom: 8 }}>Try Interview Mode: AI acts as your interviewer with follow-up probes, time pressure, and debrief feedback.</div>
-          <button className="btn bs" style={{ fontSize: 10, padding: "6px 14px", borderColor: "#8b5cf6", color: "#8b5cf6" }}>Unlock Interview Mode →</button>
+          <div style={{ fontSize: 13, color: "var(--tx2)", marginBottom: 8 }}>Try Interview Mode: AI acts as your interviewer with follow-up probes, time pressure, and debrief feedback.</div>
+          <button className="btn bs" style={{ fontSize: 12, padding: "6px 14px", borderColor: "#8b5cf6", color: "#8b5cf6" }}>Unlock Interview Mode →</button>
         </div>
 
         {/* B2B Hook */}
         {userType === "b2b" && (
           <div className="card fadeUp" style={{ marginTop: 16, padding: 16, borderColor: "var(--ok)", background: "rgba(0,224,150,.05)" }}>
             <div style={{ fontSize: 12, fontWeight: 700, color: "var(--ok)", marginBottom: 4 }}>🏢 Hiring for this role?</div>
-            <div style={{ fontSize: 11, color: "var(--tx2)", marginBottom: 8 }}>Create a custom assessment using this exact scenario for your candidates.</div>
-            <button className="btn bok" style={{ fontSize: 10, padding: "6px 14px" }} onClick={() => setView("b2b-dashboard")}>Create Assessment →</button>
+            <div style={{ fontSize: 13, color: "var(--tx2)", marginBottom: 8 }}>Create a custom assessment using this exact scenario for your candidates.</div>
+            <button className="btn bok" style={{ fontSize: 12, padding: "6px 14px" }} onClick={() => setView("b2b-dashboard")}>Create Assessment →</button>
           </div>
         )}
 
@@ -3250,7 +3530,7 @@ export default function ThreatReady() {
             {isPaid ? "2 roles = 18% off · 3+ roles = 30% off" : "Free trial · Select up to 2 roles"}
           </p>
           {!isPaid && (
-            <div style={{ background: "rgba(0,229,255,.06)", border: "1px solid rgba(0,229,255,.2)", borderRadius: 10, padding: "10px 16px", marginTop: 12, fontSize: 11, color: "var(--ac)" }}>
+            <div style={{ background: "rgba(0,229,255,.06)", border: "1px solid rgba(0,229,255,.2)", borderRadius: 10, padding: "10px 16px", marginTop: 12, fontSize: 13, color: "var(--ac)" }}>
               🎯 Free Trial — Select up to 2 roles · Beginner difficulty only · 2 attempts total
             </div>
           )}
@@ -3272,8 +3552,8 @@ export default function ThreatReady() {
                 {sel && <div style={{ position: "absolute", top: 10, right: 10, width: 22, height: 22, borderRadius: "50%", background: "var(--ac)", color: "#000", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12, fontWeight: 700 }}>✓</div>}
                 <div style={{ fontSize: 32, marginBottom: 8 }}>{r.icon}</div>
                 <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 3 }}>{r.name}</div>
-                <div style={{ fontSize: 10, color: "var(--tx3)", lineHeight: 1.4, marginBottom: 10 }}>{r.desc}</div>
-                <div className="mono" style={{ fontSize: 16, fontWeight: 700, color: sel ? r.color : "var(--tx2)" }}>₹{r.price}<span style={{ fontSize: 9, fontWeight: 400 }}>/mo</span></div>
+                <div style={{ fontSize: 13, color: "var(--tx2)", lineHeight: 1.5, marginBottom: 10, fontWeight: 500 }}>{r.desc}</div>
+                <div className="mono" style={{ fontSize: 16, fontWeight: 700, color: sel ? r.color : "var(--tx2)" }}>₹{r.price}<span style={{ fontSize: 11, fontWeight: 400 }}>/mo</span></div>
               </div>
             );
           })}
@@ -3281,9 +3561,9 @@ export default function ThreatReady() {
         {selectedRoles.length > 0 && (
           <div className="card fadeUp" style={{ marginTop: 20, padding: 20, textAlign: "center", borderColor: "var(--ac)" }}>
             <div style={{ display: "flex", justifyContent: "center", alignItems: "center", gap: 20, flexWrap: "wrap" }}>
-              <span style={{ fontSize: 11, color: "var(--tx3)" }}>{selectedRoles.length} role{selectedRoles.length > 1 ? "s" : ""}</span>
+              <span style={{ fontSize: 13, color: "var(--tx2)" }}>{selectedRoles.length} role{selectedRoles.length > 1 ? "s" : ""}</span>
               {getDiscount() > 0 && <span className="tag" style={{ background: "rgba(0,224,150,.1)", color: "var(--ok)", borderColor: "rgba(0,224,150,.2)" }}>{getDiscount()}% OFF</span>}
-              <span className="mono" style={{ fontSize: 24, fontWeight: 700, color: "var(--ac)" }}>₹{getPrice()}<span style={{ fontSize: 11, fontWeight: 400, color: "var(--tx2)" }}>/mo</span></span>
+              <span className="mono" style={{ fontSize: 24, fontWeight: 700, color: "var(--ac)" }}>₹{getPrice()}<span style={{ fontSize: 13, fontWeight: 400, color: "var(--tx2)" }}>/mo</span></span>
 
               <button className="btn bp" onClick={() => {
                 if (!isPaid && selectedRoles.length > 0) {
@@ -3327,7 +3607,7 @@ export default function ThreatReady() {
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }} className="fadeUp">
             <div>
               <h2 style={{ fontSize: 22, fontWeight: 800 }}>Welcome, {user?.name || "Agent"}</h2>
-              <div style={{ fontSize: 12, color: "var(--tx2)", marginTop: 3 }}>
+              <div style={{ fontSize: 14, color: "var(--tx2)", marginTop: 4, fontWeight: 500 }}>
                 {isPaid ? `${subscribedRoles.length} tracks` : `Free trial · ${subscribedRoles.reduce((s, rid) => s + getRemainingAttempts(rid), 0)} attempts left`} · {completedScenarios.length} completed · {streak} day streak
               </div>
             </div>
@@ -3353,18 +3633,18 @@ export default function ThreatReady() {
 
                 {showNotifs && (
                   <div style={{ position: "absolute", zIndex: 1000, right: 0, top: 36, width: 280,  background: "#111827", border: "1px solid #1e2536", borderRadius: 12, boxShadow: "0 16px 48px rgba(0,0,0,.6)", maxHeight: 300, overflowY: "auto" }}>
-                    <div style={{ padding: "10px 14px", borderBottom: "1px solid #1e2536", fontSize: 11, fontWeight: 700, color: "var(--ac)", display: "flex", justifyContent: "space-between" }}>
+                    <div style={{ padding: "10px 14px", borderBottom: "1px solid #1e2536", fontSize: 13, fontWeight: 700, color: "var(--ac)", display: "flex", justifyContent: "space-between" }}>
                       <span>NOTIFICATIONS</span>
                       <span style={{ cursor: "pointer", opacity: 1 }} onClick={() => setShowNotifs(false)}>×</span>
                     </div>
 
                     {notifications.length === 0
-                      ? <div style={{ padding: 16, fontSize: 11, color: "var(--tx3)", textAlign: "center" }}>No notifications yet</div>
+                      ? <div style={{ padding: 16, fontSize: 13, color: "var(--tx2)", textAlign: "center" }}>No notifications yet</div>
                       : notifications.map((n, i) => (
                         <div key={n.id || i} style={{ padding: "10px 14px", borderBottom: i < notifications.length - 1 ? "1px solid #1e2536" : "none", background: n.is_read ? "transparent" : "rgba(0,229,255,.04)" }}>
                           <div style={{ fontSize: 12, fontWeight: 600 }}>{n.title}</div>
-                          <div style={{ fontSize: 10, color: "var(--tx3)", marginTop: 2 }}>{n.message}</div>
-                          <div style={{ fontSize: 9, color: "var(--tx3)", marginTop: 2 }}>{new Date(n.created_at).toLocaleDateString()}</div>
+                          <div style={{ fontSize: 12, color: "var(--tx2)", marginTop: 2 }}>{n.message}</div>
+                          <div style={{ fontSize: 11, color: "var(--tx2)", marginTop: 2 }}>{new Date(n.created_at).toLocaleDateString()}</div>
                         </div>
                       ))
                     }
@@ -3372,7 +3652,7 @@ export default function ThreatReady() {
                 )}
               </div>
 
-              <button className="btn bs" style={{ padding: "5px 10px", fontSize: 10 }} onClick={logout}>Logout</button>
+              <button className="btn bs" style={{ padding: "5px 10px", fontSize: 12 }} onClick={logout}>Logout</button>
             </div>
           </div>
 
@@ -3408,7 +3688,7 @@ export default function ThreatReady() {
                   <div style={{ fontSize: 12, fontWeight: 700, color: dailyAnswered ? "var(--ok)" : dailyChallengeError ? "var(--dn)" : "var(--wn)" }}>
                     {dailyAnswered ? "✅ Daily Challenge Complete!" : dailyChallengeError ? "⚠️ Daily Challenge Unavailable" : "🎯 Daily Challenge"}
                   </div>
-                  <div style={{ fontSize: 11, color: "var(--tx2)", marginTop: 4 }}>
+                  <div style={{ fontSize: 13, color: "var(--tx2)", marginTop: 4 }}>
                     {dailyChallenge
                       ? `${dailyChallenge.role_id?.toUpperCase()} · ${dailyChallenge.difficulty} · +${dailyChallenge.points} XP`
                       : dailyChallengeError
@@ -3416,19 +3696,19 @@ export default function ThreatReady() {
                         : "Loading today's challenge..."}
                   </div>
                   {dailyAnswered && dailyResult && (
-                    <div style={{ fontSize: 10, color: "var(--ok)", marginTop: 2 }}>
+                    <div style={{ fontSize: 12, color: "var(--ok)", marginTop: 2 }}>
                       Score: {dailyResult.score}/100 · +{dailyResult.points_earned} XP earned
                     </div>
                   )}
                 </div>
                 {!dailyAnswered && dailyChallenge && (
-                  <button className="btn bp" style={{ fontSize: 10, padding: "6px 14px" }}
+                  <button className="btn bp" style={{ fontSize: 12, padding: "6px 14px" }}
                     onClick={() => setShowDailyModal(true)}>
                     Start →
                   </button>
                 )}
                 {dailyChallengeError && (
-                  <button className="btn bs" style={{ fontSize: 10, padding: "6px 14px" }}
+                  <button className="btn bs" style={{ fontSize: 12, padding: "6px 14px" }}
                     onClick={() => { setDailyChallengeError(false); loadDashboardExtras(); }}>
                     🔄 Retry
                   </button>
@@ -3441,7 +3721,7 @@ export default function ThreatReady() {
               <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.75)", zIndex: 9999, display: "flex", alignItems: "center", justifyContent: "center", backdropFilter: "blur(4px)" }}
                 onClick={e => e.target === e.currentTarget && setShowDailyModal(false)}>
                 <div style={{ background: "#111827", border: "1px solid #1e2536", borderRadius: 20, padding: 32, maxWidth: 520, width: "90%", boxShadow: "0 24px 80px rgba(0,0,0,.6)" }}>
-                  <div style={{ fontSize: 11, color: "var(--wn)", fontWeight: 700, marginBottom: 8, letterSpacing: 1 }}>🎯 DAILY CHALLENGE · +{dailyChallenge.points} XP</div>
+                  <div style={{ fontSize: 13, color: "var(--wn)", fontWeight: 700, marginBottom: 8, letterSpacing: 1 }}>🎯 DAILY CHALLENGE · +{dailyChallenge.points} XP</div>
                   <div
                     style={{ fontSize: 15, fontWeight: 700, marginBottom: 16, lineHeight: 1.5, userSelect: "none", WebkitUserSelect: "none" }}
                     onCopy={e => e.preventDefault()}
@@ -3449,17 +3729,17 @@ export default function ThreatReady() {
                     onContextMenu={e => e.preventDefault()}
                   >{dailyChallenge.question}</div>
                   {dailyChallenge.hint && (
-                    <div style={{ fontSize: 11, color: "var(--tx3)", marginBottom: 12, padding: "8px 12px", background: "var(--s2)", borderRadius: 8 }}>
+                    <div style={{ fontSize: 13, color: "var(--tx2)", marginBottom: 12, padding: "8px 12px", background: "var(--s2)", borderRadius: 8 }}>
                       💡 Hint: {dailyChallenge.hint}
                     </div>
                   )}
                   {/* Type / Dictate Toggle */}
                   <div style={{ display: "flex", gap: 6, marginBottom: 8 }}>
                     <button className={`btn ${dailyInputMode === "text" ? "bp" : "bs"}`}
-                      style={{ padding: "4px 12px", fontSize: 10 }}
+                      style={{ padding: "4px 12px", fontSize: 12 }}
                       onClick={() => setDailyInputMode("text")}>✏️ Type</button>
                     <button className={`btn ${dailyInputMode === "voice" ? "bp" : "bs"}`}
-                      style={{ padding: "4px 12px", fontSize: 10 }}
+                      style={{ padding: "4px 12px", fontSize: 12 }}
                       onClick={() => setDailyInputMode("voice")}>🎤 Dictate</button>
                   </div>
                   {dailyInputMode === "text" ? (
@@ -3471,12 +3751,20 @@ export default function ThreatReady() {
                       <div className={`rec-ring ${dailyVoice.recording ? "active" : ""}`}
                         onClick={dailyVoice.recording ? dailyVoice.stop : dailyVoice.start}
                         style={{ margin: "0 auto 8px" }}>{dailyVoice.recording ? "⏹" : "🎤"}</div>
-                      <div style={{ fontSize: 10, color: dailyVoice.recording ? "var(--dn)" : "var(--tx3)" }}>
-                        {dailyVoice.recording ? "Recording... tap to stop" : "Tap to start dictating"}
+                      <div style={{ fontSize: 12, color: dailyVoice.recording ? "var(--dn)" : "var(--tx2)" }}>
+                        {dailyVoice.recording ? "🔴 Recording... will continue even if you pause" : "Tap to start dictating"}
                       </div>
-                      {dailyVoice.transcript && (
-                        <div style={{ marginTop: 10, padding: 10, background: "var(--s2)", borderRadius: 8, fontSize: 12, textAlign: "left", lineHeight: 1.6 }}>
-                          {dailyVoice.transcript}
+                      {(dailyVoice.transcript || dailyVoice.recording) && (
+                        <div style={{ marginTop: 10 }}>
+                          <div style={{ fontSize: 11, color: "var(--tx2)", marginBottom: 4, textAlign: "left" }}>
+                            💡 Tip: Edit the text below to fix any recognition errors
+                          </div>
+                          <NoPasteInput
+                            value={dailyVoice.transcript}
+                            onChange={e => dailyVoice.setTranscript(e.target.value)}
+                            placeholder="Your dictated answer will appear here. Edit to fix errors..."
+                            style={{ minHeight: 80, padding: 10, background: "var(--s2)", borderRadius: 8, fontSize: 12, textAlign: "left", lineHeight: 1.6, width: "100%" }}
+                          />
                         </div>
                       )}
                     </div>
@@ -3490,7 +3778,7 @@ export default function ThreatReady() {
                       <div style={{ fontSize: 13, fontWeight: 700, color: dailyResult.score >= 60 ? "var(--ok)" : "var(--dn)" }}>
                         Score: {dailyResult.score}/100 · {dailyResult.correct ? "✅ Correct!" : "❌ Needs improvement"}
                       </div>
-                      <div style={{ fontSize: 11, color: "var(--tx2)", marginTop: 4 }}>{dailyResult.feedback}</div>
+                      <div style={{ fontSize: 13, color: "var(--tx2)", marginTop: 4 }}>{dailyResult.feedback}</div>
                     </div>
                   )}
                   <div style={{ display: "flex", gap: 10 }}>
@@ -3546,7 +3834,7 @@ export default function ThreatReady() {
                         <span style={{ fontSize: 28 }}>{role.icon}</span>
                         <div>
                           <div style={{ fontSize: 13, fontWeight: 700 }}>{role.name}</div>
-                          <div style={{ fontSize: 10, color: "var(--tx3)", marginTop: 2 }}>{completed} completed</div>
+                          <div style={{ fontSize: 12, color: "var(--tx2)", marginTop: 2 }}>{completed} completed</div>
                         </div>
                       </div>
                       <span style={{ color: "var(--ac)", fontSize: 12, fontWeight: 600 }}>Open →</span>
@@ -3554,7 +3842,7 @@ export default function ThreatReady() {
                     <div style={{ display: "grid", gridTemplateColumns: isPaid ? "repeat(4,1fr)" : "repeat(1,1fr)", gap: 6, marginTop: 10 }}>
                       {(isPaid ? ["Beginner", "Intermediate", "Advanced", "Expert"] : ["Beginner"]).map((d, i) => (
                         <div key={i} style={{ background: "var(--s2)", borderRadius: 6, padding: "4px 8px", textAlign: "center" }}>
-                          <div style={{ fontSize: 9, color: "var(--ac)" }}>
+                          <div style={{ fontSize: 11, color: "var(--ac)" }}>
                             {d}
                           </div>
                         </div>
@@ -3565,8 +3853,8 @@ export default function ThreatReady() {
               })
             ) : (
               <div className="card fadeUp" style={{ padding: 16, textAlign: "center" }}>
-                <div style={{ fontSize: 12, color: "var(--tx3)", marginBottom: 10 }}>No roles selected yet</div>
-                <button className="btn bp" style={{ fontSize: 11 }} onClick={() => { setDashTab("billing"); localStorage.setItem('cyberprep_tab', 'billing'); }}>
+                <div style={{ fontSize: 12, color: "var(--tx2)", marginBottom: 10 }}>No roles selected yet</div>
+                <button className="btn bp" style={{ fontSize: 13 }} onClick={() => { setDashTab("billing"); localStorage.setItem('cyberprep_tab', 'billing'); }}>
                   + Select Roles
                 </button>
               </div>
@@ -3578,10 +3866,10 @@ export default function ThreatReady() {
             <div className="card fadeUp" style={{ marginTop: 16, padding: 16 }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
                 <div className="lbl">WEEKLY LEADERBOARD</div>
-                {myRank && <span style={{ fontSize: 10, color: "var(--ac)" }}>Your rank: #{myRank}</span>}
+                {myRank && <span style={{ fontSize: 12, color: "var(--ac)" }}>Your rank: #{myRank}</span>}
               </div>
               {leaderboard.length === 0 ? (
-                <div style={{ fontSize: 11, color: "var(--tx3)", textAlign: "center", padding: 12 }}>
+                <div style={{ fontSize: 13, color: "var(--tx2)", textAlign: "center", padding: 12 }}>
                   Complete assessments this week to appear on the leaderboard!
                 </div>
               ) : (
@@ -3590,14 +3878,14 @@ export default function ThreatReady() {
                     <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                       <span className="mono" style={{
                         fontSize: 12, fontWeight: 700,
-                        color: i === 0 ? "#f59e0b" : i === 1 ? "#94a3b8" : i === 2 ? "#b45309" : "var(--tx3)"
+                        color: i === 0 ? "#f59e0b" : i === 1 ? "#94a3b8" : i === 2 ? "#b45309" : "var(--tx2)"
                       }}>
                         {i === 0 ? "🥇" : i === 1 ? "🥈" : i === 2 ? "🥉" : `#${i + 1}`}
                       </span>
                       <span style={{ fontSize: 12, color: p.id === user?.id ? "var(--ac)" : "var(--tx1)", fontWeight: p.id === user?.id ? 700 : 400 }}>
                         {p.id === user?.id ? "You" : p.name || "Anonymous"}
                       </span>
-                      {p.badge && <span style={{ fontSize: 9, color: "var(--wn)" }}>{p.badge}</span>}
+                      {p.badge && <span style={{ fontSize: 11, color: "var(--wn)" }}>{p.badge}</span>}
                     </div>
                     <div style={{ textAlign: "right" }}>
                       {(() => {
@@ -3609,7 +3897,7 @@ export default function ThreatReady() {
                             <span className="mono" style={{ fontSize: 13, fontWeight: 700, color: isValid && numScore >= 7 ? "var(--ok)" : "var(--wn)" }}>
                               {isValid ? numScore.toFixed(1) : "—"}
                             </span>
-                            <span style={{ fontSize: 9, color: "var(--tx3)" }}>/10</span>
+                            <span style={{ fontSize: 11, color: "var(--tx2)" }}>/10</span>
                           </>
                         );
                       })()}
@@ -3638,14 +3926,14 @@ export default function ThreatReady() {
               <div className="lbl" style={{ marginBottom: 12 }}>SCORE TRENDS</div>
               <div className="card fadeUp" style={{ padding: 16, marginBottom: 16 }}>
                 {scoreHistory.length === 0 ? (
-                  <div style={{ textAlign: "center", padding: "40px 20px", color: "var(--tx3)", fontSize: 12 }}>
+                  <div style={{ textAlign: "center", padding: "40px 20px", color: "var(--tx2)", fontSize: 12 }}>
                     No assessments completed yet. Your score trends will appear here after your first attempt.
                   </div>
                 ) : (
                   <ResponsiveContainer width="100%" height={200}>
                     <LineChart data={scoreHistory}>
-                      <XAxis dataKey="date" tick={{ fill: "#8890b0", fontSize: 10 }} />
-                      <YAxis domain={[0, 10]} tick={{ fill: "#8890b0", fontSize: 10 }} />
+                      <XAxis dataKey="date" tick={{ fill: "#8890b0", fontSize: 12 }} />
+                      <YAxis domain={[0, 10]} tick={{ fill: "#8890b0", fontSize: 12 }} />
                       <Tooltip contentStyle={{ background: "#1a1f2e", border: "1px solid #252b3b", borderRadius: 8 }} />
                       {(() => {
                         // Dynamically build lines for each role the user has attempted
@@ -3659,7 +3947,7 @@ export default function ThreatReady() {
                   </ResponsiveContainer>
                 )}
                 {scoreHistory.length === 1 && (
-                  <div style={{ fontSize: 10, color: "var(--tx3)", marginTop: 8, textAlign: "center" }}>
+                  <div style={{ fontSize: 12, color: "var(--tx2)", marginTop: 8, textAlign: "center" }}>
                     💡 Complete more assessments to see trends over time
                   </div>
                 )}
@@ -3667,12 +3955,12 @@ export default function ThreatReady() {
               <div className="lbl" style={{ marginBottom: 8 }}>WEAKNESS TRACKER</div>
               <div className="card fadeUp" style={{ padding: 16 }}>
                 {weaknessTracker.length === 0 ? (
-                  <div style={{ textAlign: "center", padding: "20px 10px", color: "var(--tx3)", fontSize: 12 }}>
+                  <div style={{ textAlign: "center", padding: "20px 10px", color: "var(--tx2)", fontSize: 12 }}>
                     Complete assessments across different roles to see your strengths and weaknesses.
                   </div>
                 ) : weaknessTracker.map((w, i) => (
                   <div key={i} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 0", borderBottom: i < weaknessTracker.length - 1 ? "1px solid var(--bd)" : "none" }}>
-                    <span style={{ fontSize: 12 }}>{w.area} <span style={{ fontSize: 9, color: "var(--tx3)" }}>({w.attempts} attempt{w.attempts !== 1 ? "s" : ""})</span></span>
+                    <span style={{ fontSize: 12 }}>{w.area} <span style={{ fontSize: 11, color: "var(--tx2)" }}>({w.attempts} attempt{w.attempts !== 1 ? "s" : ""})</span></span>
                     <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
                       <span className="mono" style={{ fontSize: 12, color: w.avg >= 7 ? "var(--ok)" : w.avg >= 5 ? "var(--wn)" : "var(--dn)" }}>{w.avg}/10</span>
                       <span style={{ fontSize: 14 }}>{w.trend}</span>
@@ -3694,7 +3982,7 @@ export default function ThreatReady() {
                 return (
                   <div key={r.id} className="card fadeUp" style={{ padding: 16, textAlign: "center", opacity: badge ? 1 : 0.4 }}>
                     <div style={{ fontSize: 28, marginBottom: 4 }}>{r.icon}</div>
-                    <div style={{ fontSize: 10, fontWeight: 700 }}>{r.name}</div>
+                    <div style={{ fontSize: 12, fontWeight: 700 }}>{r.name}</div>
                     {badge ? (
                       <>
                         <div className="badge-card" style={{ marginTop: 8, fontSize: 8, padding: "4px 8px", borderColor: badge.tier === "gold" ? "#f59e0b" : badge.tier === "silver" ? "#94a3b8" : badge.tier === "platinum" ? "#8b5cf6" : "#cd7f32", color: badge.tier === "gold" ? "#f59e0b" : badge.tier === "silver" ? "#94a3b8" : badge.tier === "platinum" ? "#8b5cf6" : "#cd7f32" }}>
@@ -3702,7 +3990,7 @@ export default function ThreatReady() {
                         </div>
                         <button className="btn bs" style={{ marginTop: 8, fontSize: 8, padding: "3px 8px" }}>📤 Share</button>
                       </>
-                    ) : <div style={{ fontSize: 9, color: "var(--tx3)", marginTop: 8 }}>🔒 Not earned</div>}
+                    ) : <div style={{ fontSize: 11, color: "var(--tx2)", marginTop: 8 }}>🔒 Not earned</div>}
                   </div>
                 );
               })}
@@ -3711,7 +3999,7 @@ export default function ThreatReady() {
             <div className="card fadeUp" style={{ padding: 16 }}>
               {[["🎯 First Scenario", completedScenarios.length >= 1], ["🔥 10 Scenarios", completedScenarios.length >= 10], ["🌟 All 12 Roles", false], ["💎 Expert Badge", false], ["📅 30-Day Streak", streak >= 30]].map(([m, done], i) => (
                 <div key={i} style={{ display: "flex", justifyContent: "space-between", padding: "6px 0", borderBottom: i < 4 ? "1px solid var(--bd)" : "none" }}>
-                  <span style={{ fontSize: 12, color: done ? "var(--ok)" : "var(--tx3)" }}>{m}</span>
+                  <span style={{ fontSize: 12, color: done ? "var(--ok)" : "var(--tx2)" }}>{m}</span>
                   <span style={{ fontSize: 12 }}>{done ? "✅" : "⬜"}</span>
                 </div>
               ))}
@@ -3732,8 +4020,8 @@ export default function ThreatReady() {
                 style={{ minHeight: 120, marginBottom: 10 }}
               />
               <FileUpload onUpload={(text, aiData) => { setResumeText(text); if (aiData) setResumeAiData(aiData); }} label="Upload Resume (PDF/DOC/TXT)" />
-              {resumeText && <div style={{ marginTop: 8, fontSize: 10, color: "var(--ok)" }}>✓ Resume loaded · AI will personalize your scenarios</div>}
-              <button className="btn bp" style={{ marginTop: 10, fontSize: 11, padding: "8px 20px" }}
+              {resumeText && <div style={{ marginTop: 8, fontSize: 12, color: "var(--ok)" }}>✓ Resume loaded · AI will personalize your scenarios</div>}
+              <button className="btn bp" style={{ marginTop: 10, fontSize: 13, padding: "8px 20px" }}
                 onClick={async () => {
                   try {
                     const token = localStorage.getItem('token');
@@ -3756,10 +4044,10 @@ export default function ThreatReady() {
                 <div className="card fadeUp" style={{ padding: 16, marginBottom: 16, borderColor: "var(--ac)", background: "rgba(0,229,255,.02)" }}>
                   {resumeAiData.skills?.length > 0 && (
                     <div style={{ marginBottom: 14 }}>
-                      <div style={{ fontSize: 11, fontWeight: 700, color: "var(--ac)", marginBottom: 6, letterSpacing: 0.5 }}>✓ WE DETECTED</div>
+                      <div style={{ fontSize: 13, fontWeight: 700, color: "var(--ac)", marginBottom: 6, letterSpacing: 0.5 }}>✓ WE DETECTED</div>
                       <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
                         {resumeAiData.skills.map((skill, i) => (
-                          <span key={i} style={{ background: "rgba(0,229,255,.1)", border: "1px solid rgba(0,229,255,.3)", color: "var(--ac)", fontSize: 11, padding: "4px 10px", borderRadius: 12, fontWeight: 600 }}>
+                          <span key={i} style={{ background: "rgba(0,229,255,.1)", border: "1px solid rgba(0,229,255,.3)", color: "var(--ac)", fontSize: 13, padding: "4px 10px", borderRadius: 12, fontWeight: 600 }}>
                             {skill}
                           </span>
                         ))}
@@ -3768,17 +4056,17 @@ export default function ThreatReady() {
                   )}
                   {resumeAiData.experience_years > 0 && (
                     <div style={{ fontSize: 12, color: "var(--tx2)", marginBottom: 8 }}>
-                      <span style={{ color: "var(--tx3)" }}>Experience: </span>
+                      <span style={{ color: "var(--tx2)" }}>Experience: </span>
                       <span style={{ color: "var(--tx)", fontWeight: 600 }}>{resumeAiData.experience_years} years</span>
                       {resumeAiData.top_role && <span> · Top strength: <span style={{ color: "var(--ok)" }}>{resumeAiData.top_role}</span></span>}
                     </div>
                   )}
                   {resumeAiData.weak_areas?.length > 0 && (
                     <div style={{ marginTop: 10 }}>
-                      <div style={{ fontSize: 11, fontWeight: 700, color: "var(--wn)", marginBottom: 6, letterSpacing: 0.5 }}>⚠️ AREAS TO IMPROVE</div>
+                      <div style={{ fontSize: 13, fontWeight: 700, color: "var(--wn)", marginBottom: 6, letterSpacing: 0.5 }}>⚠️ AREAS TO IMPROVE</div>
                       <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
                         {resumeAiData.weak_areas.map((area, i) => (
-                          <span key={i} style={{ background: "rgba(255,171,64,.08)", border: "1px solid rgba(255,171,64,.25)", color: "var(--wn)", fontSize: 10, padding: "3px 8px", borderRadius: 10 }}>
+                          <span key={i} style={{ background: "rgba(255,171,64,.08)", border: "1px solid rgba(255,171,64,.25)", color: "var(--wn)", fontSize: 12, padding: "3px 8px", borderRadius: 10 }}>
                             {area}
                           </span>
                         ))}
@@ -3787,7 +4075,7 @@ export default function ThreatReady() {
                   )}
                   {resumeAiData.recommended_difficulty && (
                     <div style={{ marginTop: 12, padding: 10, background: "rgba(0,224,150,.06)", border: "1px solid rgba(0,224,150,.2)", borderRadius: 8 }}>
-                      <div style={{ fontSize: 11, color: "var(--ok)", fontWeight: 700, marginBottom: 3 }}>🎯 AI RECOMMENDS</div>
+                      <div style={{ fontSize: 13, color: "var(--ok)", fontWeight: 700, marginBottom: 3 }}>🎯 AI RECOMMENDS</div>
                       <div style={{ fontSize: 12, color: "var(--tx)" }}>
                         Start with <span style={{ color: "var(--ok)", fontWeight: 700, textTransform: "capitalize" }}>{resumeAiData.recommended_difficulty}</span> difficulty
                         {resumeAiData.recommended_roles?.length > 0 && (
@@ -3814,7 +4102,7 @@ export default function ThreatReady() {
                 <option value="senior">Senior (5-8 years)</option>
                 <option value="lead">Lead (8+ years)</option>
               </select>
-              <button className="btn bp" style={{ fontSize: 11, padding: "8px 20px" }}
+              <button className="btn bp" style={{ fontSize: 13, padding: "8px 20px" }}
                 onClick={async () => {
                   try {
                     const token = localStorage.getItem('token');
@@ -3835,27 +4123,27 @@ export default function ThreatReady() {
               {readiness && readiness.has_data ? (
                 <>
                   <div className="mono" style={{ fontSize: 40, fontWeight: 700, color: readiness.overall_readiness >= 70 ? "var(--ok)" : readiness.overall_readiness >= 50 ? "var(--ac)" : "var(--wn)" }}>
-                    {readiness.overall_readiness}<span style={{ fontSize: 16, color: "var(--tx3)" }}>/100</span>
+                    {readiness.overall_readiness}<span style={{ fontSize: 16, color: "var(--tx2)" }}>/100</span>
                   </div>
-                  <div style={{ fontSize: 11, color: "var(--tx2)", marginTop: 4 }}>
+                  <div style={{ fontSize: 13, color: "var(--tx2)", marginTop: 4 }}>
                     Overall Interview Readiness · based on {readiness.total_sessions} assessment{readiness.total_sessions !== 1 ? "s" : ""}
                   </div>
                   <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 10, marginTop: 14 }}>
                     {[["Technical", readiness.technical], ["Communication", readiness.communication], ["Decision", readiness.decision]].map(([l, v], i) => (
                       <div key={i}>
                         <div className="mono" style={{ fontSize: 14, color: v >= 70 ? "var(--ok)" : v >= 50 ? "var(--ac)" : "var(--wn)" }}>{v}</div>
-                        <div style={{ fontSize: 9, color: "var(--tx3)" }}>{l}</div>
+                        <div style={{ fontSize: 11, color: "var(--tx2)" }}>{l}</div>
                       </div>
                     ))}
                   </div>
                 </>
               ) : (
                 <>
-                  <div className="mono" style={{ fontSize: 28, fontWeight: 700, color: "var(--tx3)" }}>—</div>
-                  <div style={{ fontSize: 11, color: "var(--tx2)", marginTop: 8, lineHeight: 1.6 }}>
+                  <div className="mono" style={{ fontSize: 28, fontWeight: 700, color: "var(--tx2)" }}>—</div>
+                  <div style={{ fontSize: 13, color: "var(--tx2)", marginTop: 8, lineHeight: 1.6 }}>
                     Complete your first assessment to see your readiness score.
                     <br />
-                    <span style={{ fontSize: 10, color: "var(--tx3)" }}>Score updates automatically after each session.</span>
+                    <span style={{ fontSize: 12, color: "var(--tx2)" }}>Score updates automatically after each session.</span>
                   </div>
                 </>
               )}
@@ -3885,7 +4173,7 @@ export default function ThreatReady() {
                     ].map(([icon, text], i) => (
                       <div key={i} style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 12px", background: "var(--s2)", borderRadius: 8 }}>
                         <span style={{ fontSize: 18 }}>{icon}</span>
-                        <span style={{ fontSize: 11, fontWeight: 600 }}>{text}</span>
+                        <span style={{ fontSize: 13, fontWeight: 600 }}>{text}</span>
                       </div>
                     ))}
                   </div>
@@ -3922,8 +4210,8 @@ export default function ThreatReady() {
                         }}>
                         <div style={{ fontSize: 24, marginBottom: 6 }}>{icon}</div>
                         <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 3 }}>{label}</div>
-                        <div style={{ fontSize: 10, color: "var(--tx3)" }}>{desc}</div>
-                        {interviewPersona === val && <div style={{ fontSize: 9, color: "var(--ac)", marginTop: 6, fontWeight: 700 }}>✓ SELECTED</div>}
+                        <div style={{ fontSize: 12, color: "var(--tx2)" }}>{desc}</div>
+                        {interviewPersona === val && <div style={{ fontSize: 11, color: "var(--ac)", marginTop: 6, fontWeight: 700 }}>✓ SELECTED</div>}
                       </div>
                     ))}
                   </div>
@@ -3942,7 +4230,7 @@ export default function ThreatReady() {
                         <span style={{ fontSize: 26 }}>{role.icon}</span>
                         <div style={{ textAlign: "left" }}>
                           <div style={{ fontSize: 13, fontWeight: 700 }}>{role.name}</div>
-                          <div style={{ fontSize: 9, color: activeRole === role.id ? "var(--ac)" : (isPaid ? "var(--ok)" : "var(--wn)"), marginTop: 2, fontWeight: 600 }}>
+                          <div style={{ fontSize: 11, color: activeRole === role.id ? "var(--ac)" : (isPaid ? "var(--ok)" : "var(--wn)"), marginTop: 2, fontWeight: 600 }}>
                             {activeRole === role.id ? "✓ SELECTED" : (isPaid ? "🔓 All levels unlocked" : "🔒 Beginner only · Subscribe to unlock all")}
                           </div>
                         </div>
@@ -3981,8 +4269,8 @@ export default function ThreatReady() {
                       <div key={i} style={{ display: "flex", gap: 10, padding: "8px 0", borderBottom: i < 2 ? "1px solid var(--bd)" : "none" }}>
                         <span style={{ fontSize: 20 }}>{icon}</span>
                         <div>
-                          <div style={{ fontSize: 11, fontWeight: 700 }}>{title}</div>
-                          <div style={{ fontSize: 10, color: "var(--tx3)" }}>{desc}</div>
+                          <div style={{ fontSize: 13, fontWeight: 700 }}>{title}</div>
+                          <div style={{ fontSize: 12, color: "var(--tx2)" }}>{desc}</div>
                         </div>
                       </div>
                     ))}
@@ -4008,7 +4296,7 @@ export default function ThreatReady() {
                 style={{ flex: 1, padding: "8px 0", fontSize: 13, border: "none", display: "flex", alignItems: "center", justifyContent: "center", gap: 6 }}
                 onClick={() => setBillingPeriod("yearly")}>
                 Yearly
-                <span style={{ fontSize: 9, background: "rgba(0,224,150,.2)", color: "var(--ok)", borderRadius: 20, padding: "1px 7px", fontWeight: 700 }}>-20%</span>
+                <span style={{ fontSize: 11, background: "rgba(0,224,150,.2)", color: "var(--ok)", borderRadius: 20, padding: "1px 7px", fontWeight: 700 }}>-20%</span>
               </button>
             </div>
 
@@ -4020,7 +4308,7 @@ export default function ThreatReady() {
                   <div style={{ fontSize: 14, fontWeight: 700 }}>
                     {isPaid ? `${subscribedRoles.length} Role${subscribedRoles.length > 1 ? "s" : ""} · Active` : "Free Trial"}
                   </div>
-                  <div style={{ fontSize: 11, color: "var(--tx2)", marginTop: 4 }}>
+                  <div style={{ fontSize: 13, color: "var(--tx2)", marginTop: 4 }}>
                     {isPaid
                       ? subscribedRoles.map(r => ROLES.find(x => x.id === r)?.name).filter(Boolean).join(", ")
                       : subscribedRoles.length > 0
@@ -4028,7 +4316,7 @@ export default function ThreatReady() {
                         : "Select roles to start trial"}
                   </div>
                 </div>
-                {isPaid && <span style={{ fontSize: 11, color: "var(--ok)", fontWeight: 700 }}>● Active</span>}
+                {isPaid && <span style={{ fontSize: 13, color: "var(--ok)", fontWeight: 700 }}>● Active</span>}
               </div>
             </div>
 
@@ -4059,18 +4347,18 @@ export default function ThreatReady() {
                       </div>
                     )}
                     {sel && !subscribed && (
-                      <div style={{ position: "absolute", top: 10, right: 10, width: 20, height: 20, borderRadius: "50%", background: "var(--ac)", color: "#000", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 10, fontWeight: 700 }}>✓</div>
+                      <div style={{ position: "absolute", top: 10, right: 10, width: 20, height: 20, borderRadius: "50%", background: "var(--ac)", color: "#000", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12, fontWeight: 700 }}>✓</div>
                     )}
                     <div style={{ fontSize: 28, marginBottom: 6 }}>{r.icon}</div>
-                    <div style={{ fontSize: 11, fontWeight: 700, marginBottom: 4 }}>{r.name}</div>
+                    <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 4 }}>{r.name}</div>
                     <div className="mono" style={{ fontSize: 15, fontWeight: 700, color: subscribed ? "var(--ok)" : sel ? r.color : "var(--tx2)" }}>
                       {billingPeriod === "yearly" ? `₹${yearlyPrice}/yr` : `₹${monthlyPrice}/mo`}
                     </div>
                     {billingPeriod === "yearly" && !subscribed && (
-                      <div style={{ fontSize: 9, color: "var(--ok)", marginTop: 2 }}>Save ₹{savings}/yr</div>
+                      <div style={{ fontSize: 11, color: "var(--ok)", marginTop: 2 }}>Save ₹{savings}/yr</div>
                     )}
                     {subscribed && (
-                      <div style={{ fontSize: 9, color: "var(--ok)", marginTop: 2 }}>🔓 All levels unlocked</div>
+                      <div style={{ fontSize: 11, color: "var(--ok)", marginTop: 2 }}>🔓 All levels unlocked</div>
                     )}
                   </div>
                 );
@@ -4087,7 +4375,7 @@ export default function ThreatReady() {
             {/* Checkout Summary */}
             {selectedRoles.length > 0 && (
               <div className="card fadeUp" style={{ padding: 20, textAlign: "center", borderColor: "var(--ac)", marginTop: 4 }}>
-                <div style={{ fontSize: 11, color: "var(--tx3)", marginBottom: 6 }}>
+                <div style={{ fontSize: 13, color: "var(--tx2)", marginBottom: 6 }}>
                   {selectedRoles.length} role{selectedRoles.length > 1 ? "s" : ""} selected · {billingPeriod}
                 </div>
                 <div className="mono" style={{ fontSize: 32, fontWeight: 700, color: "var(--ac)", marginBottom: 4 }}>
@@ -4095,7 +4383,7 @@ export default function ThreatReady() {
                   <span style={{ fontSize: 12, fontWeight: 400, color: "var(--tx2)" }}> /{billingPeriod === "yearly" ? "year" : "month"}</span>
                 </div>
                 {(getDiscount() > 0 || billingPeriod === "yearly") && (
-                  <div style={{ fontSize: 10, color: "var(--ok)", marginBottom: 16 }}>
+                  <div style={{ fontSize: 12, color: "var(--ok)", marginBottom: 16 }}>
                     {getDiscount() > 0 ? `${getDiscount()}% bundle discount` : ""}
                     {getDiscount() > 0 && billingPeriod === "yearly" ? " + " : ""}
                     {billingPeriod === "yearly" ? "20% yearly discount" : ""}
@@ -4110,7 +4398,7 @@ export default function ThreatReady() {
             )}
 
             {isPaid && (
-              <button className="btn bs" style={{ width: "100%", marginTop: 12, fontSize: 11, color: "var(--wn)" }}>
+              <button className="btn bs" style={{ width: "100%", marginTop: 12, fontSize: 13, color: "var(--wn)" }}>
                 Pause Subscription
               </button>
             )}
@@ -4127,7 +4415,7 @@ export default function ThreatReady() {
                 onChange={e => setSettingsName(e.target.value)}
                 style={{ marginBottom: 8 }} />
               <input className="input" placeholder="Email" value={user?.email || ''} disabled style={{ marginBottom: 8, opacity: 0.6 }} />
-              <button className="btn bp" style={{ fontSize: 11 }}
+              <button className="btn bp" style={{ fontSize: 13 }}
                 onClick={async () => {
                   const token = localStorage.getItem('token');
                   const res = await fetch('https://threatready-db.onrender.com/api/settings/profile', {
@@ -4289,7 +4577,7 @@ export default function ThreatReady() {
                   showToast('Report ready — use Print → Save as PDF', 'success');
                 } catch (e) { showToast('Report failed: ' + e.message, 'error'); }
               }}>📊 Download My Report (PDF)</button>
-              <button className="btn bdn" style={{ fontSize: 11 }} onClick={() => showConfirm('Delete your account permanently? All data will be lost.', async () => { const token = localStorage.getItem('token'); const res = await fetch('https://threatready-db.onrender.com/api/settings/delete-account', { method: 'DELETE', headers: { 'Authorization': `Bearer ${token}` } }); if (res.ok) { localStorage.clear(); setUser(null); setView('landing'); showToast('Account deleted.', 'info'); } })}>🗑️ Delete Account</button>
+              <button className="btn bdn" style={{ fontSize: 13 }} onClick={() => showConfirm('Delete your account permanently? All data will be lost.', async () => { const token = localStorage.getItem('token'); const res = await fetch('https://threatready-db.onrender.com/api/settings/delete-account', { method: 'DELETE', headers: { 'Authorization': `Bearer ${token}` } }); if (res.ok) { localStorage.clear(); setUser(null); setView('landing'); showToast('Account deleted.', 'info'); } })}>🗑️ Delete Account</button>
             </div>
             
             </div>
@@ -4305,7 +4593,7 @@ export default function ThreatReady() {
             ].map(([q, a], i) => (
               <div key={i} className="card fadeUp" style={{ padding: 14, marginBottom: 8, animationDelay: `${i * .05}s` }}>
                 <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 4 }}>{q}</div>
-                <div style={{ fontSize: 11, color: "var(--tx2)", lineHeight: 1.6 }}>{a}</div>
+                <div style={{ fontSize: 13, color: "var(--tx2)", lineHeight: 1.6 }}>{a}</div>
               </div>
             ))}
             <div className="card fadeUp" style={{ padding: 16, marginTop: 8 }}>
@@ -4317,8 +4605,8 @@ export default function ThreatReady() {
               ) : (
                 <>
                   <div style={{ display: "flex", gap: 6, marginBottom: 10 }}>
-                    <button className={`btn ${feedbackInputMode === "text" ? "bp" : "bs"}`} style={{ padding: "4px 12px", fontSize: 10 }} onClick={() => setFeedbackInputMode("text")}>✏️ Type</button>
-                    <button className={`btn ${feedbackInputMode === "voice" ? "bp" : "bs"}`} style={{ padding: "4px 12px", fontSize: 10 }} onClick={() => setFeedbackInputMode("voice")}>🎤 Dictate</button>
+                    <button className={`btn ${feedbackInputMode === "text" ? "bp" : "bs"}`} style={{ padding: "4px 12px", fontSize: 12 }} onClick={() => setFeedbackInputMode("text")}>✏️ Type</button>
+                    <button className={`btn ${feedbackInputMode === "voice" ? "bp" : "bs"}`} style={{ padding: "4px 12px", fontSize: 12 }} onClick={() => setFeedbackInputMode("voice")}>🎤 Dictate</button>
                   </div>
                   {feedbackInputMode === "text" ? (
                     <textarea
@@ -4343,7 +4631,7 @@ export default function ThreatReady() {
                           }
                         }}
                         style={{ margin: "0 auto 8px" }}>{feedbackVoice.recording ? "⏹" : "🎤"}</div>
-                      <div style={{ fontSize: 10, color: feedbackVoice.recording ? "var(--dn)" : "var(--tx3)" }}>
+                      <div style={{ fontSize: 12, color: feedbackVoice.recording ? "var(--dn)" : "var(--tx2)" }}>
                         {feedbackVoice.recording ? "Recording... tap to stop" : "Tap to start dictating"}
                       </div>
                       {feedbackVoice.transcript && <div style={{ marginTop: 10, padding: 10, background: "var(--s2)", borderRadius: 8, fontSize: 12, textAlign: "left", lineHeight: 1.6 }}>{feedbackVoice.transcript}</div>}
@@ -4352,7 +4640,7 @@ export default function ThreatReady() {
                   )}
                   <button
                     className="btn bp"
-                    style={{ fontSize: 11 }}
+                    style={{ fontSize: 13 }}
                     disabled={!feedbackText.trim() && !feedbackVoice.transcript?.trim()}
                     onClick={async () => {
                       try {
@@ -4427,19 +4715,19 @@ export default function ThreatReady() {
 
                 <div style={{ padding: "20px 28px", borderBottom: "1px solid #1e2536", background: "#0a0e1a", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                   <div>
-                    <div style={{ fontSize: 11, color: "var(--ac)", fontWeight: 700, letterSpacing: 2, marginBottom: 4 }}>📊 ASSESSMENT RESULTS</div>
+                    <div style={{ fontSize: 13, color: "var(--ac)", fontWeight: 700, letterSpacing: 2, marginBottom: 4 }}>📊 ASSESSMENT RESULTS</div>
                     <div style={{ fontSize: 18, fontWeight: 800 }}>{reportModal.name}</div>
-                    <div style={{ fontSize: 11, color: "var(--tx3)", marginTop: 2 }}>{reportModal.email} · {reportModal.assessment_name || (ROLES.find(r => r.id === reportModal.role_id)?.name + ' Assessment')}</div>
+                    <div style={{ fontSize: 13, color: "var(--tx2)", marginTop: 2 }}>{reportModal.email} · {reportModal.assessment_name || (ROLES.find(r => r.id === reportModal.role_id)?.name + ' Assessment')}</div>
                   </div>
-                  <span style={{ cursor: "pointer", fontSize: 28, color: "var(--tx3)", padding: "0 8px" }} onClick={() => setReportModal(null)}>×</span>
+                  <span style={{ cursor: "pointer", fontSize: 28, color: "var(--tx2)", padding: "0 8px" }} onClick={() => setReportModal(null)}>×</span>
                 </div>
 
                 <div style={{ overflow: "auto", flex: 1 }}>
 
                   <div style={{ padding: "32px 28px", textAlign: "center", borderBottom: "1px solid #1e2536", background: "linear-gradient(180deg, rgba(0,229,255,0.04) 0%, transparent 100%)" }}>
-                    <div style={{ fontSize: 11, color: "var(--tx3)", marginBottom: 8, letterSpacing: 2, fontWeight: 700 }}>OVERALL SCORE</div>
+                    <div style={{ fontSize: 13, color: "var(--tx2)", marginBottom: 8, letterSpacing: 2, fontWeight: 700 }}>OVERALL SCORE</div>
                     <div className="mono" style={{ fontSize: 72, fontWeight: 900, lineHeight: 1, color: verdictColor, marginBottom: 8 }}>
-                      {score.toFixed(1)}<span style={{ fontSize: 28, color: "var(--tx3)" }}>/10</span>
+                      {score.toFixed(1)}<span style={{ fontSize: 28, color: "var(--tx2)" }}>/10</span>
                     </div>
                     <div style={{ display: "inline-block", border: `2px solid ${badgeColor}`, color: badgeColor, padding: "6px 24px", borderRadius: 24, fontSize: 12, fontWeight: 800, letterSpacing: 2, marginTop: 8, marginBottom: 14 }}>
                       {(reportModal.badge || '').toUpperCase()}
@@ -4451,64 +4739,64 @@ export default function ThreatReady() {
 
                   <div style={{ padding: "20px 28px", borderBottom: "1px solid #1e2536", display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 12 }}>
                     <div style={{ textAlign: "center", padding: 14, background: "var(--s2)", borderRadius: 10 }}>
-                      <div style={{ fontSize: 9, color: "var(--tx3)", marginBottom: 4, letterSpacing: 1 }}>ROLE</div>
+                      <div style={{ fontSize: 11, color: "var(--tx2)", marginBottom: 4, letterSpacing: 1 }}>ROLE</div>
                       <div style={{ fontSize: 13, fontWeight: 700 }}>{ROLES.find(r => r.id === reportModal.role_id)?.icon} {ROLES.find(r => r.id === reportModal.role_id)?.name || reportModal.role_id}</div>
                     </div>
                     <div style={{ textAlign: "center", padding: 14, background: "var(--s2)", borderRadius: 10 }}>
-                      <div style={{ fontSize: 9, color: "var(--tx3)", marginBottom: 4, letterSpacing: 1 }}>DIFFICULTY</div>
+                      <div style={{ fontSize: 11, color: "var(--tx2)", marginBottom: 4, letterSpacing: 1 }}>DIFFICULTY</div>
                       <div style={{ fontSize: 13, fontWeight: 700, textTransform: "capitalize" }}>{reportModal.difficulty}</div>
                     </div>
                     <div style={{ textAlign: "center", padding: 14, background: "var(--s2)", borderRadius: 10 }}>
-                      <div style={{ fontSize: 9, color: "var(--tx3)", marginBottom: 4, letterSpacing: 1 }}>QUESTIONS</div>
+                      <div style={{ fontSize: 11, color: "var(--tx2)", marginBottom: 4, letterSpacing: 1 }}>QUESTIONS</div>
                       <div style={{ fontSize: 13, fontWeight: 700 }}>{evals.length} answered</div>
                     </div>
                     <div style={{ textAlign: "center", padding: 14, background: "var(--s2)", borderRadius: 10 }}>
-                      <div style={{ fontSize: 9, color: "var(--tx3)", marginBottom: 4, letterSpacing: 1 }}>COMPLETED</div>
+                      <div style={{ fontSize: 11, color: "var(--tx2)", marginBottom: 4, letterSpacing: 1 }}>COMPLETED</div>
                       <div style={{ fontSize: 13, fontWeight: 700 }}>{reportModal.completed_at?.substring(0, 10) || '—'}</div>
                     </div>
                   </div>
 
                   <div style={{ padding: "20px 28px", borderBottom: "1px solid #1e2536", display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
                     <div style={{ padding: 14, background: "rgba(0,224,150,.05)", border: "1px solid rgba(0,224,150,.25)", borderRadius: 10 }}>
-                      <div style={{ fontSize: 10, color: "var(--ok)", fontWeight: 700, marginBottom: 6, letterSpacing: 1 }}>✓ STRONG ANSWERS</div>
+                      <div style={{ fontSize: 12, color: "var(--ok)", fontWeight: 700, marginBottom: 6, letterSpacing: 1 }}>✓ STRONG ANSWERS</div>
                       <div style={{ fontSize: 24, fontWeight: 900, color: "var(--ok)" }}>{avgStrength}</div>
-                      <div style={{ fontSize: 10, color: "var(--tx3)", marginTop: 2 }}>Questions scored 7+ / 10</div>
+                      <div style={{ fontSize: 12, color: "var(--tx2)", marginTop: 2 }}>Questions scored 7+ / 10</div>
                     </div>
                     <div style={{ padding: 14, background: "rgba(255,82,82,.05)", border: "1px solid rgba(255,82,82,.25)", borderRadius: 10 }}>
-                      <div style={{ fontSize: 10, color: "var(--dn)", fontWeight: 700, marginBottom: 6, letterSpacing: 1 }}>✗ WEAK AREAS</div>
+                      <div style={{ fontSize: 12, color: "var(--dn)", fontWeight: 700, marginBottom: 6, letterSpacing: 1 }}>✗ WEAK AREAS</div>
                       <div style={{ fontSize: 24, fontWeight: 900, color: "var(--dn)" }}>{avgWeak}</div>
-                      <div style={{ fontSize: 10, color: "var(--tx3)", marginTop: 2 }}>Questions scored below 5 / 10</div>
+                      <div style={{ fontSize: 12, color: "var(--tx2)", marginTop: 2 }}>Questions scored below 5 / 10</div>
                     </div>
                   </div>
 
                   <div style={{ padding: "24px 28px" }}>
                     <div style={{ fontSize: 12, color: "var(--ac)", fontWeight: 700, letterSpacing: 2, marginBottom: 16 }}>📝 DETAILED QUESTION BREAKDOWN</div>
                     {evals.length === 0 ? (
-                      <div style={{ textAlign: "center", padding: 30, color: "var(--tx3)", fontSize: 12 }}>No evaluation data available</div>
+                      <div style={{ textAlign: "center", padding: 30, color: "var(--tx2)", fontSize: 12 }}>No evaluation data available</div>
                     ) : (
                       evals.map((ev, i) => (
                         <div key={i} style={{ marginBottom: 18, padding: 18, background: "var(--s2)", borderRadius: 12, border: `1px solid ${ev.score >= 7 ? "rgba(0,224,150,.3)" : ev.score >= 5 ? "rgba(245,158,11,.3)" : "rgba(255,82,82,.3)"}` }}>
                           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12, paddingBottom: 10, borderBottom: "1px solid var(--bd)" }}>
-                            <span style={{ fontSize: 11, color: "var(--tx3)", fontWeight: 700, letterSpacing: 1 }}>QUESTION {i + 1} · {ev.category || 'General'}</span>
+                            <span style={{ fontSize: 13, color: "var(--tx2)", fontWeight: 700, letterSpacing: 1 }}>QUESTION {i + 1} · {ev.category || 'General'}</span>
                             <span className="mono" style={{ fontSize: 16, fontWeight: 900, color: ev.score >= 7 ? "var(--ok)" : ev.score >= 5 ? "var(--wn)" : "var(--dn)" }}>{ev.score}/10</span>
                           </div>
                           <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 12, color: "var(--tx1)", lineHeight: 1.5 }}>❓ {ev.question}</div>
                           <div style={{ fontSize: 12, color: "var(--tx2)", marginBottom: 12, padding: 12, background: "var(--s1)", borderRadius: 8, lineHeight: 1.6, borderLeft: "3px solid var(--tx3)" }}>
-                            <div style={{ fontSize: 9, color: "var(--tx3)", marginBottom: 6, fontWeight: 700, letterSpacing: 1 }}>CANDIDATE'S ANSWER</div>
+                            <div style={{ fontSize: 11, color: "var(--tx2)", marginBottom: 6, fontWeight: 700, letterSpacing: 1 }}>CANDIDATE'S ANSWER</div>
                             {ev.answer || '(No answer provided)'}
                           </div>
                           {ev.strengths && (
-                            <div style={{ fontSize: 11, color: "var(--ok)", marginBottom: 8, padding: 10, background: "rgba(0,224,150,.05)", borderRadius: 8, borderLeft: "3px solid var(--ok)" }}>
+                            <div style={{ fontSize: 13, color: "var(--ok)", marginBottom: 8, padding: 10, background: "rgba(0,224,150,.05)", borderRadius: 8, borderLeft: "3px solid var(--ok)" }}>
                               <strong>✓ Strengths:</strong> {ev.strengths}
                             </div>
                           )}
                           {ev.weaknesses && (
-                            <div style={{ fontSize: 11, color: "var(--dn)", marginBottom: 8, padding: 10, background: "rgba(255,82,82,.05)", borderRadius: 8, borderLeft: "3px solid var(--dn)" }}>
+                            <div style={{ fontSize: 13, color: "var(--dn)", marginBottom: 8, padding: 10, background: "rgba(255,82,82,.05)", borderRadius: 8, borderLeft: "3px solid var(--dn)" }}>
                               <strong>✗ Weaknesses:</strong> {ev.weaknesses}
                             </div>
                           )}
                           {ev.improved_answer && ev.improved_answer !== '-' && (
-                            <div style={{ fontSize: 11, color: "var(--ac)", marginTop: 8, padding: 10, background: "rgba(0,229,255,.05)", borderRadius: 8, borderLeft: "3px solid var(--ac)" }}>
+                            <div style={{ fontSize: 13, color: "var(--ac)", marginTop: 8, padding: 10, background: "rgba(0,229,255,.05)", borderRadius: 8, borderLeft: "3px solid var(--ac)" }}>
                               <strong>💡 Ideal Answer:</strong> {ev.improved_answer}
                             </div>
                           )}
@@ -4540,7 +4828,7 @@ export default function ThreatReady() {
               {!isHrPaid && (
                 <button
                   className="btn bp"
-                  style={{ padding: "6px 14px", fontSize: 11, fontWeight: 700, marginRight: 4 }}
+                  style={{ padding: "6px 14px", fontSize: 13, fontWeight: 700, marginRight: 4 }}
                   onClick={() => {
                     setHrModalCompanyName(companyName || '');
                     setHrModalTeamSize(teamSize || '11-50');
@@ -4591,17 +4879,17 @@ export default function ThreatReady() {
                       boxShadow: "0 20px 60px rgba(0,0,0,.9), 0 0 30px rgba(0,229,255,0.15)",
                       
                     }}>
-                      <div style={{ padding: "12px 16px", borderBottom: "1px solid #1e2536", fontSize: 11, fontWeight: 700, color: "var(--ac)", letterSpacing: 1, display: "flex", justifyContent: "space-between", alignItems: "center", background: "#0a0e1a", position: "sticky", top: 0 }}>
+                      <div style={{ padding: "12px 16px", borderBottom: "1px solid #1e2536", fontSize: 13, fontWeight: 700, color: "var(--ac)", letterSpacing: 1, display: "flex", justifyContent: "space-between", alignItems: "center", background: "#0a0e1a", position: "sticky", top: 0 }}>
                         <span>NOTIFICATIONS ({notifications.length})</span>
-                        <span style={{ cursor: "pointer", fontSize: 16, color: "var(--tx3)" }} onClick={() => setShowNotifs(false)}>×</span>
+                        <span style={{ cursor: "pointer", fontSize: 16, color: "var(--tx2)" }} onClick={() => setShowNotifs(false)}>×</span>
                       </div>
                       {notifications.length === 0
-                        ? <div style={{ padding: 20, fontSize: 11, color: "var(--tx3)", textAlign: "center" }}>No notifications yet</div>
+                        ? <div style={{ padding: 20, fontSize: 13, color: "var(--tx2)", textAlign: "center" }}>No notifications yet</div>
                         : notifications.map((n, i) => (
                           <div key={n.id || i} style={{ padding: "12px 16px", borderBottom: i < notifications.length - 1 ? "1px solid #1e2536" : "none", background: n.is_read ? "transparent" : "rgba(0,229,255,.04)" }}>
                             <div style={{ fontSize: 12, fontWeight: 600, color: "var(--tx1)", lineHeight: 1.4 }}>{n.title || n.type}</div>
-                            <div style={{ fontSize: 10, color: "var(--tx2)", marginTop: 4, lineHeight: 1.4 }}>{n.message}</div>
-                            <div style={{ fontSize: 9, color: "var(--tx3)", marginTop: 5 }}>{n.created_at?.substring(0, 16).replace('T', ' ')}</div>
+                            <div style={{ fontSize: 12, color: "var(--tx2)", marginTop: 4, lineHeight: 1.4 }}>{n.message}</div>
+                            <div style={{ fontSize: 11, color: "var(--tx2)", marginTop: 5 }}>{n.created_at?.substring(0, 16).replace('T', ' ')}</div>
                           </div>
                         ))
                       }
@@ -4611,7 +4899,7 @@ export default function ThreatReady() {
               </div>
 
               
-              <button className="btn bs" style={{ padding: "5px 10px", fontSize: 10 }} onClick={logout}>Logout</button>
+              <button className="btn bs" style={{ padding: "5px 10px", fontSize: 12 }} onClick={logout}>Logout</button>
             </div>
           </div>
 
@@ -4655,7 +4943,7 @@ export default function ThreatReady() {
               const pending = candidates.filter(c => c.status === "not_started" || !c.status);
               if (completed.length === 0 && inProgress.length === 0 && pending.length === 0) {
                 return (
-                  <div className="card fadeUp" style={{ padding: 20, textAlign: "center", fontSize: 12, color: "var(--tx3)" }}>
+                  <div className="card fadeUp" style={{ padding: 20, textAlign: "center", fontSize: 12, color: "var(--tx2)" }}>
                     No notifications yet. Invite candidates to get started.
                   </div>
                 );
@@ -4667,11 +4955,11 @@ export default function ThreatReady() {
                       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                         <div>
                           <div style={{ fontSize: 12, fontWeight: 700, color: "var(--ok)" }}>✅ {c.candidate_name || c.candidate_email?.split("@")[0]} completed assessment</div>
-                          <div style={{ fontSize: 10, color: "var(--tx3)", marginTop: 3 }}>
+                          <div style={{ fontSize: 12, color: "var(--tx2)", marginTop: 3 }}>
                             {ROLES.find(r => r.id === c.role_id)?.name || c.role_id} · Score: <strong style={{ color: c.overall_score >= 7 ? "var(--ok)" : c.overall_score >= 5 ? "var(--wn)" : "var(--dn)" }}>{c.overall_score}/10</strong>
                           </div>
                         </div>
-                        <button className="btn bs" style={{ fontSize: 9, padding: "4px 10px" }}
+                        <button className="btn bs" style={{ fontSize: 11, padding: "4px 10px" }}
                           onClick={() => { setB2bTab("teamskills"); localStorage.setItem('cyberprep_b2btab', 'teamskills'); }}>
                           View →
                         </button>
@@ -4681,7 +4969,7 @@ export default function ThreatReady() {
                   {inProgress.slice(0, 2).map((c, i) => (
                     <div key={c.id} className="card fadeUp" style={{ padding: 14, marginBottom: 8, borderLeft: "3px solid var(--wn)", animationDelay: `${i * .04}s` }}>
                       <div style={{ fontSize: 12, fontWeight: 700, color: "var(--wn)" }}>● {c.candidate_name || c.candidate_email?.split("@")[0]} is taking the assessment now</div>
-                      <div style={{ fontSize: 10, color: "var(--tx3)", marginTop: 3 }}>{ROLES.find(r => r.id === c.role_id)?.name || c.role_id}</div>
+                      <div style={{ fontSize: 12, color: "var(--tx2)", marginTop: 3 }}>{ROLES.find(r => r.id === c.role_id)?.name || c.role_id}</div>
                     </div>
                   ))}
                   {pending.length > 0 && (
@@ -4708,9 +4996,9 @@ export default function ThreatReady() {
 
               {/* Mode selector tabs */}
               <div style={{ display: "flex", gap: 6, marginBottom: 14 }}>
-                <button className={`btn ${inviteMode === "individual" ? "bp" : "bs"}`} style={{ padding: "6px 14px", fontSize: 11 }} onClick={() => { setInviteMode("individual"); setInviteMsg(''); }}>👤 Individual</button>
-                <button className={`btn ${inviteMode === "multiple" ? "bp" : "bs"}`} style={{ padding: "6px 14px", fontSize: 11 }} onClick={() => { setInviteMode("multiple"); setInviteMsg(''); }}>👥 Paste Multiple</button>
-                <button className={`btn ${inviteMode === "csv" ? "bp" : "bs"}`} style={{ padding: "6px 14px", fontSize: 11 }} onClick={() => { setInviteMode("csv"); setInviteMsg(''); }}>📄 Upload CSV</button>
+                <button className={`btn ${inviteMode === "individual" ? "bp" : "bs"}`} style={{ padding: "6px 14px", fontSize: 13 }} onClick={() => { setInviteMode("individual"); setInviteMsg(''); }}>👤 Individual</button>
+                <button className={`btn ${inviteMode === "multiple" ? "bp" : "bs"}`} style={{ padding: "6px 14px", fontSize: 13 }} onClick={() => { setInviteMode("multiple"); setInviteMsg(''); }}>👥 Paste Multiple</button>
+                <button className={`btn ${inviteMode === "csv" ? "bp" : "bs"}`} style={{ padding: "6px 14px", fontSize: 13 }} onClick={() => { setInviteMode("csv"); setInviteMsg(''); }}>📄 Upload CSV</button>
               </div>
 
               {/* MODE: Individual email */}
@@ -4725,11 +5013,11 @@ export default function ThreatReady() {
                   <textarea className="input" placeholder={"Paste emails (one per line OR comma-separated)\n\nExample:\njohn@company.com\njane@company.com\nbob@company.com"}
                     value={inviteMultipleEmails}
                     onChange={e => setInviteMultipleEmails(e.target.value)}
-                    style={{ minHeight: 120, fontFamily: "monospace", fontSize: 11 }} />
+                    style={{ minHeight: 120, fontFamily: "monospace", fontSize: 13 }} />
                   {inviteMultipleEmails.trim() && (() => {
                     const emails = inviteMultipleEmails.split(/[\n,;]+/).map(e => e.trim()).filter(e => e && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e));
                     return (
-                      <div style={{ fontSize: 10, color: emails.length > 0 ? "var(--ok)" : "var(--wn)", marginTop: 6 }}>
+                      <div style={{ fontSize: 12, color: emails.length > 0 ? "var(--ok)" : "var(--wn)", marginTop: 6 }}>
                         {emails.length > 0 ? `✓ ${emails.length} valid email${emails.length !== 1 ? "s" : ""} detected` : "⚠️ No valid emails detected yet"}
                       </div>
                     );
@@ -4760,17 +5048,17 @@ export default function ThreatReady() {
                       <div style={{ fontSize: 12, color: "var(--tx)", fontWeight: 600 }}>
                         {inviteCsvFile ? inviteCsvFile.name : "Click to upload CSV"}
                       </div>
-                      <div style={{ fontSize: 10, color: "var(--tx3)", marginTop: 4 }}>
+                      <div style={{ fontSize: 12, color: "var(--tx2)", marginTop: 4 }}>
                         Any column with email addresses works · .csv or .txt
                       </div>
                     </label>
                   </div>
                   {inviteParsedEmails.length > 0 && (
                     <div style={{ marginTop: 10, padding: 10, background: "rgba(0,224,150,.04)", border: "1px solid rgba(0,224,150,.2)", borderRadius: 6, maxHeight: 120, overflowY: "auto" }}>
-                      <div style={{ fontSize: 10, color: "var(--ok)", fontWeight: 700, marginBottom: 6 }}>
+                      <div style={{ fontSize: 12, color: "var(--ok)", fontWeight: 700, marginBottom: 6 }}>
                         {inviteParsedEmails.length} EMAIL{inviteParsedEmails.length !== 1 ? "S" : ""} READY TO INVITE
                       </div>
-                      <div style={{ fontSize: 10, color: "var(--tx2)", fontFamily: "monospace", lineHeight: 1.6 }}>
+                      <div style={{ fontSize: 12, color: "var(--tx2)", fontFamily: "monospace", lineHeight: 1.6 }}>
                         {inviteParsedEmails.slice(0, 20).join(", ")}
                         {inviteParsedEmails.length > 20 && ` ... and ${inviteParsedEmails.length - 20} more`}
                       </div>
@@ -4781,7 +5069,7 @@ export default function ThreatReady() {
 
               {/* Assessment Selector — links to saved assessment with custom questions */}
               <div style={{ marginBottom: 12 }}>
-                <div style={{ fontSize: 10, color: "var(--tx3)", marginBottom: 4 }}>ASSESSMENT (Optional — links to saved assessment)</div>
+                <div style={{ fontSize: 12, color: "var(--tx2)", marginBottom: 4 }}>ASSESSMENT (Optional — links to saved assessment)</div>
                 <select className="input" value={inviteAssessmentId}
                   onChange={e => {
                     const id = e.target.value;
@@ -4802,7 +5090,7 @@ export default function ThreatReady() {
                   ))}
                 </select>
                 {inviteAssessmentId && (
-                  <div style={{ fontSize: 9, color: "var(--ok)", marginTop: 4 }}>
+                  <div style={{ fontSize: 11, color: "var(--ok)", marginTop: 4 }}>
                     ✅ Candidates will receive the full set of questions from this assessment
                   </div>
                 )}
@@ -4810,20 +5098,20 @@ export default function ThreatReady() {
 
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 12 }}>
                 <div>
-                  <div style={{ fontSize: 10, color: "var(--tx3)", marginBottom: 4 }}>ROLE</div>
+                  <div style={{ fontSize: 12, color: "var(--tx2)", marginBottom: 4 }}>ROLE</div>
                   <select className="input" value={inviteRole} onChange={e => setInviteRole(e.target.value)} disabled={!!inviteAssessmentId}>
                     {ROLES.map(r => <option key={r.id} value={r.id}>{r.icon} {r.name}</option>)}
                   </select>
                 </div>
                 <div>
-                  <div style={{ fontSize: 10, color: "var(--tx3)", marginBottom: 4 }}>DIFFICULTY</div>
+                  <div style={{ fontSize: 12, color: "var(--tx2)", marginBottom: 4 }}>DIFFICULTY</div>
                   <select className="input" value={inviteDiff} onChange={e => setInviteDiff(e.target.value)} disabled={!!inviteAssessmentId}>
                     {DIFFICULTIES.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
                   </select>
                 </div>
               </div>
               {inviteMsg && (
-                <div style={{ padding: 9, borderRadius: 8, marginBottom: 10, fontSize: 11, background: inviteMsg.includes("✅") ? "rgba(0,224,150,.1)" : "rgba(255,82,82,.1)", color: inviteMsg.includes("✅") ? "var(--ok)" : "var(--dn)" }}>
+                <div style={{ padding: 9, borderRadius: 8, marginBottom: 10, fontSize: 13, background: inviteMsg.includes("✅") ? "rgba(0,224,150,.1)" : "rgba(255,82,82,.1)", color: inviteMsg.includes("✅") ? "var(--ok)" : "var(--dn)" }}>
                   {inviteMsg}
                 </div>
               )}
@@ -4900,7 +5188,7 @@ export default function ThreatReady() {
                 <div className="lbl">ALL CANDIDATES ({filterBySearch(candidates, candidatesSearch, c => c.candidate_name, c => c.candidate_email, c => c.invited_at).length})</div>
                 {selectedCandidates.length > 0 && (
                   <>
-                    <button className="btn" style={{ fontSize: 10, padding: "4px 10px", background: "rgba(0,224,150,.15)", border: "1px solid var(--ok)", color: "var(--ok)" }}
+                    <button className="btn" style={{ fontSize: 12, padding: "4px 10px", background: "rgba(0,224,150,.15)", border: "1px solid var(--ok)", color: "var(--ok)" }}
                       onClick={async () => {
                         const token = localStorage.getItem('token');
                         const selectedCompleted = candidates.filter(c => selectedCandidates.includes(c.id) && c.status === 'completed');
@@ -5022,7 +5310,7 @@ ${evals.map((ev, i) => {
                         }
                         showToast(`${selectedCompleted.length} PDF(s) opened!`, 'success');
                       }}>📥 Download PDFs ({selectedCandidates.length})</button>
-                    <button className="btn bdn" style={{ fontSize: 10, padding: "4px 10px" }}
+                    <button className="btn bdn" style={{ fontSize: 12, padding: "4px 10px" }}
                       onClick={() => {
                         showConfirm(`Delete ${selectedCandidates.length} selected candidate(s)?`, async () => {
                           const token = localStorage.getItem('token');
@@ -5042,12 +5330,12 @@ ${evals.map((ev, i) => {
               <div style={{ display: "flex", gap: 8, alignItems: "center", flex: 1, maxWidth: 400, minWidth: 250 }}>
                 <input className="input" type="text" placeholder="🔍 Search name, email, or date..."
                   value={candidatesSearch} onChange={e => setCandidatesSearch(e.target.value)}
-                  style={{ fontSize: 11, padding: "6px 12px", flex: 1 }} />
+                  style={{ fontSize: 13, padding: "6px 12px", flex: 1 }} />
                 {candidatesSearch && (
-                  <button className="btn bs" style={{ fontSize: 10, padding: "4px 10px" }} onClick={() => setCandidatesSearch('')}>✕</button>
+                  <button className="btn bs" style={{ fontSize: 12, padding: "4px 10px" }} onClick={() => setCandidatesSearch('')}>✕</button>
                 )}
               </div>
-              <button className="btn bs" style={{ fontSize: 10, padding: "4px 10px" }}
+              <button className="btn bs" style={{ fontSize: 12, padding: "4px 10px" }}
                 onClick={() => {
                   const filtered = filterBySearch(candidates, candidatesSearch, c => c.candidate_name, c => c.candidate_email, c => c.invited_at);
                   const csv = ['Name,Email,Role,Difficulty,Score,Status,Invited']
@@ -5060,7 +5348,7 @@ ${evals.map((ev, i) => {
             </div>
             {b2bLoading && <div style={{ textAlign: "center", padding: 20 }}><div className="loader" /></div>}
             <div className="card fadeUp" style={{ padding: 0, overflow: "hidden" }}>
-              <div style={{ display: "grid", gridTemplateColumns: "30px 2fr 2fr 1fr 1fr 1fr 1fr 0.5fr", padding: "10px 14px", background: "var(--s2)", fontSize: 9, fontWeight: 700, color: "var(--ac)", letterSpacing: 1, textTransform: "uppercase" }}>
+              <div style={{ display: "grid", gridTemplateColumns: "30px 2fr 2fr 1fr 1fr 1fr 1fr 0.5fr", padding: "10px 14px", background: "var(--s2)", fontSize: 11, fontWeight: 700, color: "var(--ac)", letterSpacing: 1, textTransform: "uppercase" }}>
                 <span>
                   <input type="checkbox" style={{ cursor: "pointer" }}
                     checked={selectedCandidates.length === filterBySearch(candidates, candidatesSearch, c => c.candidate_name, c => c.candidate_email, c => c.invited_at).length && candidates.length > 0}
@@ -5072,31 +5360,31 @@ ${evals.map((ev, i) => {
                 <span>Name</span><span>Email</span><span>Role</span><span>Score</span><span>Status</span><span>Report</span><span></span>
               </div>
               {candidates.length === 0 && !b2bLoading && (
-                <div style={{ padding: 20, textAlign: "center", color: "var(--tx3)", fontSize: 12 }}>No candidates yet. Use the invite form above.</div>
+                <div style={{ padding: 20, textAlign: "center", color: "var(--tx2)", fontSize: 12 }}>No candidates yet. Use the invite form above.</div>
               )}
               {candidates.length > 0 && filterBySearch(candidates, candidatesSearch, c => c.candidate_name, c => c.candidate_email, c => c.invited_at).length === 0 && (
-                <div style={{ padding: 20, textAlign: "center", color: "var(--tx3)", fontSize: 12 }}>No candidates match "{candidatesSearch}"</div>
+                <div style={{ padding: 20, textAlign: "center", color: "var(--tx2)", fontSize: 12 }}>No candidates match "{candidatesSearch}"</div>
               )}
               {filterBySearch(candidates, candidatesSearch, c => c.candidate_name, c => c.candidate_email, c => c.invited_at).map((c, i) => (
-                <div key={c.id} style={{ display: "grid", gridTemplateColumns: "30px 2fr 2fr 1fr 1fr 1fr 1fr 0.5fr", padding: "10px 14px", borderTop: "1px solid var(--bd)", fontSize: 11, alignItems: "center", background: selectedCandidates.includes(c.id) ? "rgba(0,229,255,0.05)" : undefined }}>
+                <div key={c.id} style={{ display: "grid", gridTemplateColumns: "30px 2fr 2fr 1fr 1fr 1fr 1fr 0.5fr", padding: "10px 14px", borderTop: "1px solid var(--bd)", fontSize: 13, alignItems: "center", background: selectedCandidates.includes(c.id) ? "rgba(0,229,255,0.05)" : undefined }}>
                   <span>
                     <input type="checkbox" style={{ cursor: "pointer" }}
                       checked={selectedCandidates.includes(c.id)}
                       onChange={e => setSelectedCandidates(prev => e.target.checked ? [...prev, c.id] : prev.filter(id => id !== c.id))} />
                   </span>
                   <span style={{ fontWeight: 600 }}>{c.candidate_name || c.candidate_email?.split("@")[0] || '—'}</span>
-                  <span style={{ color: "var(--tx3)", fontSize: 10 }}>{c.candidate_email}</span>
+                  <span style={{ color: "var(--tx2)", fontSize: 12 }}>{c.candidate_email}</span>
                   <span>{c.role_id ? (ROLES.find(r => r.id === c.role_id)?.icon || c.role_id) : "—"}</span>
-                  <span className="mono" style={{ fontWeight: 700, color: c.overall_score ? (c.overall_score >= 7 ? "var(--ok)" : c.overall_score >= 5 ? "var(--wn)" : "var(--dn)") : "var(--tx3)" }}>
+                  <span className="mono" style={{ fontWeight: 700, color: c.overall_score ? (c.overall_score >= 7 ? "var(--ok)" : c.overall_score >= 5 ? "var(--wn)" : "var(--dn)") : "var(--tx2)" }}>
                     {c.overall_score ? `${c.overall_score}/10` : "—"}
                   </span>
-                  <span style={{ fontSize: 9, fontWeight: 600, color: c.status === "completed" ? "var(--ok)" : c.status === "in_progress" ? "var(--wn)" : "var(--tx3)" }}>
+                  <span style={{ fontSize: 11, fontWeight: 600, color: c.status === "completed" ? "var(--ok)" : c.status === "in_progress" ? "var(--wn)" : "var(--tx2)" }}>
                     {c.status === "completed" ? "✓ Done" : c.status === "in_progress" ? "● Active" : "○ Pending"}
                   </span>
                   <span style={{ display: "flex", gap: 6 }}>
                     {c.status === "completed" ? (
                       <>
-                        <button style={{ background: "rgba(0,229,255,.1)", border: "1px solid var(--ac)", cursor: "pointer", fontSize: 10, color: "var(--ac)", padding: "3px 8px", borderRadius: 4 }}
+                        <button style={{ background: "rgba(0,229,255,.1)", border: "1px solid var(--ac)", cursor: "pointer", fontSize: 12, color: "var(--ac)", padding: "3px 8px", borderRadius: 4 }}
                           title="View Report"
                           onClick={async () => {
                             try {
@@ -5109,7 +5397,7 @@ ${evals.map((ev, i) => {
                               else showToast('Report not available', 'error');
                             } catch (e) { showToast('Error loading report', 'error'); }
                           }}>👁 View</button>
-                        <button style={{ background: "rgba(0,224,150,.1)", border: "1px solid var(--ok)", cursor: "pointer", fontSize: 10, color: "var(--ok)", padding: "3px 8px", borderRadius: 4 }}
+                        <button style={{ background: "rgba(0,224,150,.1)", border: "1px solid var(--ok)", cursor: "pointer", fontSize: 12, color: "var(--ok)", padding: "3px 8px", borderRadius: 4 }}
                           title="Download PDF"
                           onClick={async () => {
                             try {
@@ -5247,7 +5535,7 @@ ${evals.map((ev, i) => {
                           }}>📥</button>
                       </>
                     ) : (
-                      <span style={{ fontSize: 9, color: "var(--tx3)" }}>—</span>
+                      <span style={{ fontSize: 11, color: "var(--tx2)" }}>—</span>
                     )}
                   </span>
                   <span>
@@ -5289,20 +5577,20 @@ ${evals.map((ev, i) => {
                 <div style={{ display: "flex", gap: 8, alignItems: "center", flex: 1, maxWidth: 400, minWidth: 250 }}>
                   <input className="input" type="text" placeholder="🔍 Search name, email, or date..."
                     value={teamSkillsSearch} onChange={e => setTeamSkillsSearch(e.target.value)}
-                    style={{ fontSize: 11, padding: "6px 12px", flex: 1 }} />
+                    style={{ fontSize: 13, padding: "6px 12px", flex: 1 }} />
                   {teamSkillsSearch && (
-                    <button className="btn bs" style={{ fontSize: 10, padding: "4px 10px" }} onClick={() => setTeamSkillsSearch('')}>✕</button>
+                    <button className="btn bs" style={{ fontSize: 12, padding: "4px 10px" }} onClick={() => setTeamSkillsSearch('')}>✕</button>
                   )}
                 </div>
-                <button className="btn bs" style={{ fontSize: 10, padding: "4px 10px" }} onClick={loadB2bData}>🔄 Refresh</button>
+                <button className="btn bs" style={{ fontSize: 12, padding: "4px 10px" }} onClick={loadB2bData}>🔄 Refresh</button>
               </div>
               {b2bLoading && <div style={{ textAlign: "center", padding: 20 }}><div className="loader" /></div>}
               <div className="card fadeUp" style={{ padding: 0, overflow: "hidden", marginBottom: 16 }}>
-                <div style={{ display: "grid", gridTemplateColumns: "1.5fr 1fr 1fr 1fr 1fr", padding: "10px 14px", background: "var(--s2)", fontSize: 9, fontWeight: 700, color: "var(--ac)", letterSpacing: 1, textTransform: "uppercase" }}>
+                <div style={{ display: "grid", gridTemplateColumns: "1.5fr 1fr 1fr 1fr 1fr", padding: "10px 14px", background: "var(--s2)", fontSize: 11, fontWeight: 700, color: "var(--ac)", letterSpacing: 1, textTransform: "uppercase" }}>
                   <span>Candidate</span><span style={{ textAlign: "center" }}>Role</span><span style={{ textAlign: "center" }}>Difficulty</span><span style={{ textAlign: "center" }}>Score</span><span style={{ textAlign: "center" }}>Badge</span>
                 </div>
                 {filterBySearch(teamMembers, teamSkillsSearch, m => m.name, m => m.email, m => m.completed_at).length === 0 && teamSkillsSearch && (
-                  <div style={{ padding: 20, textAlign: "center", color: "var(--tx3)", fontSize: 12 }}>No candidates match "{teamSkillsSearch}"</div>
+                  <div style={{ padding: 20, textAlign: "center", color: "var(--tx2)", fontSize: 12 }}>No candidates match "{teamSkillsSearch}"</div>
                 )}
                 {filterBySearch(teamMembers, teamSkillsSearch, m => m.name, m => m.email, m => m.completed_at).map((m, i) => {
                   const score = m.score;
@@ -5310,14 +5598,14 @@ ${evals.map((ev, i) => {
                   const badgeColor = score >= 8 ? "#e2e8f0" : score >= 7 ? "#f59e0b" : score >= 6 ? "#94a3b8" : score >= 4 ? "#b45309" : "var(--dn)";
                   const role = ROLES.find(r => r.id === m.role);
                   return (
-                    <div key={m.id} style={{ display: "grid", gridTemplateColumns: "1.5fr 1fr 1fr 1fr 1fr", padding: "12px 14px", borderTop: "1px solid var(--bd)", fontSize: 11, alignItems: "center" }}>
+                    <div key={m.id} style={{ display: "grid", gridTemplateColumns: "1.5fr 1fr 1fr 1fr 1fr", padding: "12px 14px", borderTop: "1px solid var(--bd)", fontSize: 13, alignItems: "center" }}>
                       <div>
                         <div style={{ fontWeight: 600 }}>{m.name}</div>
-                        <div style={{ fontSize: 9, color: "var(--tx3)", marginTop: 2 }}>{m.completed_at?.substring(0, 10)}</div>
+                        <div style={{ fontSize: 11, color: "var(--tx2)", marginTop: 2 }}>{m.completed_at?.substring(0, 10)}</div>
                       </div>
                       <div style={{ textAlign: "center" }}>
                         <span style={{ fontSize: 16 }}>{role?.icon || "🔒"}</span>
-                        <div style={{ fontSize: 9, color: "var(--tx3)" }}>{role?.name || m.role}</div>
+                        <div style={{ fontSize: 11, color: "var(--tx2)" }}>{role?.name || m.role}</div>
                       </div>
                       <div style={{ textAlign: "center" }}>
                         <span className={`diff diff-${m.difficulty}`} style={{ fontSize: 8 }}>{m.difficulty}</span>
@@ -5326,16 +5614,16 @@ ${evals.map((ev, i) => {
                         <span className="mono" style={{ fontSize: 18, fontWeight: 800, color: score >= 7 ? "var(--ok)" : score >= 5 ? "var(--wn)" : "var(--dn)" }}>
                           {score.toFixed(1)}
                         </span>
-                        <div style={{ fontSize: 9, color: "var(--tx3)" }}>/10</div>
+                        <div style={{ fontSize: 11, color: "var(--tx2)" }}>/10</div>
                       </div>
                       <div style={{ textAlign: "center" }}>
-                        <span style={{ fontSize: 9, fontWeight: 700, color: badgeColor }}>{badge}</span>
+                        <span style={{ fontSize: 11, fontWeight: 700, color: badgeColor }}>{badge}</span>
                       </div>
                     </div>
                   );
                 })}
               </div>
-              <div className="card fadeUp" style={{ padding: 14, fontSize: 11, lineHeight: 1.8, color: "var(--tx2)" }}>
+              <div className="card fadeUp" style={{ padding: 14, fontSize: 13, lineHeight: 1.8, color: "var(--tx2)" }}>
                 <div className="lbl" style={{ marginBottom: 8 }}>INSIGHTS</div>
                 {teamMembers.filter(m => m.score >= 7).length > 0 && (
                   <div>✅ <strong style={{ color: "var(--ok)" }}>{teamMembers.filter(m => m.score >= 7).length} candidate(s)</strong> scored 7+ — strong hires</div>
@@ -5362,9 +5650,9 @@ ${evals.map((ev, i) => {
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                 <div>
                   <div style={{ fontSize: 13, fontWeight: 700 }}>📊 Hiring Report</div>
-                  <div style={{ fontSize: 10, color: "var(--tx3)", marginTop: 3 }}>Top candidates ranked with scorecards</div>
+                  <div style={{ fontSize: 12, color: "var(--tx2)", marginTop: 3 }}>Top candidates ranked with scorecards</div>
                 </div>
-                <button className="btn bp" style={{ fontSize: 10, padding: "6px 14px" }}
+                <button className="btn bp" style={{ fontSize: 12, padding: "6px 14px" }}
                   onClick={() => {
                     const completed = candidates.filter(c => c.status === 'completed' && c.overall_score);
                     if (completed.length === 0) { showToast('No completed assessments to report yet.', 'warning'); return; }
@@ -5393,7 +5681,7 @@ ${evals.map((ev, i) => {
               </div>
               {candidates.filter(c => c.status === 'completed').length > 0 && (
                 <div style={{ marginTop: 12 }}>
-                  <div style={{ fontSize: 10, color: "var(--tx3)", marginBottom: 6 }}>TOP CANDIDATES</div>
+                  <div style={{ fontSize: 12, color: "var(--tx2)", marginBottom: 6 }}>TOP CANDIDATES</div>
                   {candidates
                     .filter(c => c.status === 'completed' && c.overall_score)
                     .sort((a, b) => (b.overall_score || 0) - (a.overall_score || 0))
@@ -5401,7 +5689,7 @@ ${evals.map((ev, i) => {
                     .map((c, i) => {
                       const score = parseFloat(c.overall_score || 0);
                       return (
-                        <div key={c.id} style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0', borderBottom: i < 2 ? '1px solid var(--bd)' : 'none', fontSize: 11 }}>
+                        <div key={c.id} style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0', borderBottom: i < 2 ? '1px solid var(--bd)' : 'none', fontSize: 13 }}>
                           <span><span style={{ color: 'var(--ac)', fontWeight: 700, marginRight: 8 }}>#{i + 1}</span>{c.candidate_name || c.candidate_email}</span>
                           <span className="mono" style={{ fontWeight: 700, color: score >= 7 ? 'var(--ok)' : score >= 5 ? 'var(--wn)' : 'var(--dn)' }}>{score.toFixed(1)}/10</span>
                         </div>
@@ -5416,9 +5704,9 @@ ${evals.map((ev, i) => {
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                 <div>
                   <div style={{ fontSize: 13, fontWeight: 700 }}>🏢 Team Skills Report</div>
-                  <div style={{ fontSize: 10, color: "var(--tx3)", marginTop: 3 }}>Skill gap analysis across all candidates</div>
+                  <div style={{ fontSize: 12, color: "var(--tx2)", marginTop: 3 }}>Skill gap analysis across all candidates</div>
                 </div>
-                <button className="btn bp" style={{ fontSize: 10, padding: "6px 14px" }}
+                <button className="btn bp" style={{ fontSize: 12, padding: "6px 14px" }}
                   onClick={() => {
                     if (candidates.length === 0) { showToast('No candidates data yet.', 'warning'); return; }
                     const roleGroups = {};
@@ -5453,9 +5741,9 @@ ${evals.map((ev, i) => {
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                 <div>
                   <div style={{ fontSize: 13, fontWeight: 700 }}>📈 Benchmark Report</div>
-                  <div style={{ fontSize: 10, color: "var(--tx3)", marginTop: 3 }}>Your candidates vs. industry average (7.2/10)</div>
+                  <div style={{ fontSize: 12, color: "var(--tx2)", marginTop: 3 }}>Your candidates vs. industry average (7.2/10)</div>
                 </div>
-                <button className="btn bp" style={{ fontSize: 10, padding: "6px 14px" }}
+                <button className="btn bp" style={{ fontSize: 12, padding: "6px 14px" }}
                   onClick={() => {
                     const completed = candidates.filter(c => c.status === 'completed' && c.overall_score);
                     if (completed.length === 0) { showToast('No completed assessments yet.', 'warning'); return; }
@@ -5516,7 +5804,7 @@ ${evals.map((ev, i) => {
 
               {/* JD Upload */}
               <div style={{ marginBottom: 14 }}>
-                <div style={{ fontSize: 11, color: "var(--tx2)", marginBottom: 8 }}>
+                <div style={{ fontSize: 13, color: "var(--tx2)", marginBottom: 8 }}>
                   Paste a job description — AI will auto-suggest the role and difficulty.
                 </div>
                 <input type="file" id="jd-file-input" accept=".pdf,.txt,.doc,.docx"
@@ -5555,14 +5843,14 @@ ${evals.map((ev, i) => {
                   }}
                 />
                 <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
-                  <button className="btn bs" style={{ fontSize: 11, padding: "6px 14px" }} onClick={() => document.getElementById('jd-file-input').click()}>📎 Upload JD</button>
-                  <span style={{ fontSize: 10, color: "var(--tx3)" }}>PDF · TXT · DOC</span>
-                  {newAssessJD && <button className="btn bs" style={{ marginLeft: "auto", fontSize: 10, padding: "4px 8px", color: "var(--dn)", borderColor: "var(--dn)" }} onClick={() => { setNewAssessJD(''); setJdAnalysis(null); }}>✕ Clear</button>}
+                  <button className="btn bs" style={{ fontSize: 13, padding: "6px 14px" }} onClick={() => document.getElementById('jd-file-input').click()}>📎 Upload JD</button>
+                  <span style={{ fontSize: 12, color: "var(--tx2)", fontWeight: 600 }}>PDF · TXT · DOC</span>
+                  {newAssessJD && <button className="btn bs" style={{ marginLeft: "auto", fontSize: 12, padding: "4px 8px", color: "var(--dn)", borderColor: "var(--dn)" }} onClick={() => { setNewAssessJD(''); setJdAnalysis(null); }}>✕ Clear</button>}
                 </div>
                 <textarea className="input" placeholder="Or paste job description text here..." value={newAssessJD}
                   onChange={e => { setNewAssessJD(e.target.value); setJdAnalysis(null); }}
                   style={{ minHeight: 80, marginBottom: 10, fontSize: 12 }} />
-                <button className="btn bp" style={{ fontSize: 11, padding: "8px 20px" }}
+                <button className="btn bp" style={{ fontSize: 13, padding: "8px 20px" }}
                   disabled={!newAssessJD.trim() || jdAnalyzing}
                   onClick={async () => {
                     setJdAnalyzing(true); setJdAnalysis(null);
@@ -5586,12 +5874,12 @@ ${evals.map((ev, i) => {
                   {jdAnalyzing ? <><span className="loader" style={{ width: 12, height: 12 }} /> Analyzing...</> : "🤖 Analyze JD →"}
                 </button>
                 {jdAnalysis && (
-                  <div style={{ marginTop: 10, padding: 12, background: "rgba(0,224,150,.07)", borderRadius: 10, border: "1px solid rgba(0,224,150,.2)", fontSize: 11 }}>
+                  <div style={{ marginTop: 10, padding: 12, background: "rgba(0,224,150,.07)", borderRadius: 10, border: "1px solid rgba(0,224,150,.2)", fontSize: 13 }}>
                     <div style={{ color: "var(--ok)", fontWeight: 700, marginBottom: 6 }}>✅ AI Analysis Complete</div>
                     {jdAnalysis.summary && <div style={{ color: "var(--tx2)", marginBottom: 4 }}>{jdAnalysis.summary}</div>}
                     {jdAnalysis.key_skills?.length > 0 && (
                       <div style={{ display: "flex", flexWrap: "wrap", gap: 4, marginTop: 6 }}>
-                        {jdAnalysis.key_skills.map((s, i) => <span key={i} className="tag" style={{ fontSize: 9 }}>{s}</span>)}
+                        {jdAnalysis.key_skills.map((s, i) => <span key={i} className="tag" style={{ fontSize: 11 }}>{s}</span>)}
                       </div>
                     )}
                   </div>
@@ -5601,11 +5889,11 @@ ${evals.map((ev, i) => {
               {/* Assessment Config */}
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 12 }}>
                 <div>
-                  <div style={{ fontSize: 10, color: "var(--tx3)", marginBottom: 4 }}>ASSESSMENT NAME</div>
+                  <div style={{ fontSize: 12, color: "var(--tx2)", marginBottom: 4 }}>ASSESSMENT NAME</div>
                   <input className="input" placeholder="e.g. Senior Cloud Engineer Q2" value={newAssessName} onChange={e => setNewAssessName(e.target.value)} style={{ fontSize: 12 }} />
                 </div>
                 <div>
-                  <div style={{ fontSize: 10, color: "var(--tx3)", marginBottom: 4 }}>ROLE</div>
+                  <div style={{ fontSize: 12, color: "var(--tx2)", marginBottom: 4 }}>ROLE</div>
                   <select className="input" value={newAssessRole} onChange={e => setNewAssessRole(e.target.value)} style={{ fontSize: 12 }}>
                     {ROLES.map(r => <option key={r.id} value={r.id}>{r.icon} {r.name}</option>)}
                   </select>
@@ -5613,13 +5901,13 @@ ${evals.map((ev, i) => {
               </div>
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 14 }}>
                 <div>
-                  <div style={{ fontSize: 10, color: "var(--tx3)", marginBottom: 4 }}>DIFFICULTY</div>
+                  <div style={{ fontSize: 12, color: "var(--tx2)", marginBottom: 4 }}>DIFFICULTY</div>
                   <select className="input" value={newAssessDiff} onChange={e => setNewAssessDiff(e.target.value)} style={{ fontSize: 12 }}>
                     {DIFFICULTIES.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
                   </select>
                 </div>
                 <div>
-                  <div style={{ fontSize: 10, color: "var(--tx3)", marginBottom: 4 }}>TYPE</div>
+                  <div style={{ fontSize: 12, color: "var(--tx2)", marginBottom: 4 }}>TYPE</div>
                   <select className="input" value={newAssessType} onChange={e => setNewAssessType(e.target.value)} style={{ fontSize: 12 }}>
                     <option value="standard">Standard</option>
                     <option value="timed">Timed Challenge</option>
@@ -5630,12 +5918,12 @@ ${evals.map((ev, i) => {
 
               {/* Custom Question Count */}
               <div style={{ marginBottom: 14 }}>
-                <div style={{ fontSize: 10, color: "var(--tx3)", marginBottom: 6 }}>NUMBER OF QUESTIONS</div>
+                <div style={{ fontSize: 12, color: "var(--tx2)", marginBottom: 6 }}>NUMBER OF QUESTIONS</div>
                 <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 8 }}>
                   {[5, 10, 15, 20, 25].map(n => (
                     <button key={n} type="button"
                       className={`btn ${newAssessQuestionCount === n ? 'bp' : 'bs'}`}
-                      style={{ fontSize: 11, padding: "6px 14px" }}
+                      style={{ fontSize: 13, padding: "6px 14px" }}
                       onClick={() => setNewAssessQuestionCount(n)}>
                       {n} Q
                     </button>
@@ -5648,13 +5936,13 @@ ${evals.map((ev, i) => {
                   }}
                   placeholder="Or enter custom number (1-50)"
                   style={{ fontSize: 12 }} />
-                <div style={{ fontSize: 9, color: "var(--tx3)", marginTop: 4 }}>
+                <div style={{ fontSize: 11, color: "var(--tx2)", marginTop: 4 }}>
                   AI will generate exactly {newAssessQuestionCount} question{newAssessQuestionCount !== 1 ? 's' : ''} for this assessment
                 </div>
               </div>
 
               {assessMsg && (
-                <div style={{ padding: 9, borderRadius: 8, marginBottom: 10, fontSize: 11, background: assessMsg.includes("✅") ? "rgba(0,224,150,.1)" : "rgba(255,82,82,.1)", color: assessMsg.includes("✅") ? "var(--ok)" : "var(--dn)" }}>{assessMsg}</div>
+                <div style={{ padding: 9, borderRadius: 8, marginBottom: 10, fontSize: 13, background: assessMsg.includes("✅") ? "rgba(0,224,150,.1)" : "rgba(255,82,82,.1)", color: assessMsg.includes("✅") ? "var(--ok)" : "var(--dn)" }}>{assessMsg}</div>
               )}
               <button className="btn bp" style={{ width: "100%", padding: 12, fontSize: 13 }}
                 disabled={!newAssessName.trim()}
@@ -5703,12 +5991,12 @@ ${evals.map((ev, i) => {
               <div style={{ display: "flex", gap: 8, alignItems: "center", flex: 1, maxWidth: 400, minWidth: 250 }}>
                 <input className="input" type="text" placeholder="🔍 Search name or date..."
                   value={librarySearch} onChange={e => setLibrarySearch(e.target.value)}
-                  style={{ fontSize: 11, padding: "6px 12px", flex: 1 }} />
+                  style={{ fontSize: 13, padding: "6px 12px", flex: 1 }} />
                 {librarySearch && (
-                  <button className="btn bs" style={{ fontSize: 10, padding: "4px 10px" }} onClick={() => setLibrarySearch('')}>✕</button>
+                  <button className="btn bs" style={{ fontSize: 12, padding: "4px 10px" }} onClick={() => setLibrarySearch('')}>✕</button>
                 )}
               </div>
-              <button className="btn bp" style={{ fontSize: 11, padding: "6px 14px" }}
+              <button className="btn bp" style={{ fontSize: 13, padding: "6px 14px" }}
                 onClick={() => { setB2bTab("create"); localStorage.setItem('cyberprep_b2btab', 'create'); }}>
                 + New Assessment
               </button>
@@ -5718,7 +6006,7 @@ ${evals.map((ev, i) => {
               <div className="card fadeUp" style={{ padding: 40, textAlign: "center" }}>
                 <div style={{ fontSize: 40, marginBottom: 12 }}>📚</div>
                 <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 6 }}>No saved assessments yet</div>
-                <div style={{ fontSize: 12, color: "var(--tx3)", marginBottom: 16 }}>Create an assessment and it will appear here.</div>
+                <div style={{ fontSize: 12, color: "var(--tx2)", marginBottom: 16 }}>Create an assessment and it will appear here.</div>
                 <button className="btn bp" style={{ fontSize: 12, padding: "10px 24px" }}
                   onClick={() => { setB2bTab("create"); localStorage.setItem('cyberprep_b2btab', 'create'); }}>
                   Create First Assessment →
@@ -5726,7 +6014,7 @@ ${evals.map((ev, i) => {
               </div>
             )}
             {assessments.length > 0 && filterBySearch(assessments, librarySearch, a => a.name, a => '', a => a.created_at).length === 0 && (
-              <div className="card fadeUp" style={{ padding: 20, textAlign: "center", color: "var(--tx3)", fontSize: 12 }}>
+              <div className="card fadeUp" style={{ padding: 20, textAlign: "center", color: "var(--tx2)", fontSize: 12 }}>
                 No assessments match "{librarySearch}"
               </div>
             )}
@@ -5735,15 +6023,15 @@ ${evals.map((ev, i) => {
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                   <div>
                     <div style={{ fontSize: 13, fontWeight: 700 }}>{a.name}</div>
-                    <div style={{ fontSize: 10, color: "var(--tx3)", marginTop: 3 }}>
+                    <div style={{ fontSize: 12, color: "var(--tx2)", marginTop: 3 }}>
                       {ROLES.find(r => r.id === a.role_id)?.name || a.role_id} · {a.difficulty} · {a.total_candidates || 0} candidates · {a.created_at?.substring(0, 10)}
                     </div>
                     {a.questions?.length > 0 && (
-                      <div style={{ fontSize: 9, color: "var(--ok)", marginTop: 4 }}>✅ {a.questions.length} questions generated</div>
+                      <div style={{ fontSize: 11, color: "var(--ok)", marginTop: 4 }}>✅ {a.questions.length} questions generated</div>
                     )}
                   </div>
                   <div style={{ display: "flex", gap: 6 }}>
-                    <button className="btn bs" style={{ fontSize: 9, padding: "4px 8px" }}
+                    <button className="btn bs" style={{ fontSize: 11, padding: "4px 8px" }}
                       onClick={async () => {
                         const token = localStorage.getItem('token');
                         const res = await fetch(`https://threatready-db.onrender.com/api/b2b/assessments/${a.id}/duplicate`, {
@@ -5753,7 +6041,7 @@ ${evals.map((ev, i) => {
                         if (data.assessment) { loadB2bData(); showToast('Assessment duplicated!', 'success'); }
                         else showToast('Duplicate failed', 'error');
                       }}>Duplicate</button>
-                    <button className="btn bp" style={{ fontSize: 9, padding: "4px 8px" }}
+                    <button className="btn bp" style={{ fontSize: 11, padding: "4px 8px" }}
                       onClick={() => {
                         setInviteRole(a.role_id); setInviteDiff(a.difficulty);
                         setInviteAssessmentId(String(a.id));
@@ -5761,7 +6049,7 @@ ${evals.map((ev, i) => {
                         setTimeout(() => document.getElementById('invite-email-input')?.focus(), 300);
                         showToast(`Linked to "${a.name}" (${a.question_count || 5} questions). Enter email to invite.`, 'info');
                       }}>Invite →</button>
-                    <button className="btn bs" style={{ fontSize: 9, padding: "4px 8px", color: "var(--dn)", borderColor: "var(--dn)" }}
+                    <button className="btn bs" style={{ fontSize: 11, padding: "4px 8px", color: "var(--dn)", borderColor: "var(--dn)" }}
                       onClick={() => {
                         showConfirm(`Delete "${a.name}"? This cannot be undone.`, async () => {
                           const token = localStorage.getItem('token');
@@ -5784,7 +6072,7 @@ ${evals.map((ev, i) => {
           <div className="lbl" style={{ marginBottom: 10 }}>COMPANY PROFILE</div>
             <div className="card fadeUp" style={{ padding: 16, marginBottom: 16 }}>
               {companySettingsMsg && (
-                <div style={{ padding: 9, borderRadius: 8, marginBottom: 10, fontSize: 11, background: companySettingsMsg.includes("✅") ? "rgba(0,224,150,.1)" : "rgba(255,82,82,.1)", color: companySettingsMsg.includes("✅") ? "var(--ok)" : "var(--dn)" }}>
+                <div style={{ padding: 9, borderRadius: 8, marginBottom: 10, fontSize: 13, background: companySettingsMsg.includes("✅") ? "rgba(0,224,150,.1)" : "rgba(255,82,82,.1)", color: companySettingsMsg.includes("✅") ? "var(--ok)" : "var(--dn)" }}>
                   {companySettingsMsg}
                 </div>
               )}
@@ -5817,7 +6105,7 @@ ${evals.map((ev, i) => {
             <div className="card fadeUp" style={{ padding: 18, marginBottom: 14 }}>
               <div className="lbl" style={{ marginBottom: 12 }}>INTEGRATIONS</div>
               {integrationMsg && (
-                <div style={{ padding: 9, borderRadius: 8, marginBottom: 10, fontSize: 11, background: integrationMsg.includes("✅") ? "rgba(0,224,150,.1)" : "rgba(255,82,82,.1)", color: integrationMsg.includes("✅") ? "var(--ok)" : "var(--dn)" }}>
+                <div style={{ padding: 9, borderRadius: 8, marginBottom: 10, fontSize: 13, background: integrationMsg.includes("✅") ? "rgba(0,224,150,.1)" : "rgba(255,82,82,.1)", color: integrationMsg.includes("✅") ? "var(--ok)" : "var(--dn)" }}>
                   {integrationMsg}
                 </div>
               )}
@@ -5825,12 +6113,12 @@ ${evals.map((ev, i) => {
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
                   <div>
                     <div style={{ fontSize: 12, fontWeight: 700 }}>💬 Slack Notifications</div>
-                    <div style={{ fontSize: 10, color: "var(--tx3)", marginTop: 2 }}>Get notified when candidates complete assessments</div>
+                    <div style={{ fontSize: 12, color: "var(--tx2)", marginTop: 2 }}>Get notified when candidates complete assessments</div>
                   </div>
-                  <span style={{ fontSize: 10, color: slackWebhook ? "var(--ok)" : "var(--tx3)", fontWeight: 600 }}>{slackWebhook ? "✅ Connected" : "Not connected"}</span>
+                  <span style={{ fontSize: 12, color: slackWebhook ? "var(--ok)" : "var(--tx2)", fontWeight: 600 }}>{slackWebhook ? "✅ Connected" : "Not connected"}</span>
                 </div>
-                <input className="input" placeholder="Slack Webhook URL (https://hooks.slack.com/...)" value={slackWebhook} onChange={e => setSlackWebhook(e.target.value)} style={{ marginBottom: 8, fontSize: 11 }} />
-                <button className="btn bs" style={{ fontSize: 11, padding: "6px 16px" }}
+                <input className="input" placeholder="Slack Webhook URL (https://hooks.slack.com/...)" value={slackWebhook} onChange={e => setSlackWebhook(e.target.value)} style={{ marginBottom: 8, fontSize: 13 }} />
+                <button className="btn bs" style={{ fontSize: 13, padding: "6px 16px" }}
                   onClick={async () => {
                     setIntegrationMsg('Saving...');
                     try {
@@ -5846,12 +6134,12 @@ ${evals.map((ev, i) => {
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
                   <div>
                     <div style={{ fontSize: 12, fontWeight: 700 }}>⚡ ATS Integration (Zapier)</div>
-                    <div style={{ fontSize: 10, color: "var(--tx3)", marginTop: 2 }}>Push candidate results to your ATS automatically</div>
+                    <div style={{ fontSize: 12, color: "var(--tx2)", marginTop: 2 }}>Push candidate results to your ATS automatically</div>
                   </div>
-                  <span style={{ fontSize: 10, color: zapierWebhook ? "var(--ok)" : "var(--tx3)", fontWeight: 600 }}>{zapierWebhook ? "✅ Connected" : "Not connected"}</span>
+                  <span style={{ fontSize: 12, color: zapierWebhook ? "var(--ok)" : "var(--tx2)", fontWeight: 600 }}>{zapierWebhook ? "✅ Connected" : "Not connected"}</span>
                 </div>
-                <input className="input" placeholder="Zapier Webhook URL (https://hooks.zapier.com/...)" value={zapierWebhook} onChange={e => setZapierWebhook(e.target.value)} style={{ marginBottom: 8, fontSize: 11 }} />
-                <button className="btn bs" style={{ fontSize: 11, padding: "6px 16px" }}
+                <input className="input" placeholder="Zapier Webhook URL (https://hooks.zapier.com/...)" value={zapierWebhook} onChange={e => setZapierWebhook(e.target.value)} style={{ marginBottom: 8, fontSize: 13 }} />
+                <button className="btn bs" style={{ fontSize: 13, padding: "6px 16px" }}
                   onClick={async () => {
                     setIntegrationMsg('Saving...');
                     try {
@@ -5866,9 +6154,9 @@ ${evals.map((ev, i) => {
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                 <div>
                   <div style={{ fontSize: 12, fontWeight: 700 }}>🔐 Google Workspace SSO</div>
-                  <div style={{ fontSize: 10, color: "var(--tx3)", marginTop: 2 }}>Let your team sign in with Google Workspace</div>
+                  <div style={{ fontSize: 12, color: "var(--tx2)", marginTop: 2 }}>Let your team sign in with Google Workspace</div>
                 </div>
-                <span style={{ fontSize: 10, color: "var(--ok)", fontWeight: 600 }}>✅ Available via Google Login</span>
+                <span style={{ fontSize: 12, color: "var(--ok)", fontWeight: 600 }}>✅ Available via Google Login</span>
               </div>
             </div>
 
@@ -5879,17 +6167,17 @@ ${evals.map((ev, i) => {
                 ["👑 Admin", "Full access — manage everything", "#f59e0b"],
                 ["👔 Hiring Manager", "Create assessments, view results, invite candidates", "var(--ac)"],
                 ["📋 Recruiter", "Invite candidates only", "var(--ok)"],
-                ["👁️ Viewer", "View results only, no actions", "var(--tx3)"]
+                ["👁️ Viewer", "View results only, no actions", "var(--tx2)"]
               ].map(([role, desc, color], i) => (
                 <div key={i} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 0", borderBottom: i < 3 ? "1px solid var(--bd)" : "none" }}>
                   <div>
                     <div style={{ fontSize: 12, fontWeight: 700, color }}>{role}</div>
-                    <div style={{ fontSize: 10, color: "var(--tx3)", marginTop: 2 }}>{desc}</div>
+                    <div style={{ fontSize: 12, color: "var(--tx2)", marginTop: 2 }}>{desc}</div>
                   </div>
-                  <span style={{ fontSize: 9, color: "var(--tx3)", background: "var(--s2)", padding: "3px 10px", borderRadius: 20 }}>{i === 0 ? "You" : "Invite via email"}</span>
+                  <span style={{ fontSize: 11, color: "var(--tx2)", background: "var(--s2)", padding: "3px 10px", borderRadius: 20 }}>{i === 0 ? "You" : "Invite via email"}</span>
                 </div>
               ))}
-              <div style={{ marginTop: 14, padding: 12, background: "rgba(0,229,255,.05)", borderRadius: 10, border: "1px solid rgba(0,229,255,.15)", fontSize: 11, color: "var(--tx2)" }}>
+              <div style={{ marginTop: 14, padding: 12, background: "rgba(0,229,255,.05)", borderRadius: 10, border: "1px solid rgba(0,229,255,.15)", fontSize: 13, color: "var(--tx2)" }}>
                 💡 Invite team members as candidates with their work email — they'll appear after completing their assessment.
               </div>
             </div>
@@ -5908,7 +6196,7 @@ ${evals.map((ev, i) => {
             ].map(([q, a], i) => (
               <div key={i} className="card fadeUp" style={{ padding: 14, marginBottom: 8, animationDelay: `${i * .05}s` }}>
                 <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 4 }}>{q}</div>
-                <div style={{ fontSize: 11, color: "var(--tx2)", lineHeight: 1.6 }}>{a}</div>
+                <div style={{ fontSize: 13, color: "var(--tx2)", lineHeight: 1.6 }}>{a}</div>
               </div>
             ))}
             <div className="card fadeUp" style={{ padding: 16, marginTop: 8 }}>
@@ -5919,7 +6207,7 @@ ${evals.map((ev, i) => {
                 <>
                   <textarea className="input" placeholder="Describe your issue or question..." style={{ minHeight: 60, marginBottom: 10 }}
                     value={feedbackText} onChange={e => setFeedbackText(e.target.value)} />
-                  <button className="btn bp" style={{ fontSize: 11 }} disabled={!feedbackText.trim()}
+                  <button className="btn bp" style={{ fontSize: 13 }} disabled={!feedbackText.trim()}
                     onClick={async () => {
                       try {
                         const token = localStorage.getItem('token');
@@ -5970,7 +6258,7 @@ ${evals.map((ev, i) => {
 
                 {/* Company Name */}
                 <div style={{ marginBottom: 14 }}>
-                  <div style={{ fontSize: 11, color: "var(--tx3)", marginBottom: 6, fontWeight: 600 }}>COMPANY NAME</div>
+                  <div style={{ fontSize: 13, color: "var(--tx2)", marginBottom: 6, fontWeight: 600 }}>COMPANY NAME</div>
                   <input
                     className="input"
                     placeholder="e.g. Acme Security Inc."
@@ -5981,7 +6269,7 @@ ${evals.map((ev, i) => {
 
                 {/* Team Size */}
                 <div style={{ marginBottom: 14 }}>
-                  <div style={{ fontSize: 11, color: "var(--tx3)", marginBottom: 6, fontWeight: 600 }}>TEAM SIZE</div>
+                  <div style={{ fontSize: 13, color: "var(--tx2)", marginBottom: 6, fontWeight: 600 }}>TEAM SIZE</div>
                   <select
                     className="input"
                     value={hrModalTeamSize}
@@ -5994,19 +6282,19 @@ ${evals.map((ev, i) => {
 
                 {/* Billing Period Toggle */}
                 <div style={{ marginBottom: 16 }}>
-                  <div style={{ fontSize: 11, color: "var(--tx3)", marginBottom: 6, fontWeight: 600 }}>BILLING CYCLE</div>
+                  <div style={{ fontSize: 13, color: "var(--tx2)", marginBottom: 6, fontWeight: 600 }}>BILLING CYCLE</div>
                   <div style={{ display: "flex", gap: 8 }}>
                     <button
                       className={`btn ${hrBillingPeriod === "monthly" ? "bp" : "bs"}`}
-                      style={{ flex: 1, padding: "8px 14px", fontSize: 11 }}
+                      style={{ flex: 1, padding: "8px 14px", fontSize: 13 }}
                       onClick={() => setHrBillingPeriod("monthly")}>
                       Monthly
                     </button>
                     <button
                       className={`btn ${hrBillingPeriod === "yearly" ? "bp" : "bs"}`}
-                      style={{ flex: 1, padding: "8px 14px", fontSize: 11 }}
+                      style={{ flex: 1, padding: "8px 14px", fontSize: 13 }}
                       onClick={() => setHrBillingPeriod("yearly")}>
-                      Yearly <span style={{ fontSize: 9, color: "var(--ok)" }}>· SAVE 20%</span>
+                      Yearly <span style={{ fontSize: 11, color: "var(--ok)" }}>· SAVE 20%</span>
                     </button>
                   </div>
                 </div>
@@ -6019,7 +6307,7 @@ ${evals.map((ev, i) => {
                     return (
                       <div style={{ padding: 16, background: "rgba(255,171,64,.06)", border: "1px solid rgba(255,171,64,.3)", borderRadius: 10, marginBottom: 16, textAlign: "center" }}>
                         <div style={{ fontSize: 14, fontWeight: 700, color: "var(--wn)", marginBottom: 4 }}>Contact Sales</div>
-                        <div style={{ fontSize: 10, color: "var(--tx3)" }}>We'll reach out with a custom quote for enterprise teams</div>
+                        <div style={{ fontSize: 12, color: "var(--tx2)" }}>We'll reach out with a custom quote for enterprise teams</div>
                       </div>
                     );
                   }
@@ -6032,7 +6320,7 @@ ${evals.map((ev, i) => {
                         <span style={{ fontSize: 12, color: "var(--tx2)", fontWeight: 600 }}>/{hrBillingPeriod === "yearly" ? "yr" : "mo"}</span>
                       </div>
                       {hrBillingPeriod === "yearly" && (
-                        <div style={{ fontSize: 10, color: "var(--ok)", marginTop: 4 }}>
+                        <div style={{ fontSize: 12, color: "var(--ok)", marginTop: 4 }}>
                           That's ₹{monthlyEquiv.toLocaleString('en-IN')}/month effective
                         </div>
                       )}
@@ -6042,8 +6330,8 @@ ${evals.map((ev, i) => {
 
                 {/* Feature list */}
                 <div style={{ marginBottom: 16, padding: "10px 12px", background: "rgba(0,224,150,.04)", border: "1px solid rgba(0,224,150,.2)", borderRadius: 8 }}>
-                  <div style={{ fontSize: 10, color: "var(--ok)", fontWeight: 700, marginBottom: 6 }}>INCLUDED</div>
-                  <div style={{ fontSize: 11, color: "var(--tx2)", lineHeight: 1.9 }}>
+                  <div style={{ fontSize: 12, color: "var(--ok)", fontWeight: 700, marginBottom: 6 }}>INCLUDED</div>
+                  <div style={{ fontSize: 13, color: "var(--tx2)", lineHeight: 1.9 }}>
                     ✓ Unlimited candidate assessments<br/>
                     ✓ Bulk invites (CSV + paste multiple)<br/>
                     ✓ Team skill heatmap &amp; benchmarks<br/>
@@ -6152,7 +6440,7 @@ ${evals.map((ev, i) => {
                   </button>
                 </div>
 
-                <div style={{ fontSize: 9, color: "var(--tx3)", textAlign: "center", marginTop: 10 }}>
+                <div style={{ fontSize: 11, color: "var(--tx2)", textAlign: "center", marginTop: 10 }}>
                   Secure payment via Razorpay · Cancel anytime
                 </div>
               </div>
@@ -6199,7 +6487,7 @@ ${evals.map((ev, i) => {
 
           {candidateAssessState === "intro" && candidateAssessData && (
             <div className="card fadeUp" style={{ padding: 36, textAlign: "center" }}>
-              <div style={{ fontSize: 11, fontWeight: 700, color: "var(--ac)", letterSpacing: 2, marginBottom: 12 }}>⚡ THREATREADY ASSESSMENT</div>
+              <div style={{ fontSize: 13, fontWeight: 700, color: "var(--ac)", letterSpacing: 2, marginBottom: 12 }}>⚡ THREATREADY ASSESSMENT</div>
               <h2 style={{ fontSize: 22, fontWeight: 800, marginBottom: 8 }}>
                 {candidateAssessData.candidate.assessment_name || `${ROLES.find(r => r.id === candidateAssessData.candidate.role_id)?.name} Assessment`}
               </h2>
@@ -6210,8 +6498,8 @@ ${evals.map((ev, i) => {
                 {[["📋", "5 Questions", "Scenario-based"], ["🤖", "AI Evaluated", "Instant scoring"], ["📧", "Email Report", "Sent after submit"]].map(([icon, t, d], i) => (
                   <div key={i} className="card" style={{ padding: 14, textAlign: "center" }}>
                     <div style={{ fontSize: 24, marginBottom: 6 }}>{icon}</div>
-                    <div style={{ fontSize: 11, fontWeight: 700 }}>{t}</div>
-                    <div style={{ fontSize: 10, color: "var(--tx3)" }}>{d}</div>
+                    <div style={{ fontSize: 13, fontWeight: 700 }}>{t}</div>
+                    <div style={{ fontSize: 12, color: "var(--tx2)" }}>{d}</div>
                   </div>
                 ))}
               </div>
@@ -6318,10 +6606,10 @@ ${evals.map((ev, i) => {
                 <div style={{ padding: "18px 22px", background: "var(--s2)", borderRadius: 10, border: "1px solid var(--bd)", marginBottom: 20 }}>
                   <div style={{ fontSize: 15, fontWeight: 700, lineHeight: 1.7 }}>{q.question}</div>
                   <div style={{ display: "flex", gap: 6, marginTop: 12 }}>
-                    <button className="btn bs" style={{ fontSize: 10, padding: "4px 10px" }} onClick={replayQuestion}>
+                    <button className="btn bs" style={{ fontSize: 12, padding: "4px 10px" }} onClick={replayQuestion}>
                       🔊 Replay Question
                     </button>
-                    <button className="btn bs" style={{ fontSize: 10, padding: "4px 10px" }}
+                    <button className="btn bs" style={{ fontSize: 12, padding: "4px 10px" }}
                       onClick={() => { window.speechSynthesis.cancel(); setIsSpeaking(false); setIsMuted(m => !m); }}>
                       {isMuted ? "🔇 Unmute" : "🔈 Mute"}
                     </button>
@@ -6329,7 +6617,7 @@ ${evals.map((ev, i) => {
                 </div>
 
                 {candidateAssessData.candidate.difficulty === "beginner" && q.hint && (
-                  <div style={{ padding: "8px 14px", background: "rgba(0,229,255,.05)", borderRadius: 8, border: "1px solid rgba(0,229,255,.15)", fontSize: 11, color: "var(--ac)", marginBottom: 14 }}>
+                  <div style={{ padding: "8px 14px", background: "rgba(0,229,255,.05)", borderRadius: 8, border: "1px solid rgba(0,229,255,.15)", fontSize: 13, color: "var(--ac)", marginBottom: 14 }}>
                     💡 Hint: {q.hint}
                   </div>
                 )}
@@ -6337,9 +6625,9 @@ ${evals.map((ev, i) => {
                 {/* Answer section with voice + text */}
                 <div style={{ marginBottom: 16 }}>
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
-                    <span style={{ fontSize: 11, color: "var(--tx3)", fontWeight: 700, letterSpacing: 1 }}>YOUR ANSWER</span>
+                    <span style={{ fontSize: 13, color: "var(--tx2)", fontWeight: 700, letterSpacing: 1 }}>YOUR ANSWER</span>
                     <button className={`btn ${voice.recording ? 'bdn' : 'bs'}`}
-                      style={{ fontSize: 11, padding: "6px 14px", display: "flex", alignItems: "center", gap: 6 }}
+                      style={{ fontSize: 13, padding: "6px 14px", display: "flex", alignItems: "center", gap: 6 }}
                       onClick={toggleDictation}>
                       {voice.recording
                         ? <><span style={{ width: 8, height: 8, borderRadius: "50%", background: "#ff5252", animation: "pulse 1s infinite" }} /> Stop Recording</>
@@ -6352,7 +6640,7 @@ ${evals.map((ev, i) => {
                     style={{ minHeight: 140, fontSize: 13, borderColor: voice.recording ? "#ff5252" : undefined }} />
                   {voice.recording && (
                     <div style={{ marginTop: 8, padding: "8px 12px", background: "rgba(255,82,82,.08)", border: "1px solid rgba(255,82,82,.25)", borderRadius: 8 }}>
-                      <div style={{ fontSize: 10, color: "var(--dn)", marginBottom: 4, display: "flex", alignItems: "center", gap: 6 }}>
+                      <div style={{ fontSize: 12, color: "var(--dn)", marginBottom: 4, display: "flex", alignItems: "center", gap: 6 }}>
                         <span style={{ width: 6, height: 6, borderRadius: "50%", background: "#ff5252", animation: "pulse 1s infinite" }} />
                         Recording — click "Stop Recording" to add to answer
                       </div>
@@ -6421,17 +6709,17 @@ ${evals.map((ev, i) => {
           {candidateAssessState === "done" && candidateResult && (
             <div className="card fadeUp" style={{ padding: 40, textAlign: "center" }}>
               <div style={{ fontSize: 64, marginBottom: 12 }}>🎉</div>
-              <div style={{ fontSize: 11, color: "var(--ok)", fontWeight: 700, letterSpacing: 2, marginBottom: 8 }}>ASSESSMENT COMPLETE</div>
+              <div style={{ fontSize: 13, color: "var(--ok)", fontWeight: 700, letterSpacing: 2, marginBottom: 8 }}>ASSESSMENT COMPLETE</div>
               <h2 style={{ fontSize: 24, fontWeight: 800, marginBottom: 6 }}>Well done!</h2>
               <p style={{ fontSize: 13, color: "var(--tx2)", marginBottom: 24, lineHeight: 1.7 }}>
                 Thank you for completing the assessment. Your results have been recorded.
               </p>
               <div style={{ background: "var(--s2)", borderRadius: 16, padding: 28, marginBottom: 20 }}>
-                <div style={{ fontSize: 12, color: "var(--tx3)", marginBottom: 8 }}>Your Score</div>
+                <div style={{ fontSize: 12, color: "var(--tx2)", marginBottom: 8 }}>Your Score</div>
                 <div className="mono" style={{ fontSize: 64, fontWeight: 900, color: candidateResult.score >= 7 ? "var(--ok)" : candidateResult.score >= 5 ? "var(--wn)" : "var(--dn)" }}>
                   {candidateResult.score}
                 </div>
-                <div style={{ fontSize: 12, color: "var(--tx3)", marginBottom: 14 }}>out of 10</div>
+                <div style={{ fontSize: 12, color: "var(--tx2)", marginBottom: 14 }}>out of 10</div>
                 <div style={{ display: "inline-block", border: `2px solid ${candidateResult.score >= 8 ? "#e2e8f0" : candidateResult.score >= 7 ? "#f59e0b" : candidateResult.score >= 6 ? "#94a3b8" : candidateResult.score >= 4 ? "#cd7f32" : "#ff5252"}`, color: candidateResult.score >= 8 ? "#e2e8f0" : candidateResult.score >= 7 ? "#f59e0b" : candidateResult.score >= 6 ? "#94a3b8" : candidateResult.score >= 4 ? "#cd7f32" : "#ff5252", padding: "6px 24px", borderRadius: 24, fontSize: 13, fontWeight: 800, letterSpacing: 2 }}>
                   {(candidateResult.badge || "").toUpperCase()}
                 </div>
