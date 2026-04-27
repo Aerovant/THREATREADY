@@ -1724,13 +1724,32 @@ app.post('/api/feedback', async (req, res) => {
     let userId = null;
     let userLabel = 'Free Trial User (anonymous)';
     let userType = 'Free Trial';
+    let companyName = null;
     const token = req.headers.authorization?.replace('Bearer ', '');
     if (token && token !== 'null' && token !== 'undefined') {
       try {
         const decoded = jwt.verify(token, JWT_SECRET);
         userId = decoded.id;
         userLabel = decoded.email || `User #${decoded.id}`;
-        userType = 'Logged-in User';
+
+        // Look up the user's actual user_type from the database (b2b vs b2c)
+        try {
+          const userRow = await pool.query(
+            'SELECT user_type, company_name FROM users WHERE id = $1',
+            [userId]
+          );
+          const dbUserType = userRow.rows[0]?.user_type;
+          companyName = userRow.rows[0]?.company_name || null;
+
+          if (dbUserType === 'b2b') {
+            userType = 'Logged-in HR / Hiring User';
+          } else {
+            userType = 'Logged-in Candidate';
+          }
+        } catch (dbErr) {
+          // If user_type lookup fails, fall back to generic label
+          userType = 'Logged-in User';
+        }
       } catch (e) {
         // Invalid token → treat as anonymous, don't reject
       }
@@ -1741,7 +1760,7 @@ app.post('/api/feedback', async (req, res) => {
       [userId, message]
     );
 
-    console.log('Feedback saved from:', userLabel);
+    console.log('Feedback saved from:', userLabel, '— type:', userType);
 
     // Send email notification to admin (fire-and-forget, doesn't block response)
     try {
@@ -1760,6 +1779,7 @@ app.post('/api/feedback', async (req, res) => {
             <div style="background:#1a1f2e;border:1px solid #1e2536;border-radius:10px;padding:20px;margin-bottom:16px">
               <div style="display:flex;margin-bottom:10px"><span style="color:#5a6380;width:110px;font-size:13px">From:</span><span style="color:#e8eaf6;font-size:13px;font-weight:600">${userLabel}</span></div>
               <div style="display:flex;margin-bottom:10px"><span style="color:#5a6380;width:110px;font-size:13px">Type:</span><span style="color:#00e5ff;font-size:13px;font-weight:600">${userType}</span></div>
+              ${companyName ? `<div style="display:flex;margin-bottom:10px"><span style="color:#5a6380;width:110px;font-size:13px">Company:</span><span style="color:#ffab40;font-size:13px;font-weight:600">${String(companyName).replace(/</g, '&lt;').replace(/>/g, '&gt;')}</span></div>` : ''}
               <div style="display:flex;margin-bottom:10px"><span style="color:#5a6380;width:110px;font-size:13px">User ID:</span><span style="color:#e8eaf6;font-size:13px">${userId || 'N/A (free trial)'}</span></div>
               <div style="display:flex"><span style="color:#5a6380;width:110px;font-size:13px">Submitted:</span><span style="color:#e8eaf6;font-size:13px">${submittedAt} IST</span></div>
             </div>
