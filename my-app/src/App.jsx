@@ -737,6 +737,9 @@ export default function ThreatReady() {
   const [showChain, setShowChain] = useState(false);
   const [inputMode, setInputMode] = useState("text");
   const [elapsed, setElapsed] = useState(0);
+  // Tab switch / focus loss tracking (anti-cheating)
+  const [tabSwitchCount, setTabSwitchCount] = useState(0);
+  const [showTabWarning, setShowTabWarning] = useState(false);
   const timerRef = useRef(null);
   const voice = useVoice();
 
@@ -753,6 +756,9 @@ export default function ThreatReady() {
   const feedbackVoice = useVoice();
 
   const demoVoice = useVoice();
+  // Daily challenge voice + input mode
+  const dailyVoice = useVoice();
+  const [dailyInputMode, setDailyInputMode] = useState("text");
   // ---------------Mute------------------
   const [isMuted, setIsMuted] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
@@ -1339,6 +1345,76 @@ export default function ThreatReady() {
       clearInterval(timerRef.current);
       window.speechSynthesis.cancel();
     };
+  }, [view]);
+
+  // ── ANTI-CHEAT: Tab Switch / Focus Loss Detection ──
+  useEffect(() => {
+    if (view !== "interview") return;
+
+    const handleVisibilityChange = () => {
+      if (document.hidden) {
+        // User switched tabs or minimized the window
+        setTabSwitchCount(prev => {
+          const newCount = prev + 1;
+          // Show warning modal on every tab switch
+          setShowTabWarning(true);
+          showToast(`⚠️ Tab switch detected! (${newCount}/3) — please stay on this tab`, "error");
+          return newCount;
+        });
+      }
+    };
+
+    const handleBlur = () => {
+      // User clicked outside the window (different app)
+      if (!document.hidden) {
+        showToast("⚠️ Window focus lost — keep this window active during your attempt", "warning");
+      }
+    };
+
+    // Block right-click context menu (prevents inspect element / save / copy options)
+    const handleContextMenu = (e) => { e.preventDefault(); return false; };
+
+    // Block keyboard shortcuts: Ctrl+C, Ctrl+V, Ctrl+X, Ctrl+A, F12, Ctrl+Shift+I
+    const handleKeyDown = (e) => {
+      // Allow typing in input fields
+      const tag = e.target.tagName;
+      const isInputField = tag === 'TEXTAREA' || tag === 'INPUT';
+
+      // Block dev tools (F12 + Ctrl+Shift+I + Ctrl+Shift+J + Ctrl+U)
+      if (e.key === 'F12') { e.preventDefault(); showToast("Dev tools blocked during attempt", "warning"); return; }
+      if (e.ctrlKey && e.shiftKey && (e.key === 'I' || e.key === 'i' || e.key === 'J' || e.key === 'j' || e.key === 'C' || e.key === 'c')) {
+        e.preventDefault();
+        showToast("Dev tools blocked during attempt", "warning");
+        return;
+      }
+      if (e.ctrlKey && (e.key === 'u' || e.key === 'U')) { e.preventDefault(); return; }
+
+      // Block copy/paste/cut/select-all OUTSIDE input fields (questions can't be copied)
+      if (!isInputField && e.ctrlKey && (e.key === 'c' || e.key === 'C' || e.key === 'a' || e.key === 'A' || e.key === 'p' || e.key === 'P' || e.key === 's' || e.key === 'S')) {
+        e.preventDefault();
+        return;
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    window.addEventListener('blur', handleBlur);
+    document.addEventListener('contextmenu', handleContextMenu);
+    document.addEventListener('keydown', handleKeyDown);
+
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('blur', handleBlur);
+      document.removeEventListener('contextmenu', handleContextMenu);
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [view]);
+
+  // Reset tab switch count when leaving interview
+  useEffect(() => {
+    if (view !== "interview") {
+      setTabSwitchCount(0);
+      setShowTabWarning(false);
+    }
   }, [view]);
 
   // ── DETECT B2C/B2B ──
@@ -2849,6 +2925,34 @@ export default function ThreatReady() {
   // ═══════════════════════════════════════════════════════════
   if (view === "interview" && scenario && currentQ) return (
     <div className="app"><style>{CSS}</style><div className="scanbar" /><div className="gridbg" />
+      {/* Tab Switch Warning Modal */}
+      {showTabWarning && (
+        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.85)", zIndex: 99999, display: "flex", alignItems: "center", justifyContent: "center", backdropFilter: "blur(8px)" }}>
+          <div style={{ background: "var(--bg)", border: "2px solid var(--dn)", borderRadius: 16, padding: 32, maxWidth: 480, width: "90%", textAlign: "center" }}>
+            <div style={{ fontSize: 56, marginBottom: 12 }}>⚠️</div>
+            <div style={{ fontSize: 18, fontWeight: 800, marginBottom: 8, color: "var(--dn)" }}>Tab Switch Detected!</div>
+            <div style={{ fontSize: 12, color: "var(--tx2)", marginBottom: 16, lineHeight: 1.6 }}>
+              You switched tabs or minimized the window during your attempt.
+              <br />
+              <strong style={{ color: "var(--wn)" }}>Tab switches: {tabSwitchCount}/3</strong>
+            </div>
+            {tabSwitchCount >= 3 ? (
+              <div style={{ fontSize: 11, color: "var(--dn)", marginBottom: 16, padding: 10, background: "rgba(255,82,82,.1)", borderRadius: 8 }}>
+                ⚠️ Maximum warnings reached. Further tab switches may invalidate your assessment.
+              </div>
+            ) : (
+              <div style={{ fontSize: 11, color: "var(--tx3)", marginBottom: 16 }}>
+                Please stay on this tab. Repeated tab switches will be flagged.
+              </div>
+            )}
+            <button className="btn bp" style={{ width: "100%", padding: 12 }}
+              onClick={() => setShowTabWarning(false)}>
+              I Understand · Continue
+            </button>
+          </div>
+        </div>
+      )}
+
       <div className="page"><div className="cnt" style={{ paddingTop: 20 }}>
         {/* Header */}
         <div className="fadeUp" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
@@ -2857,6 +2961,11 @@ export default function ThreatReady() {
             <div style={{ display: "flex", gap: 6, marginTop: 4 }}>
               <span className={`diff diff-${activeDifficulty}`}>{activeDifficulty}</span>
               <span className="tag">Q{qIndex + 1}/5</span>
+              {tabSwitchCount > 0 && (
+                <span className="tag" style={{ color: "var(--dn)", borderColor: "var(--dn)" }}>
+                  ⚠️ {tabSwitchCount} tab switch{tabSwitchCount > 1 ? 'es' : ''}
+                </span>
+              )}
             </div>
           </div>
           <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
@@ -2916,7 +3025,12 @@ export default function ThreatReady() {
               {isMuted ? "🔊 Unmute" : "🔇 Mute"}
             </button>
           </div>
-          <div style={{ fontSize: 13, fontWeight: 600, lineHeight: 1.6 }}>{currentQ.t}</div>
+          <div
+            style={{ fontSize: 13, fontWeight: 600, lineHeight: 1.6, userSelect: "none", WebkitUserSelect: "none", MozUserSelect: "none", msUserSelect: "none" }}
+            onCopy={e => e.preventDefault()}
+            onCut={e => e.preventDefault()}
+            onContextMenu={e => e.preventDefault()}
+          >{currentQ.t}</div>
           {showHint && currentQ.h && activeDifficulty === "beginner" && (
             <div style={{ marginTop: 8, padding: 8, background: "rgba(0,229,255,.05)", borderRadius: 6, fontSize: 10, color: "var(--ac)" }}>💡 Hint: {currentQ.h}</div>
           )}
@@ -3328,15 +3442,45 @@ export default function ThreatReady() {
                 onClick={e => e.target === e.currentTarget && setShowDailyModal(false)}>
                 <div style={{ background: "#111827", border: "1px solid #1e2536", borderRadius: 20, padding: 32, maxWidth: 520, width: "90%", boxShadow: "0 24px 80px rgba(0,0,0,.6)" }}>
                   <div style={{ fontSize: 11, color: "var(--wn)", fontWeight: 700, marginBottom: 8, letterSpacing: 1 }}>🎯 DAILY CHALLENGE · +{dailyChallenge.points} XP</div>
-                  <div style={{ fontSize: 15, fontWeight: 700, marginBottom: 16, lineHeight: 1.5 }}>{dailyChallenge.question}</div>
+                  <div
+                    style={{ fontSize: 15, fontWeight: 700, marginBottom: 16, lineHeight: 1.5, userSelect: "none", WebkitUserSelect: "none" }}
+                    onCopy={e => e.preventDefault()}
+                    onCut={e => e.preventDefault()}
+                    onContextMenu={e => e.preventDefault()}
+                  >{dailyChallenge.question}</div>
                   {dailyChallenge.hint && (
                     <div style={{ fontSize: 11, color: "var(--tx3)", marginBottom: 12, padding: "8px 12px", background: "var(--s2)", borderRadius: 8 }}>
                       💡 Hint: {dailyChallenge.hint}
                     </div>
                   )}
-                  <textarea className="input" placeholder="Type your answer..."
-                    value={dailyAnswer} onChange={e => setDailyAnswer(e.target.value)}
-                    style={{ minHeight: 80, marginBottom: 12, fontSize: 12 }} />
+                  {/* Type / Dictate Toggle */}
+                  <div style={{ display: "flex", gap: 6, marginBottom: 8 }}>
+                    <button className={`btn ${dailyInputMode === "text" ? "bp" : "bs"}`}
+                      style={{ padding: "4px 12px", fontSize: 10 }}
+                      onClick={() => setDailyInputMode("text")}>✏️ Type</button>
+                    <button className={`btn ${dailyInputMode === "voice" ? "bp" : "bs"}`}
+                      style={{ padding: "4px 12px", fontSize: 10 }}
+                      onClick={() => setDailyInputMode("voice")}>🎤 Dictate</button>
+                  </div>
+                  {dailyInputMode === "text" ? (
+                    <NoPasteInput placeholder="Type your answer... (copy-paste disabled)"
+                      value={dailyAnswer} onChange={e => setDailyAnswer(e.target.value)}
+                      style={{ minHeight: 80, marginBottom: 12, fontSize: 12 }} />
+                  ) : (
+                    <div style={{ textAlign: "center", marginBottom: 12 }}>
+                      <div className={`rec-ring ${dailyVoice.recording ? "active" : ""}`}
+                        onClick={dailyVoice.recording ? dailyVoice.stop : dailyVoice.start}
+                        style={{ margin: "0 auto 8px" }}>{dailyVoice.recording ? "⏹" : "🎤"}</div>
+                      <div style={{ fontSize: 10, color: dailyVoice.recording ? "var(--dn)" : "var(--tx3)" }}>
+                        {dailyVoice.recording ? "Recording... tap to stop" : "Tap to start dictating"}
+                      </div>
+                      {dailyVoice.transcript && (
+                        <div style={{ marginTop: 10, padding: 10, background: "var(--s2)", borderRadius: 8, fontSize: 12, textAlign: "left", lineHeight: 1.6 }}>
+                          {dailyVoice.transcript}
+                        </div>
+                      )}
+                    </div>
+                  )}
                   {dailyResult && (
                     <div style={{
                       padding: 12, borderRadius: 10, marginBottom: 12,
@@ -3352,15 +3496,20 @@ export default function ThreatReady() {
                   <div style={{ display: "flex", gap: 10 }}>
                     <button className="btn bs" style={{ flex: 1 }} onClick={() => setShowDailyModal(false)}>Close</button>
                     {!dailyAnswered && (
-                      <button className="btn bp" style={{ flex: 2 }} disabled={!dailyAnswer.trim() || dailyLoading}
+                      <button className="btn bp" style={{ flex: 2 }}
+                        disabled={(!dailyAnswer.trim() && !dailyVoice.transcript?.trim()) || dailyLoading}
                         onClick={async () => {
                           setDailyLoading(true);
                           try {
                             const token = localStorage.getItem('token');
+                            // Use voice transcript if in voice mode, otherwise text
+                            const finalAnswer = dailyInputMode === "voice"
+                              ? (dailyVoice.transcript || '').trim()
+                              : (dailyAnswer || '').trim();
                             const res = await fetch('https://threatready-db.onrender.com/api/daily-challenge/submit', {
                               method: 'POST',
                               headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-                              body: JSON.stringify({ challenge_id: dailyChallenge.id, answer: dailyAnswer })
+                              body: JSON.stringify({ challenge_id: dailyChallenge.id, answer: finalAnswer })
                             });
                             const data = await res.json();
                             if (data.result) {
