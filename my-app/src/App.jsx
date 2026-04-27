@@ -868,12 +868,15 @@ export default function ThreatReady() {
   const [hrModalCompanyName, setHrModalCompanyName] = useState('');
   const [hrModalTeamSize, setHrModalTeamSize] = useState('11-50');
 
-  // HR pricing tiers (PLACEHOLDER — adjust later)
+  // HR pricing tiers (FINALIZED)
+  // Team Starter: 5-10 people  → ₹2,999/mo
+  // Team Pro:     11-50 people → ₹7,999/mo
+  // Enterprise:   50+ people   → Custom pricing (Contact Sales)
+  // Yearly = Monthly × 12 × 0.8 (20% discount)
   const HR_PRICING = {
-    '1-10':    { monthly: 4999,  yearly: 47990,  label: '1-10 engineers' },
-    '11-50':   { monthly: 19999, yearly: 191990, label: '11-50 engineers' },
-    '51-100':  { monthly: 49999, yearly: 479990, label: '51-100 engineers' },
-    '100+':    { monthly: 0,     yearly: 0,      label: '100+ engineers (Contact Sales)', contactSales: true }
+    '5-10':    { monthly: 2999,  yearly: 28790,  label: 'Team Starter · 5-10 people', planName: 'Team Starter' },
+    '11-50':   { monthly: 7999,  yearly: 76790,  label: 'Team Pro · 11-50 people',    planName: 'Team Pro' },
+    '50+':     { monthly: 0,     yearly: 0,      label: 'Enterprise · 50+ people (Contact Sales)', planName: 'Enterprise', contactSales: true }
   };
   const [newAssessJD, setNewAssessJD] = useState('');
   const [jdAnalysis, setJdAnalysis] = useState(null);
@@ -4286,7 +4289,7 @@ export default function ThreatReady() {
               <h2 style={{ fontSize: 22, fontWeight: 800 }}>{companyName || user?.name || 'Hiring Dashboard'}</h2>
               <div style={{ fontSize: 12, color: "var(--tx2)", marginTop: 3 }}>
                 {isHrPaid
-                  ? `✓ Active subscription · ${teamSize} engineers`
+                  ? `✓ ${HR_PRICING[teamSize]?.planName || 'Active subscription'} · ${teamSize} people`
                   : `Free trial · ${subscribedRoles.reduce((s, rid) => s + getRemainingAttempts(rid), 0)} attempts left`}
                 {" · "}{candidates.length} candidates · {assessments.length} assessments
               </div>
@@ -5546,11 +5549,9 @@ ${evals.map((ev, i) => {
               )}
               <input className="input" placeholder="Company Name" value={companyName} onChange={e => setCompanyName(e.target.value)} style={{ marginBottom: 10 }} />
               <select className="input" value={teamSize} onChange={e => setTeamSize(e.target.value)} style={{ marginBottom: 14 }}>
-                <option value="1-5">Team size: 1–5 engineers</option>
-                <option value="5-10">Team size: 5–10 engineers</option>
-                <option value="11-50">Team size: 11–50 engineers</option>
-                <option value="50-100">Team size: 50–100 engineers</option>
-                <option value="100+">Team size: 100+ engineers</option>
+                <option value="5-10">Team Starter · 5-10 people</option>
+                <option value="11-50">Team Pro · 11-50 people</option>
+                <option value="50+">Enterprise · 50+ people</option>
               </select>
               <button className="btn bp" style={{ fontSize: 12, padding: "10px 24px" }}
                 onClick={async () => {
@@ -5837,7 +5838,7 @@ ${evals.map((ev, i) => {
                           await fetch('https://threatready-db.onrender.com/api/feedback', {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json', ...(token ? { 'Authorization': `Bearer ${token}` } : {}) },
-                            body: JSON.stringify({ message: `[HR ENTERPRISE LEAD] Company: ${hrModalCompanyName}, Team size: 100+, Contact: ${user?.email || 'N/A'}` })
+                            body: JSON.stringify({ message: `[HR ENTERPRISE LEAD] Company: ${hrModalCompanyName}, Team size: 50+, Contact: ${user?.email || 'N/A'}` })
                           });
                         } catch(e) {}
                         return;
