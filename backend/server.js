@@ -1193,25 +1193,7 @@ app.post('/api/stats/update', auth, async (req, res) => {
 // ═══════════════════════════════════════════════════════════════
 
 // Get global leaderboard
-app.get('/api/leaderboard', async (req, res) => {
-  try {
-    const result = await pool.query(
-      `SELECT u.name, u.email,
-              us.total_xp, us.streak,
-              COUNT(s.id) as total_sessions,
-              ROUND(AVG(s.overall_score)::numeric, 1) as avg_score
-       FROM users u
-       JOIN user_stats us ON us.user_id = u.id
-       LEFT JOIN sessions s ON s.user_id = u.id AND s.completed_at IS NOT NULL
-       GROUP BY u.id, u.name, u.email, us.total_xp, us.streak
-       ORDER BY us.total_xp DESC
-       LIMIT 20`
-    );
-    res.json({ leaderboard: result.rows });
-  } catch (e) {
-    res.status(500).json({ error: e.message });
-  }
-});
+// (Old duplicate /api/leaderboard endpoint removed — see line ~2735 for the active one)
 
 // Get leaderboard by role
 app.get('/api/leaderboard/:roleId', async (req, res) => {
