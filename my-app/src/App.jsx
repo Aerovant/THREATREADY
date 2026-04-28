@@ -1,743 +1,39 @@
+// ═══════════════════════════════════════════════════════════════
+// CYBERPREP v4 — Attack Reasoning Lab (COMPLETE)
+// 12 Roles · 4 Difficulty Levels · Adaptive AI · B2C + B2B
+// Dynamic Hooks · Anti-Gaming · Full Dashboard Suite
+// ═══════════════════════════════════════════════════════════════
 import { useState, useEffect, useRef, useCallback } from "react";
 import { RadarChart, PolarGrid, PolarAngleAxis, Radar, ResponsiveContainer, LineChart, Line, XAxis, YAxis, Tooltip, BarChart, Bar } from "recharts";
-import { SCENARIOS } from './cyberprep-database.js';
-import.meta.env.VITE_ANTHROPIC_API_KEY
 
-/* ═══════════════════════════════════════════════════════════════
-   CYBERPREP v4 — Attack Reasoning Lab (COMPLETE)
-   12 Roles · 4 Difficulty Levels · Adaptive AI · B2C + B2B
-   Dynamic Hooks · Anti-Gaming · Full Dashboard Suite
-   ═══════════════════════════════════════════════════════════════ */
+// ── Constants & data (extracted to constants.js) ──
+import { SCENARIOS, ROLES, DIFFICULTIES, HOOK_HEADLINES, HOOK_SUBLINES, NT, DEMO_QUESTIONS, TOTAL_SC } from "./constants.js";
+
+// ── CSS (extracted to styles.js) ──
+import { CSS } from "./styles.js";
+
+// ── Helpers and toast/confirm bridge (extracted to components/helpers.js) ──
+import {
+  showToast, showConfirm, noPaste, fmt, pick, useVoice
+} from "./components/helpers.js";
+
+// ── UI components (extracted to components/) ──
+import ToastContainer from "./components/ToastContainer.jsx";
+import NoPasteInput from "./components/NoPasteInput.jsx";
+import FileUpload from "./components/FileUpload.jsx";
+import ArchDiagram from "./components/ArchDiagram.jsx";
+import PasswordStrength from "./components/PasswordStrength.jsx";
+import AIAvatar from "./components/AIAvatar.jsx";
+
+import HomeBtn from "./components/HomeBtn.jsx";
+
+// ── Views (Phase 1: 5 simple views extracted) ──
+import LandingView from "./views/LandingView.jsx";
+import TrialRoleSelectView from "./views/TrialRoleSelectView.jsx";
+import TrialCompleteView from "./views/TrialCompleteView.jsx";
+import RolesView from "./views/RolesView.jsx";
+import DifficultyView from "./views/DifficultyView.jsx";
 
-// ── ROLES ──
-const ROLES = [
-  { id: "cloud", name: "Cloud Security", icon: "☁️", color: "#00d4ff", desc: "AWS/Azure/GCP security, cloud-native defense, multi-cloud IR", price: 399 },
-  { id: "devsecops", name: "DevSecOps", icon: "🔧", color: "#ff6b35", desc: "CI/CD pipeline security, container hardening, IaC scanning", price: 399 },
-  { id: "appsec", name: "Application Security", icon: "🛡️", color: "#a855f7", desc: "OWASP Top 10, secure code review, API security, threat modeling", price: 399 },
-  { id: "netsec", name: "Network Security", icon: "🌐", color: "#22c55e", desc: "Zero trust networking, firewall architecture, IDS/IPS, forensics", price: 399 },
-  { id: "prodsec", name: "Product Security", icon: "📦", color: "#f59e0b", desc: "Security design reviews, SDL lifecycle, risk assessment", price: 399 },
-  { id: "secarch", name: "Security Architect", icon: "🏗️", color: "#ec4899", desc: "Enterprise security design, zero trust, frameworks, governance", price: 399 },
-  { id: "dfir", name: "DFIR & Incident Response", icon: "🔍", color: "#ef4444", desc: "Digital forensics, malware analysis, incident handling", price: 399 },
-  { id: "grc", name: "GRC & Compliance", icon: "📋", color: "#06b6d4", desc: "ISO 27001, SOC2, NIST, PCI-DSS, risk management", price: 399 },
-  { id: "soc", name: "SOC Analyst", icon: "📡", color: "#8b5cf6", desc: "SIEM triage, alert analysis, threat detection, log correlation", price: 399 },
-  { id: "threat", name: "Threat Hunter", icon: "🎯", color: "#f97316", desc: "Proactive threat detection, hypothesis-driven hunting", price: 399 },
-  { id: "red", name: "Red Team", icon: "🔴", color: "#dc2626", desc: "Adversary simulation, exploitation, privilege escalation", price: 399 },
-  { id: "blue", name: "Blue Team", icon: "🔵", color: "#2563eb", desc: "Detection engineering, SOAR, threat response automation", price: 399 }
-];
-
-const DIFFICULTIES = [
-  { id: "beginner", name: "Beginner", color: "#22c55e", icon: "🌱", hints: true, time: "5-8 min", questions: 5 },
-  { id: "intermediate", name: "Intermediate", color: "#f59e0b", icon: "⚡", hints: "reduced", time: "10-14 min", questions: 5 },
-  { id: "advanced", name: "Advanced", color: "#ef4444", icon: "🔥", hints: "minimal", time: "12-18 min", questions: 5 },
-  { id: "expert", name: "Expert", color: "#8b5cf6", icon: "💎", hints: false, time: "15-20 min", questions: 5 }
-];
-
-// ── HOOK COPY POOL (Randomized on each refresh) ──
-const HOOK_HEADLINES = [
-  "Your Attack Reasoning Matters More Than Your Certifications",
-  "Prove How You Think Under Fire — Not Just What You Know",
-  "Decision-Making Under Attack. That's What Gets You Hired.",
-  "Stop Memorizing Frameworks. Start Reasoning Through Attacks.",
-  "The Interview That Tests What Certifications Can't Measure"
-];
-
-const HOOK_SUBLINES = [
-  "You Have 2 Minutes. What's Your Move?",
-  "Show Us How You'd Stop This Attack",
-  "What Would You Do in the First 60 Seconds?",
-  "Prove Your Attack Reasoning Right Now",
-  "Real Attack. Real Decision. 2 Minutes.",
-  "How Would You Contain This?",
-  "Your Next Interview Starts Here",
-  "Think Like They're Already Inside",
-  "Can You See What They See?",
-  "One Scenario. One Chance. Go."
-];
-
-// ── NODE TYPES ──
-const NT = { threat: { bg: "#3a1a2a", bd: "#f44336", ic: "☠️" }, cloud: { bg: "#0d2137", bd: "#4FC3F7", ic: "☁️" }, iam: { bg: "#3a1a1a", bd: "#ff5252", ic: "🔐" }, vault: { bg: "#1a3a3a", bd: "#00BCD4", ic: "🔒" }, db: { bg: "#1a2a3a", bd: "#9C27B0", ic: "🗄️" }, storage: { bg: "#2a2a1a", bd: "#FF9800", ic: "📦" }, siem: { bg: "#2a1a3a", bd: "#7C4DFF", ic: "📊" }, user: { bg: "#1a2a2a", bd: "#00BCD4", ic: "👤" }, api: { bg: "#2a1a2a", bd: "#AB47BC", ic: "🔌" }, waf: { bg: "#1a2a1a", bd: "#4CAF50", ic: "🛡️" }, lambda: { bg: "#1a2a1a", bd: "#FF9800", ic: "⚡" }, compute: { bg: "#1a3a2a", bd: "#66BB6A", ic: "💻" }, k8s: { bg: "#0d1f3c", bd: "#326CE5", ic: "☸️" }, pam: { bg: "#3a1a2a", bd: "#E91E63", ic: "🔑" }, cicd: { bg: "#1a3a5c", bd: "#2196F3", ic: "⚙️" }, registry: { bg: "#1a2a2a", bd: "#26A69A", ic: "📋" }, policy: { bg: "#2a2a1a", bd: "#FFCA28", ic: "📜" }, monitor: { bg: "#1a1a2a", bd: "#7E57C2", ic: "👁️" }, network: { bg: "#1a1a3a", bd: "#5C6BC0", ic: "🔗" }, firewall: { bg: "#2a2a1a", bd: "#FF6F00", ic: "🧱" }, dns: { bg: "#1a3a1a", bd: "#43A047", ic: "🌐" }, c2: { bg: "#3a0a0a", bd: "#D50000", ic: "💀" }, vpn: { bg: "#1a2a2a", bd: "#0288D1", ic: "🔒" }, endpoint: { bg: "#2a2a2a", bd: "#78909C", ic: "🖥️" }, ad: { bg: "#2a1a1a", bd: "#EF5350", ic: "🏛️" }, container: { bg: "#0d2137", bd: "#0097A7", ic: "🐳" } };
-
-// ── DEMO QUESTIONS (Randomized) ──
-const DEMO_QUESTIONS = [
-  { q: "An attacker has stolen AWS STS tokens from a developer's laptop. What's your first containment action and why?", ca: "Cloud Security · Incident Response" },
-  { q: "50,000 failed logins in 1 hour from 200 unique IPs. Is this credential stuffing or password spraying? How do you tell?", ca: "SOC Analysis · Threat Detection" },
-  { q: "Ransomware is actively encrypting file shares. What are your first 3 actions in the next 60 seconds?", ca: "DFIR · Incident Response" },
-  { q: "A CI/CD pipeline has been compromised via a poisoned GitHub Actions workflow. How does this bypass code review?", ca: "DevSecOps · Supply Chain" },
-  { q: "Your GraphQL API has introspection enabled in production. An attacker just discovered your full schema. What's the risk?", ca: "Application Security · API" },
-  { q: "Terraform state file in S3 contains plaintext database passwords. How did this happen and what's your remediation plan?", ca: "DevSecOps · IaC Security" },
-  { q: "An OAuth redirect_uri validation flaw allows authorization code interception. Walk through the attack chain.", ca: "Application Security · OAuth" },
-  { q: "SSRF in a microservice reaches internal admin APIs via service mesh localhost trust. How do you prevent lateral movement?", ca: "Network Security · Zero Trust" },
-  { q: "A container image from Docker Hub contains a cryptominer. It passed your Trivy scan. Why?", ca: "DevSecOps · Container Security" },
-  { q: "CloudTrail shows AssumeRole calls from an OIDC provider you don't recognize. What's happening?", ca: "Cloud Security · IAM" }
-];
-
-
-const TOTAL_SC = Object.values(SCENARIOS).reduce((s, a) => s + a.length, 0);
-// ── CSS ──
-const CSS = `
-:root{--bg:#0a0e1a;--s1:#111827;--s2:#1a1f2e;--s3:#252b3b;--ac:#00e5ff;--ok:#00e096;--wn:#ffab40;--dn:#ff5252;--tx1:#e8eaf6;--tx2:#b8c0dc;--tx3:#9098b8;--bd:#1e2536}
-*{margin:0;padding:0;box-sizing:border-box}
-body{background:var(--bg);color:var(--tx1);font-family:'Inter','Segoe UI',system-ui,sans-serif;overflow-x:hidden;font-size:15px}
-.app{min-height:100vh;position:relative;overflow-x:hidden;width:100%}
-/* Readability: bump up very small fonts across the app */
-.lbl{font-size:13px !important;letter-spacing:1.5px}
-.tag{font-size:12px !important}
-.statlbl{font-size:12px !important}
-.diff{font-size:12px !important}
-.badge-card{font-size:12px !important}
-.nav-tab{font-size:14px !important}
-.sidebar-item{font-size:15px !important}
-.heatmap-cell{font-size:11px !important}
-.toast{font-size:14px !important}
-/* Scale up tiny inline fonts (8-11px) for readability — React outputs 'font-size: 8px' style */
-[style*="font-size: 8px"]{font-size:11px !important}
-[style*="font-size: 9px"]{font-size:11px !important}
-[style*="font-size: 10px"]{font-size:12px !important}
-[style*="font-size: 11px"]{font-size:13px !important}
-.gridbg{position:fixed;inset:0;background-image:linear-gradient(rgba(0,229,255,.03) 1px,transparent 1px),linear-gradient(90deg,rgba(0,229,255,.03) 1px,transparent 1px);background-size:60px 60px;pointer-events:none;z-index:0}
-.scanbar{position:fixed;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,transparent,var(--ac),transparent);animation:scan 4s infinite;z-index:100;opacity:.6}
-@keyframes scan{0%{transform:translateX(-100%)}100%{transform:translateX(100%)}}
-
-
-@keyframes avatarRing{0%,100%{transform:scale(1);opacity:1}50%{transform:scale(1.08);opacity:.7}}
-@keyframes talking{0%{height:4px;width:20px}100%{height:10px;width:26px}}
-@keyframes blink{0%,90%,100%{transform:scaleY(1)}95%{transform:scaleY(0.1)}}
-@keyframes soundBar{from{height:20%}to{height:100%}}
-
-@keyframes soundBar1{from{height:3px}to{height:16px}}
-@keyframes soundBar2{from{height:5px}to{height:20px}}
-@keyframes soundBar3{from{height:4px}to{height:14px}}
-
-.orb{position:fixed;border-radius:50%;pointer-events:none;z-index:0;filter:blur(60px)}
-.page{position:relative;z-index:1;min-height:100vh;padding:20px 0;width:100%}
-.cnt{width:100%;padding:0 24px;box-sizing:border-box}
-.hero{text-align:center;padding:80px 0 40px}
-.hero h1{font-size:clamp(36px,7vw,72px);font-weight:900;line-height:1.1;background:linear-gradient(135deg,#fff,var(--ac));-webkit-background-clip:text;-webkit-text-fill-color:transparent;margin-bottom:14px}
-.hero p{font-size:17px;color:var(--tx2);max-width:760px;margin:0 auto;line-height:1.7}
-.card{background:var(--s1);border:1px solid var(--bd);border-radius:14px;padding:20px;position:relative;transition:all .3s}
-.card-glow:hover{border-color:var(--ac);box-shadow:0 0 20px rgba(0,229,255,.08)}
-.btn{border:none;border-radius:10px;font-weight:700;cursor:pointer;transition:all .2s;font-size:15px;padding:10px 20px;display:inline-flex;align-items:center;justify-content:center;gap:6px}
-.bp{background:var(--ac);color:#000}.bp:hover{opacity:.85}.bp:disabled{opacity:.4;cursor:not-allowed}
-.bs{background:transparent;border:1px solid var(--bd);color:var(--tx1)}.bs:hover{border-color:var(--ac)}
-.bdn{background:var(--dn);color:#fff}
-.bok{background:var(--ok);color:#000}
-.input{width:100%;background:var(--s2);border:1px solid var(--bd);border-radius:10px;padding:12px 14px;color:var(--tx1);font-size:15px;outline:none;transition:border .2s;resize:vertical;font-family:inherit}
-.input:focus{border-color:var(--ac)}
-.input[data-nopaste]{-webkit-user-select:text;user-select:text}
-.lbl{font-size:12px;letter-spacing:2px;color:var(--ac);text-transform:uppercase;font-weight:700}
-.tag{display:inline-block;padding:3px 10px;background:rgba(0,229,255,.06);border:1px solid rgba(0,229,255,.15);border-radius:20px;font-size:11px;color:var(--ac);font-weight:600}
-.mono{font-family:'JetBrains Mono','Fira Code',monospace}
-.rgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
-@media(max-width:640px){.rgrid{grid-template-columns:repeat(2,1fr)}}
-.sgrid{display:grid;gap:12px}
-.sub-card{background:var(--s1);border:1px solid var(--bd);border-radius:14px;padding:20px;cursor:pointer;transition:all .2s;position:relative;text-align:center}
-.sub-card:hover,.sub-card.sel{border-color:var(--ac);background:rgba(0,229,255,.02)}
-.statbox{background:var(--s2);border-radius:12px;padding:14px;text-align:center}
-.statval{font-size:26px;font-weight:800;font-family:'JetBrains Mono',monospace}
-.statlbl{font-size:11px;color:var(--tx3);margin-top:3px;text-transform:uppercase;letter-spacing:1px}
-.pbar{height:4px;background:var(--s3);border-radius:4px;overflow:hidden}.pfill{height:100%;border-radius:4px;transition:width .6s}
-.diff{font-size:11px;font-weight:700;padding:3px 8px;border-radius:6px;text-transform:uppercase;letter-spacing:.5px}
-.diff-beginner,.diff-Beginner{background:rgba(34,197,94,.1);color:#22c55e;border:1px solid rgba(34,197,94,.2)}
-.diff-intermediate,.diff-Intermediate{background:rgba(245,158,11,.1);color:#f59e0b;border:1px solid rgba(245,158,11,.2)}
-.diff-advanced,.diff-Advanced{background:rgba(239,68,68,.1);color:#ef4444;border:1px solid rgba(239,68,68,.2)}
-.diff-expert,.diff-Expert{background:rgba(139,92,246,.1);color:#8b5cf6;border:1px solid rgba(139,92,246,.2)}
-.eval-card{background:var(--s2);border-radius:10px;padding:12px;margin-bottom:10px;border-left:3px solid var(--ac)}
-.badge-card{border:2px solid;border-radius:12px;padding:8px 16px;font-weight:800;font-size:11px;text-transform:uppercase;letter-spacing:2px;text-align:center;font-family:'JetBrains Mono',monospace}
-.loader{width:18px;height:18px;border:2px solid transparent;border-top-color:currentColor;border-radius:50%;animation:spin .6s linear infinite;display:inline-block}
-@keyframes spin{to{transform:rotate(360deg)}}
-.rec-ring{width:56px;height:56px;border-radius:50%;border:2px solid var(--tx3);display:flex;align-items:center;justify-content:center;font-size:22px;cursor:pointer;transition:all .2s}
-.rec-ring.active{border-color:var(--dn);animation:pulse 1.2s infinite;background:rgba(255,82,82,.1)}
-@keyframes pulse{0%,100%{box-shadow:0 0 0 0 rgba(255,82,82,.4)}50%{box-shadow:0 0 0 12px rgba(255,82,82,0)}}
-.home-btn{position:fixed;top:14px;left:14px;z-index:50;background:var(--s2);border:1px solid var(--bd);color:var(--tx2);padding:6px 14px;border-radius:8px;font-size:13px;cursor:pointer;font-weight:600;transition:all .2s}
-.home-btn:hover{border-color:var(--ac);color:var(--ac)}
-.fadeUp{animation:fadeUp .5s ease both}
-@keyframes fadeUp{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:translateY(0)}}
-.heatmap-cell{width:100%;aspect-ratio:1;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;font-family:'JetBrains Mono',monospace}
-.nav-tabs{display:flex;gap:4px;margin-bottom:20px;overflow-x:auto;padding-bottom:4px}
-.nav-tab{padding:8px 16px;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;white-space:nowrap;transition:all .2s;background:var(--s2);color:var(--tx2);border:1px solid var(--bd)}
-.nav-tab.active{background:rgba(0,229,255,.1);color:var(--ac);border-color:var(--ac)}
-.nav-tab:hover{border-color:var(--ac)}
-.sidebar{position:fixed;left:0;top:0;bottom:0;width:220px;background:var(--s1);border-right:1px solid var(--bd);padding:20px 0;z-index:40;overflow-y:auto}
-.sidebar-item{padding:10px 20px;font-size:14px;color:var(--tx2);cursor:pointer;display:flex;align-items:center;gap:10px;transition:all .15s}
-.sidebar-item:hover{background:rgba(0,229,255,.05);color:var(--tx1)}
-.sidebar-item.active{color:var(--ac);background:rgba(0,229,255,.08);border-right:2px solid var(--ac)}
-.main-with-sidebar{margin-left:220px}
-@media(max-width:768px){.sidebar{display:none}.main-with-sidebar{margin-left:0}}
-.tooltip{position:relative;cursor:help}.tooltip:hover::after{content:attr(data-tip);position:absolute;bottom:100%;left:50%;transform:translateX(-50%);background:var(--s3);color:var(--tx1);padding:6px 10px;border-radius:6px;font-size:10px;white-space:nowrap;z-index:99}
-.strength-bar{height:4px;border-radius:4px;transition:all .3s}
-.overlay{position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:60;display:flex;align-items:center;justify-content:center}
-.modal{background:var(--s1);border:1px solid var(--bd);border-radius:16px;padding:32px;max-width:500px;width:90%;max-height:80vh;overflow-y:auto}
-
-/* ── TOAST NOTIFICATIONS ── */
-.toast-wrap{position:fixed;top:20px;right:20px;z-index:99999;display:flex;flex-direction:column;gap:10px;max-width:360px;pointer-events:none}
-.toast{display:flex;align-items:center;gap:10px;padding:13px 16px;border-radius:14px;backdrop-filter:blur(16px);box-shadow:0 8px 32px rgba(0,0,0,0.5);animation:toastIn .35s cubic-bezier(.34,1.56,.64,1) both;pointer-events:all;cursor:default;font-size:13px;font-weight:600;color:#e8eaf6}
-.toast-success{background:rgba(0,224,150,.13);border:1px solid rgba(0,224,150,.4);box-shadow:0 8px 32px rgba(0,0,0,.5),0 0 20px rgba(0,224,150,.1)}
-.toast-error{background:rgba(255,82,82,.13);border:1px solid rgba(255,82,82,.4);box-shadow:0 8px 32px rgba(0,0,0,.5),0 0 20px rgba(255,82,82,.1)}
-.toast-warning{background:rgba(255,171,64,.13);border:1px solid rgba(255,171,64,.4);box-shadow:0 8px 32px rgba(0,0,0,.5),0 0 20px rgba(255,171,64,.1)}
-.toast-info{background:rgba(0,229,255,.10);border:1px solid rgba(0,229,255,.35);box-shadow:0 8px 32px rgba(0,0,0,.5),0 0 20px rgba(0,229,255,.08)}
-.toast-icon{font-size:18px;flex-shrink:0}
-.toast-msg{flex:1;line-height:1.4}
-.toast-close{font-size:18px;opacity:.45;transition:opacity .15s;flex-shrink:0;background:none;border:none;color:#e8eaf6;cursor:pointer;padding:0 2px;line-height:1}
-.toast-close:hover{opacity:1}
-@keyframes toastIn{from{opacity:0;transform:translateX(60px) scale(.9)}to{opacity:1;transform:translateX(0) scale(1)}}
-@keyframes toastOut{to{opacity:0;transform:translateX(60px) scale(.9)}}
-
-/* ── CONFIRM DIALOG ── */
-.confirm-backdrop{position:fixed;inset:0;z-index:100000;background:rgba(0,0,0,.75);display:flex;align-items:center;justify-content:center;backdrop-filter:blur(6px);animation:fadeUp .2s ease}
-.confirm-box{background:linear-gradient(145deg,#111827,#0a0e1a);border:1px solid #1e2536;border-radius:22px;padding:40px 36px;max-width:420px;width:90%;box-shadow:0 32px 80px rgba(0,0,0,.7),0 0 0 1px rgba(0,229,255,.06),inset 0 1px 0 rgba(255,255,255,.04);text-align:center;animation:confirmPop .3s cubic-bezier(.34,1.56,.64,1) both}
-.confirm-emoji{font-size:48px;margin-bottom:16px;display:block}
-.confirm-title{font-size:18px;font-weight:800;color:#e8eaf6;margin-bottom:8px;line-height:1.3}
-.confirm-sub{font-size:12px;color:#5a6380;margin-bottom:28px;line-height:1.6}
-.confirm-btns{display:flex;gap:12px}
-.confirm-cancel{flex:1;padding:13px 0;font-size:13px;font-weight:700;border-radius:12px;background:var(--s2);border:1px solid var(--bd);color:var(--tx2);cursor:pointer;transition:all .2s}
-.confirm-cancel:hover{border-color:var(--ac);color:var(--ac)}
-.confirm-ok{flex:1;padding:13px 0;font-size:13px;font-weight:700;border-radius:12px;border:none;cursor:pointer;transition:all .2s}
-.confirm-ok-logout{background:linear-gradient(135deg,#00e5ff,#00b4cc);color:#000;box-shadow:0 4px 20px rgba(0,229,255,.35)}
-.confirm-ok-logout:hover{box-shadow:0 6px 28px rgba(0,229,255,.5);transform:translateY(-1px)}
-.confirm-ok-delete{background:linear-gradient(135deg,#ef4444,#dc2626);color:#fff;box-shadow:0 4px 20px rgba(239,68,68,.35)}
-.confirm-ok-delete:hover{box-shadow:0 6px 28px rgba(239,68,68,.5);transform:translateY(-1px)}
-.confirm-ok-default{background:linear-gradient(135deg,#00e5ff,#00b4cc);color:#000;box-shadow:0 4px 20px rgba(0,229,255,.35)}
-@keyframes confirmPop{from{opacity:0;transform:scale(.85) translateY(20px)}to{opacity:1;transform:scale(1) translateY(0)}}
-`;
-// ── TOAST & CONFIRM SYSTEM ──
-let _showToast = null;
-let _showConfirm = null;
-const showToast = (msg, type = 'info') => _showToast && _showToast(msg, type);
-const showConfirm = (msg, onYes, onNo) => _showConfirm && _showConfirm(msg, onYes, onNo);
-
-function ToastContainer() {
-  const [toasts, setToasts] = useState([]);
-  const [confirm, setConfirm] = useState(null);
-
-  _showToast = (msg, type = 'info') => {
-    const id = Date.now() + Math.random();
-    setToasts(p => [...p, { id, msg, type }]);
-    setTimeout(() => setToasts(p => p.filter(t => t.id !== id)), 4000);
-  };
-  _showConfirm = (msg, onYes, onNo) => setConfirm({ msg, onYes, onNo });
-
-  const icons = { success: '✅', error: '❌', warning: '⚠️', info: 'ℹ️' };
-
-  const isLogout = (msg) => msg.toLowerCase().includes('logout');
-  const isDelete = (msg) => msg.toLowerCase().includes('delete');
-
-  return (
-    <>
-      {/* ── TOAST NOTIFICATIONS ── */}
-      <div className="toast-wrap">
-        {toasts.map(t => (
-          <div key={t.id} className={`toast toast-${t.type || 'info'}`}>
-            <span className="toast-icon">{icons[t.type] || 'ℹ️'}</span>
-            <span className="toast-msg">{t.msg}</span>
-            <button className="toast-close" onClick={() => setToasts(p => p.filter(x => x.id !== t.id))}>×</button>
-          </div>
-        ))}
-      </div>
-
-      {/* ── CONFIRM DIALOG ── */}
-      {confirm && (
-        <div className="confirm-backdrop"
-          onClick={e => e.target === e.currentTarget && (confirm.onNo?.(), setConfirm(null))}>
-          <div className="confirm-box">
-            <span className="confirm-emoji">
-              {isLogout(confirm.msg) ? '👋' : isDelete(confirm.msg) ? '🗑️' : '⚠️'}
-            </span>
-            <div className="confirm-title">{confirm.msg}</div>
-            <div className="confirm-sub">
-              {isLogout(confirm.msg)
-                ? 'You will be signed out and redirected to the home page.'
-                : isDelete(confirm.msg)
-                  ? 'This action is permanent and cannot be undone.'
-                  : 'Please confirm to proceed with this action.'}
-            </div>
-            <div className="confirm-btns">
-              <button className="confirm-cancel"
-                onClick={() => { confirm.onNo?.(); setConfirm(null); }}>
-                Cancel
-              </button>
-              <button className={`confirm-ok ${isDelete(confirm.msg) ? 'confirm-ok-delete' : 'confirm-ok-logout'}`}
-                onClick={() => { confirm.onYes?.(); setConfirm(null); }}>
-                {isLogout(confirm.msg) ? 'Yes, Logout'
-                  : isDelete(confirm.msg) ? 'Yes, Delete'
-                    : 'Confirm'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-    </>
-  );
-}
-
-// ── VOICE HOOK ──
-function useVoice() {
-  const [recording, setRec] = useState(false);
-  const [transcript, setTr] = useState("");
-  const recRef = useRef(null);
-  const finalTranscriptRef = useRef("");
-  const manuallyStopped = useRef(false);
-  const processedFinalsRef = useRef(new Set());  // Track unique final segments to avoid duplicates on mobile
-
-  const startRecognition = useCallback(() => {
-    if (manuallyStopped.current) return;
-
-    const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-    if (!SR) { console.log("Speech recognition not supported"); return; }
-
-    const r = new SR();
-    r.continuous = true;
-    r.interimResults = true;
-    r.lang = 'en-US';  // Explicit language for better accuracy
-    r.maxAlternatives = 1;
-
-    r.onresult = (e) => {
-      let interim = "";
-      for (let i = e.resultIndex; i < e.results.length; i++) {
-        const text = e.results[i][0].transcript;
-        const trimmed = text.trim();
-        if (e.results[i].isFinal) {
-          // MOBILE FIX: Mobile Chrome sometimes re-emits the same final segment
-          // when recognition auto-restarts. Dedupe by tracking processed finals.
-          if (!trimmed) continue;
-
-          // Skip if already processed this exact text recently
-          const key = trimmed.toLowerCase();
-          if (processedFinalsRef.current.has(key)) continue;
-          processedFinalsRef.current.add(key);
-
-          // Keep set bounded (last 50 segments)
-          if (processedFinalsRef.current.size > 50) {
-            const arr = Array.from(processedFinalsRef.current);
-            processedFinalsRef.current = new Set(arr.slice(-30));
-          }
-
-          finalTranscriptRef.current += trimmed + ' ';
-        } else {
-          interim += text;
-        }
-      }
-      setTr(finalTranscriptRef.current + interim);
-    };
-
-    r.onend = () => {
-      // Auto-restart on silence (browsers auto-stop after ~10sec of silence)
-      // Only restart if user hasn't manually clicked stop
-      if (!manuallyStopped.current) {
-        setTimeout(() => {
-          if (!manuallyStopped.current) {
-            startRecognition();
-          }
-        }, 100);
-      } else {
-        setRec(false);
-        recRef.current = null;
-      }
-    };
-
-    r.onerror = (e) => {
-      console.log("Speech error:", e.error);
-      // Permission denied or service unavailable - stop completely
-      if (e.error === 'not-allowed' || e.error === 'service-not-allowed') {
-        manuallyStopped.current = true;
-        setRec(false);
-        recRef.current = null;
-      }
-      // For 'no-speech', 'aborted', or 'network' - let onend handle restart
-    };
-
-    try {
-      r.start();
-      recRef.current = r;
-    } catch (err) {
-      console.log("Failed to start recognition:", err.message);
-    }
-  }, []);
-
-  const start = useCallback(() => {
-    manuallyStopped.current = false;
-    processedFinalsRef.current = new Set();  // Reset dedup tracker on fresh start
-    setRec(true);
-    startRecognition();
-  }, [startRecognition]);
-
-  const stop = useCallback(() => {
-    manuallyStopped.current = true;
-    setRec(false);
-    if (recRef.current) {
-      try { recRef.current.stop(); } catch (e) {}
-      recRef.current = null;
-    }
-  }, []);
-
-  const reset = useCallback(() => {
-    manuallyStopped.current = true;
-    finalTranscriptRef.current = "";
-    processedFinalsRef.current = new Set();
-    setTr("");
-    setRec(false);
-    if (recRef.current) {
-      try { recRef.current.stop(); } catch (e) {}
-      recRef.current = null;
-    }
-  }, []);
-
-  // Allow user to manually edit the transcript (fix recognition errors)
-  const setTranscript = useCallback((text) => {
-    finalTranscriptRef.current = text + ' ';  // sync internal ref so voice continues from edit point
-    setTr(text);
-  }, []);
-
-  return { recording, transcript, start, stop, reset, setTranscript };
-}
-
-// ── DISABLE COPY PASTE ──
-function noPaste(e) { e.preventDefault(); }
-function NoPasteInput({ value, onChange, ...props }) {
-  return <textarea className="input" value={value} onChange={onChange} onPaste={noPaste} onCopy={noPaste} onCut={noPaste} {...props} />;
-}
-
-// ── FILE UPLOAD ──
-function FileUpload({ onUpload, label }) {
-  const ref = useRef();
-  const [uploading, setUploading] = useState(false);
-
-  const extractPdfText = async (file) => {
-    return new Promise((resolve) => {
-      const reader = new FileReader();
-      reader.onload = async (e) => {
-        try {
-          const pdfjsLib = window['pdfjs-dist/build/pdf'];
-          pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
-          const pdf = await pdfjsLib.getDocument({ data: e.target.result }).promise;
-          let fullText = '';
-          for (let i = 1; i <= pdf.numPages; i++) {
-            const page = await pdf.getPage(i);
-            const content = await page.getTextContent();
-            fullText += content.items.map(item => item.str).join(' ') + '\n';
-          }
-          resolve(fullText);
-        } catch (err) {
-          resolve('');
-        }
-      };
-      reader.readAsArrayBuffer(file);
-    });
-  };
-
-  const handle = async e => {
-    const f = e.target.files[0];
-    if (!f) return;
-    setUploading(true);
-
-    try {
-      let extractedText = '';
-
-      if (f.type === 'application/pdf') {
-        extractedText = await extractPdfText(f);
-      } else if (f.name.endsWith('.txt')) {
-        extractedText = await new Promise((resolve) => {
-          const reader = new FileReader();
-          reader.onload = ev => resolve(ev.target.result);
-          reader.readAsText(f);
-        });
-      } else {
-        // DOC/DOCX - send to backend
-        const formData = new FormData();
-        formData.append('resume', f);
-        const token = localStorage.getItem('token');
-        const res = await fetch('https://threatready-db.onrender.com/api/resume/extract', {
-          method: 'POST',
-          headers: { 'Authorization': `Bearer ${token}` },
-          body: formData
-        });
-        const data = await res.json();
-        extractedText = data.text || '';
-      }
-
-      if (!extractedText.trim()) {
-        showToast('Could not read file. Try PDF or TXT format.', 'warning');
-        setUploading(false);
-        return;
-      }
-
-      // Send to backend for AI extraction
-      const resumeToken = localStorage.getItem('token');
-      const resumeResp = await fetch("https://threatready-db.onrender.com/api/resume/parse-text", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": "Bearer " + (resumeToken || '')
-        },
-        body: JSON.stringify({ text: extractedText })
-      });
-      const resumeData = await resumeResp.json();
-      const keyPoints = resumeData.key_points || extractedText.substring(0, 500);
-      // Pass full AI data so parent can display skills, recommendations, etc.
-      onUpload(keyPoints, resumeData);
-
-    } catch (err) {
-      console.error(err);
-      showToast('Upload failed: ' + err.message, 'error');
-    }
-    setUploading(false);
-  };
-
-  return (
-    <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 8 }}>
-      <button
-        className="btn bs"
-        style={{ fontSize: 12, padding: "6px 12px" }}
-        disabled={uploading}
-        onClick={() => ref.current?.click()}
-      >
-        {uploading ? '⏳ Analyzing...' : `📎 ${label || "Upload File"}`}
-      </button>
-      <span style={{ fontSize: 12, color: "var(--tx2)", fontWeight: 600 }}>PDF · TXT · DOC</span>
-      <input ref={ref} type="file" accept=".pdf,.txt,.doc,.docx" style={{ display: "none" }} onChange={handle} />
-    </div>
-  );
-}
-// ── ARCHITECTURE DIAGRAM ──
-function ArchDiagram({ nodes, edges, zoom = 1 }) {
-  const [z, setZ] = useState(zoom);
-  const [pan, setPan] = useState({ x: 0, y: 0 });
-  const dragging = useRef(false);
-  const lastPos = useRef({ x: 0, y: 0 });
-
-  if (!nodes?.length) return null;
-  const maxX = Math.max(...nodes.map(n => n.x)) + 120;
-  const maxY = Math.max(...nodes.map(n => n.y)) + 80;
-
-  return (
-    <div style={{ position: "relative", marginBottom: 12 }}>
-      <div style={{ display: "flex", gap: 4, marginBottom: 6 }}>
-        <button className="btn bs" style={{ padding: "2px 8px", fontSize: 12 }} onClick={() => setZ(p => Math.min(2, p + 0.2))}>+</button>
-        <button className="btn bs" style={{ padding: "2px 8px", fontSize: 12 }} onClick={() => setZ(p => Math.max(0.5, p - 0.2))}>-</button>
-        <button className="btn bs" style={{ padding: "2px 8px", fontSize: 12 }} onClick={() => { setZ(1); setPan({ x: 0, y: 0 }); }}>Reset</button>
-        <span style={{ fontSize: 11, color: "var(--tx2)", marginLeft: 4 }}>{Math.round(z * 100)}%</span>
-      </div>
-      <div style={{ overflow: "hidden", borderRadius: 10, background: "var(--s2)", border: "1px solid var(--bd)", cursor: "grab" }}
-        onMouseDown={e => { dragging.current = true; lastPos.current = { x: e.clientX, y: e.clientY }; }}
-        onMouseMove={e => { if (!dragging.current) return; setPan(p => ({ x: p.x + e.clientX - lastPos.current.x, y: p.y + e.clientY - lastPos.current.y })); lastPos.current = { x: e.clientX, y: e.clientY }; }}
-        onMouseUp={() => { dragging.current = false; }}
-        onMouseLeave={() => { dragging.current = false; }}>
-        <svg viewBox={`0 0 ${maxX} ${maxY}`} style={{ width: "100%", height: 200, transform: `scale(${z}) translate(${pan.x / z}px, ${pan.y / z}px)`, transformOrigin: "center" }}>
-          <defs><marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 Z" fill="#ff5252" /></marker></defs>
-
-          {/* PASS 1: Draw edge lines (connecting nodes) */}
-          {edges?.map((e, i) => {
-            const from = nodes.find(n => n.id === e.f), to = nodes.find(n => n.id === e.t);
-            if (!from || !to) return null;
-            return (
-              <line key={`line-${i}`}
-                x1={from.x + 50} y1={from.y + 25}
-                x2={to.x + 50} y2={to.y + 25}
-                stroke={e.a ? "#ff5252b0" : "#ffffff30"}
-                strokeWidth={e.a ? 2 : 1}
-                markerEnd={e.a ? "url(#ah)" : ""}
-              />
-            );
-          })}
-
-          {/* PASS 2: Draw nodes (boxes with icon and label) */}
-          {nodes.map(n => {
-            const t = NT[n.t] || NT.compute;
-            return <g key={n.id}>
-              <rect x={n.x} y={n.y} width={100} height={50} rx={6} fill={t.bg} stroke={t.bd} strokeWidth={1.5} />
-              <text x={n.x + 50} y={n.y + 20} fill="#fff" fontSize="16" textAnchor="middle">{t.ic}</text>
-              <text x={n.x + 50} y={n.y + 38} fill="#e8eaf6" fontSize="11" fontWeight="600" textAnchor="middle">{n.l}</text>
-            </g>;
-          })}
-
-          {/* PASS 3: Draw edge LABELS LAST — text only with outline, no box */}
-          {edges?.map((e, i) => {
-            const from = nodes.find(n => n.id === e.f), to = nodes.find(n => n.id === e.t);
-            if (!from || !to) return null;
-            const label = e.l || '';
-            if (!label) return null;
-
-            // Node centers
-            const fromCx = from.x + 50;
-            const fromCy = from.y + 25;
-            const toCx = to.x + 50;
-            const toCy = to.y + 25;
-
-            // Midpoint of the connecting line
-            const mx = (fromCx + toCx) / 2;
-            const my = (fromCy + toCy) / 2;
-
-            // Calculate perpendicular offset to push label OFF the line and away from boxes
-            const dx = toCx - fromCx;
-            const dy = toCy - fromCy;
-            const len = Math.sqrt(dx * dx + dy * dy) || 1;
-
-            // Perpendicular unit vector (90° rotation)
-            let perpX = -dy / len;
-            let perpY = dx / len;
-
-            // Always position label "above" the line in screen coordinates
-            if (perpY > 0) {
-              perpX = -perpX;
-              perpY = -perpY;
-            }
-
-            // Offset distance — push label away from line
-            const offsetDistance = 18;
-            const labelX = mx + perpX * offsetDistance;
-            const labelY = my + perpY * offsetDistance;
-
-            return (
-              <text
-                key={`label-${i}`}
-                x={labelX}
-                y={labelY}
-                fill="#ffffff"
-                fontSize="11"
-                fontWeight="700"
-                textAnchor="middle"
-                dominantBaseline="middle"
-                style={{
-                  paintOrder: 'stroke',
-                  stroke: '#0a0e1a',
-                  strokeWidth: '4px',
-                  strokeLinejoin: 'round',
-                  pointerEvents: 'none',
-                  userSelect: 'none'
-                }}
-              >{label}</text>
-            );
-          })}
-        </svg>
-      </div>
-    </div>
-  );
-}
-
-// ── PASSWORD STRENGTH ──
-function PasswordStrength({ password }) {
-  if (!password) return null;
-  const score = (password.length >= 8 ? 1 : 0) + (password.length >= 12 ? 1 : 0) + (/[A-Z]/.test(password) ? 1 : 0) + (/[0-9]/.test(password) ? 1 : 0) + (/[^A-Za-z0-9]/.test(password) ? 1 : 0);
-  const levels = [{ l: "Weak", c: "#ff5252" }, { l: "Fair", c: "#ffab40" }, { l: "Good", c: "#f59e0b" }, { l: "Strong", c: "#22c55e" }, { l: "Very Strong", c: "#00e096" }];
-  const level = levels[Math.min(score - 1, 4)] || levels[0];
-  return (
-    <div style={{ marginBottom: 10 }}>
-      <div className="strength-bar" style={{ width: "100%", background: "var(--s3)" }}>
-        <div className="strength-bar" style={{ width: `${score * 20}%`, background: level.c }} />
-      </div>
-      <div style={{ fontSize: 11, color: level.c, marginTop: 3 }}>{level.l}</div>
-    </div>
-  );
-}
-
-// ── TIME FORMAT ──
-const fmt = s => `${Math.floor(s / 60)}:${(s % 60).toString().padStart(2, "0")}`;
-
-// ── AI AVATAR COMPONENT — Static Avatar with Audio Wave Visualizer ──
-function AIAvatar({ isSpeaking, isMuted, qIndex }) {
-  const isFemale = qIndex % 2 === 0;
-  const accentColor = isFemale ? "#ff6b9d" : "#00e5ff";
-  const name = isFemale ? "ARIA" : "NEXUS";
-
-  return (
-    <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-start", marginBottom: 0 }}>
-      <div style={{ position: "relative", width: 150, height: 170 }}>
-
-        {/* Outer pulse ring when speaking */}
-        {isSpeaking && !isMuted && (
-          <>
-            <div style={{
-              position: "absolute", inset: -10, borderRadius: 16,
-              border: `2px solid ${accentColor}`,
-              animation: "avatarRing 1s ease-in-out infinite",
-              opacity: 0.6, pointerEvents: "none"
-            }} />
-            <div style={{
-              position: "absolute", inset: -20, borderRadius: 20,
-              border: `1px solid ${accentColor}`,
-              animation: "avatarRing 1s ease-in-out infinite 0.3s",
-              opacity: 0.3, pointerEvents: "none"
-            }} />
-          </>
-        )}
-
-        {/* Static Avatar Card */}
-        <div style={{
-          width: 150, height: 170, borderRadius: 12,
-          overflow: "hidden", position: "relative",
-          border: `2px solid ${isSpeaking ? accentColor : "#1e2536"}`,
-          transition: "border-color 0.3s, box-shadow 0.3s",
-          background: `linear-gradient(135deg, ${isFemale ? "rgba(255,107,157,0.08)" : "rgba(0,229,255,0.08)"}, rgba(10,14,26,0.9))`,
-          display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
-          boxShadow: isSpeaking && !isMuted
-            ? `0 0 30px ${isFemale ? "rgba(255,107,157,0.4)" : "rgba(0,229,255,0.4)"}`
-            : "0 4px 20px rgba(0,0,0,0.5)"
-        }}>
-
-          {/* Avatar Icon (static) */}
-          <div style={{
-            fontSize: 50, marginBottom: 6,
-            opacity: isMuted ? 0.3 : 1,
-            filter: isSpeaking && !isMuted ? "none" : "grayscale(0.2)"
-          }}>
-            {isFemale ? "👩‍💼" : "👨‍💼"}
-          </div>
-
-          {/* Name */}
-          <div style={{
-            fontSize: 12, fontWeight: 700, letterSpacing: 1.5,
-            color: isSpeaking && !isMuted ? accentColor : "#8890b0",
-            marginBottom: 8, transition: "color 0.3s"
-          }}>
-            {name}
-          </div>
-
-          {/* Status / Audio Wave */}
-          <div style={{ height: 24, display: "flex", alignItems: "center", justifyContent: "center", gap: 3 }}>
-            {isSpeaking && !isMuted ? (
-              // Active audio waves (larger, more prominent)
-              [1, 2, 3, 4, 5, 6, 7, 8, 9].map(i => (
-                <div key={i} style={{
-                  width: 3, borderRadius: 3,
-                  background: accentColor,
-                  animation: `soundBar${i % 3 + 1} ${0.35 + (i % 4) * 0.08}s ease-in-out infinite alternate`,
-                  height: 14
-                }} />
-              ))
-            ) : (
-              // Idle state
-              <div style={{ fontSize: 11, color: "#5a6380", letterSpacing: 1 }}>
-                {isMuted ? "MUTED" : "READY"}
-              </div>
-            )}
-          </div>
-
-          {/* Dark overlay when muted */}
-          {isMuted && (
-            <div style={{
-              position: "absolute", inset: 0,
-              background: "rgba(0,0,0,0.45)",
-              display: "flex", alignItems: "center", justifyContent: "center",
-              fontSize: 40, pointerEvents: "none"
-            }}>🔇</div>
-          )}
-        </div>
-
-        {/* Muted badge */}
-        {isMuted && (
-          <div style={{
-            position: "absolute", top: -8, right: -8,
-            width: 26, height: 26, borderRadius: "50%",
-            background: "#ff5252", display: "flex",
-            alignItems: "center", justifyContent: "center",
-            fontSize: 12, border: "2px solid #0a0e1a"
-          }}>🔇</div>
-        )}
-      </div>
-    </div>
-  );
-}
-// ── RANDOM PICK ──
-const pick = arr => arr[Math.floor(Math.random() * arr.length)];
 
 // ═══════════════════════════════════════════════════════════════
 // MAIN COMPONENT
@@ -841,7 +137,9 @@ export default function ThreatReady() {
           setViewState(prevView);
           return;
         }
+
       }
+      
     } catch (e) {}
     // Fallback: go to dashboard if logged-in/free-trial, else landing
     const token = localStorage.getItem('token');
@@ -2324,7 +1622,7 @@ export default function ThreatReady() {
     setView("dashboard");
   };
 
-  const HomeBtn = ({ label = "← Home" }) => <button className="home-btn" onClick={goHome}>{label}</button>;
+  
   const doLogout = () => {
     // Mark that user logged out → next login won't auto-load resume/career data
     localStorage.setItem('cyberprep_just_logged_out', 'true');
@@ -2401,293 +1699,63 @@ export default function ThreatReady() {
   // ═══════════════════════════════════════════════════════════
   // PAGE 1: LANDING PAGE (Dynamic Hooks + Random Demo)
   // ═══════════════════════════════════════════════════════════
+  
+  
   if (view === "landing") return (
-    <div className="app"><style>{CSS}</style><div className="scanbar" /><div className="gridbg" />
-      <ToastContainer />
-      <div className="orb" style={{ width: 600, height: 600, background: "radial-gradient(circle,rgba(0,229,255,.15),transparent)", top: -200, right: 0 }} />
-      <div className="orb" style={{ width: 500, height: 500, background: "radial-gradient(circle,rgba(255,61,113,.1),transparent)", bottom: -100, left: 0 }} />
-      <div className="page"><div className="cnt">
-        {/* HERO */}
-        <div className="hero fadeUp">
-          <div className="lbl" style={{ marginBottom: 14 }}>ATTACK REASONING LAB</div>
-          <h1>{hookHeadline}</h1>
-          <p>A real-world cybersecurity assessment platform. Validate security decision-making through adaptive attack simulations. For engineers proving skills and hiring managers validating talent.</p>
-          <div style={{ display: "flex", gap: 10, justifyContent: "center", flexWrap: "wrap", marginTop: 20 }}>
-            <button className="btn bp" onClick={() => {
-              setIsPaid(false);
-              setFreeAttempts(2);
-              setUser(null);
-              setSubscribedRoles([]);
-              setSelectedRoles([]);
-              setTrialRoles([]);
-              localStorage.removeItem('token');
-              localStorage.removeItem('cyberprep_user');
-              localStorage.removeItem('cyberprep_usertype');
-              localStorage.removeItem('cyberprep_freetrial');
-              localStorage.removeItem('trialRoles');
-              localStorage.removeItem('subscribedRoles');
-              localStorage.removeItem('roleAttempts');
-              setView("trial-role-select");
-            }} style={{ fontSize: 18, padding: "18px 48px" }}>Start Free Trial</button>
-            <button className="btn bs" onClick={() => { setAuthMode("login"); setView("auth"); }} style={{ fontSize: 15, padding: "14px 32px" }}>Sign In</button>
-          </div>
-        </div>
-
-        {/* INSTANT DEMO */}
-        <div className="card fadeUp" style={{ marginTop: 36, padding: 28, borderColor: "var(--ac)", background: "rgba(0,229,255,.02)" }}>
-          <div style={{ textAlign: "center", marginBottom: 16 }}>
-            <div className="lbl" style={{ marginBottom: 8 }}>TRY A REAL ATTACK SCENARIO IN 2 MINUTES</div>
-            <div style={{ fontSize: 20, fontWeight: 800 }}>{hookSubline}</div>
-            <div style={{ fontSize: 12, color: "var(--tx2)", marginTop: 4 }}>No signup required. Type or dictate your answer. Instant AI score.</div>
-
-            {/* <div style={{ fontSize: 12, color: "var(--dn)", marginTop: 6, fontWeight: 600 }}>
-              ⚠️ This assessment is evaluated by AI
-            </div> */}
-
-          </div>
-          {!demoScore ? (
-            <div>
-              <div className="tag" style={{ marginBottom: 10 }}>{demoQ.ca}</div>
-              <div style={{ fontSize: 13, fontWeight: 600, lineHeight: 1.6, marginBottom: 14 }}>{demoQ.q}</div>
-              <div style={{ display: "flex", gap: 6, marginBottom: 10 }}>
-                <button className={`btn ${demoInputMode === "text" ? "bp" : "bs"}`} style={{ padding: "4px 12px", fontSize: 12 }} onClick={() => setDemoInputMode("text")}>✏️ Type</button>
-                <button className={`btn ${demoInputMode === "voice" ? "bp" : "bs"}`} style={{ padding: "4px 12px", fontSize: 12 }} onClick={() => setDemoInputMode("voice")}>🎤 Dictate</button>
-              </div>
-              {demoInputMode === "text" ? (
-                <NoPasteInput placeholder="Type your answer here..." value={demoAnswer} onChange={e => setDemoAnswer(e.target.value)} style={{ minHeight: 80, marginBottom: 12, fontSize: 13 }} />
-              ) : (
-                <div style={{ textAlign: "center", marginBottom: 12 }}>
-                  <div className={`rec-ring ${demoVoice.recording ? "active" : ""}`}
-                    onClick={demoVoice.recording ? demoVoice.stop : demoVoice.start}
-                    style={{ margin: "0 auto 8px" }}>{demoVoice.recording ? "⏹" : "🎤"}</div>
-                  <div style={{ fontSize: 12, color: demoVoice.recording ? "var(--dn)" : "var(--tx2)" }}>
-                    {demoVoice.recording ? "Recording... tap to stop" : "Tap to start dictating"}
-                  </div>
-                  {demoVoice.transcript && <div style={{ marginTop: 10, padding: 10, background: "var(--s2)", borderRadius: 8, fontSize: 12, textAlign: "left", lineHeight: 1.6 }}>{demoVoice.transcript}</div>}
-                </div>
-              )}
-              <button className="btn bp" style={{ width: "100%", padding: 11 }}
-                disabled={demoLoading || (!(demoAnswer?.trim()) && !(demoVoice.transcript?.trim()))}
-                onClick={runDemo}>
-                {demoLoading ? <span className="loader" /> : "Get My Score →"}
-              </button>
-            </div>
-          ) : (
-            <div style={{ textAlign: "center" }}>
-              <div className="mono" style={{ fontSize: 48, fontWeight: 700, color: demoScore.score >= 7 ? "var(--ok)" : demoScore.score >= 5 ? "var(--wn)" : "var(--dn)" }}>{demoScore.score}/10</div>
-              <div className="tag" style={{ marginBottom: 8 }}>{demoScore.level}</div>
-              <div style={{ fontSize: 12, color: "var(--tx2)", marginBottom: 14 }}>{demoScore.feedback}</div>
-              <div style={{ fontSize: 13, color: "var(--tx2)", marginBottom: 12 }}>Your full Skills Score (0-500) + benchmarking + role readiness badges require a free account.</div>
-              <button className="btn bp" onClick={() => { setAuthMode("signup"); setView("auth"); }} style={{ padding: "10px 28px" }}>Create Free Account →</button>
-            </div>
-          )}
-        </div>
-
-        {/* BUSINESS VALUE */}
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 14, marginTop: 28, textAlign: "center" }}>
-          {[
-            ["🎯 Replace 2-3 Interview Rounds", "Pre-validate attack reasoning. Companies save 20+ hours per hire."],
-            ["🏗️ Real Architecture Reasoning", "Not theory. Not certifications. Real attack scenarios with real architectures."],
-            ["📊 Team Skill Visibility", "CISOs see team gaps across security domains. Measurable improvement."]
-          ].map(([t, d], i) => (
-            <div key={i} className="card fadeUp" style={{ padding: 18, animationDelay: `${i * .05}s` }}>
-              <div style={{ fontSize: 14, fontWeight: 700, color: "var(--ac)", marginBottom: 8 }}>{t}</div>
-              <div style={{ fontSize: 13, color: "var(--tx2)", lineHeight: 1.6 }}>{d}</div>
-            </div>
-          ))}
-        </div>
-
-        {/* TRUST SIGNALS */}
-        <div style={{ textAlign: "center", marginTop: 28 }}>
-          <div className="mono" style={{ fontSize: 13, color: "var(--tx2)", letterSpacing: 2, fontWeight: 600 }}>TRUSTED BY 500+ SECURITY ENGINEERS</div>
-          <div style={{ display: "flex", justifyContent: "center", gap: 16, marginTop: 10, fontSize: 13, color: "var(--tx2)", flexWrap: "wrap", fontWeight: 500 }}>
-            <span>Based on real CVEs</span><span>·</span>
-            <span>MITRE ATT&CK mapped</span><span>·</span>
-            <span>AI-powered evaluation</span><span>·</span>
-            <span>Designed by security engineers</span>
-          </div>
-        </div>
-
-        {/* ROLE GRID */}
-        <div style={{ marginTop: 36 }}>
-          <div className="lbl" style={{ textAlign: "center", marginBottom: 16 }}>12 SECURITY TRACKS · 4 DIFFICULTY LEVELS · ADAPTIVE AI</div>
-          <div className="rgrid">
-            {ROLES.map((r, i) => (
-              <div key={r.id} className="card card-glow fadeUp" style={{ animationDelay: `${i * .04}s`, textAlign: "center", padding: 16 }}>
-                <div style={{ fontSize: 28, marginBottom: 6 }}>{r.icon}</div>
-                <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 3 }}>{r.name}</div>
-                <div style={{ fontSize: 13, color: "var(--tx2)", lineHeight: 1.5, fontWeight: 500 }}>{r.desc}</div>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* STATS */}
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 10, marginTop: 28 }}>
-          {[["12", "Roles"], ["4", "Difficulty Levels"], ["0-500", "Skills Score"], ["AI", "Adaptive Questions"]].map(([v, l], i) => (
-            <div key={i} className="statbox fadeUp" style={{ animationDelay: `${i * .06}s` }}>
-              <div className="statval" style={{ color: "var(--ac)" }}>{v}</div>
-              <div className="statlbl">{l}</div>
-            </div>
-          ))}
-        </div>
-      </div></div>
-    </div>
+    <LandingView
+      hookHeadline={hookHeadline}
+      hookSubline={hookSubline}
+      demoQ={demoQ}
+      demoAnswer={demoAnswer}
+      demoScore={demoScore}
+      demoLoading={demoLoading}
+      demoInputMode={demoInputMode}
+      demoVoice={demoVoice}
+      setDemoAnswer={setDemoAnswer}
+      setDemoInputMode={setDemoInputMode}
+      setView={setView}
+      setAuthMode={setAuthMode}
+      setIsPaid={setIsPaid}
+      setFreeAttempts={setFreeAttempts}
+      setUser={setUser}
+      setSubscribedRoles={setSubscribedRoles}
+      setSelectedRoles={setSelectedRoles}
+      setTrialRoles={setTrialRoles}
+      runDemo={runDemo}
+    />
   );
 
   // ═══════════════════════════════════════════════════════════
   // PAGE: TRIAL ROLE SELECT (Free Trial Entry — Pick exactly 2 roles)
   // ═══════════════════════════════════════════════════════════
+  
   if (view === "trial-role-select") return (
-    <div className="app"><style>{CSS}</style><div className="scanbar" /><div className="gridbg" />
-      <ToastContainer />
-      <button className="home-btn" onClick={goBack}>← Back</button>
-      <div className="page"><div className="cnt" style={{ paddingTop: 60 }}>
-        <div style={{ textAlign: "center", marginBottom: 28 }} className="fadeUp">
-          <div className="lbl" style={{ marginBottom: 10 }}>FREE TRIAL</div>
-          <h2 style={{ fontSize: 26, fontWeight: 800 }}>Select 1 or 2 Roles to Try</h2>
-          <p style={{ fontSize: 13, color: "var(--tx2)", marginTop: 8, lineHeight: 1.7, maxWidth: 500, margin: "8px auto 0" }}>
-            Pick 1 or 2 security roles. You'll get 2 beginner-level interview attempts — no credit card needed.
-          </p>
-          <div style={{ background: "rgba(0,229,255,.06)", border: "1px solid rgba(0,229,255,.2)", borderRadius: 10, padding: "10px 16px", marginTop: 14, fontSize: 13, color: "var(--ac)", display: "inline-block" }}>
-            🎯 Beginner difficulty only &nbsp;·&nbsp; 2 total attempts &nbsp;·&nbsp; No signup to start
-          </div>
-        </div>
-
-        <div className="rgrid">
-          {ROLES.map((r, i) => {
-            const sel = trialRoles.includes(r.id);
-            const disabled = !sel && trialRoles.length >= 2;
-            return (
-              <div key={r.id} className={`sub-card fadeUp ${sel ? "sel" : ""}`}
-                style={{
-                  animationDelay: `${i * .04}s`,
-                  borderColor: sel ? r.color : undefined,
-                  opacity: disabled ? 0.3 : 1,
-                  cursor: disabled ? "not-allowed" : "pointer",
-                  pointerEvents: disabled ? "none" : "auto"
-                }}
-                onClick={() => setTrialRoles(p => sel ? p.filter(x => x !== r.id) : [...p, r.id])}>
-                {sel && <div style={{ position: "absolute", top: 10, right: 10, width: 22, height: 22, borderRadius: "50%", background: r.color, color: "#000", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12, fontWeight: 700 }}>✓</div>}
-                <div style={{ fontSize: 32, marginBottom: 8 }}>{r.icon}</div>
-                <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 3 }}>{r.name}</div>
-                <div style={{ fontSize: 13, color: "var(--tx2)", lineHeight: 1.5, marginBottom: 10, fontWeight: 500 }}>{r.desc}</div>
-                <div className="tag" style={{ fontSize: 11 }}>Beginner Free</div>
-              </div>
-            );
-          })}
-        </div>
-
-        <div style={{ marginTop: 16, textAlign: "center" }}>
-          {trialRoles.length >= 1 && (
-            <div className="card fadeUp" style={{ padding: 24, borderColor: "var(--ac)", maxWidth: 480, margin: "0 auto" }}>
-              <div style={{ display: "flex", justifyContent: "center", gap: 10, flexWrap: "wrap", marginBottom: 16 }}>
-                {trialRoles.map(rid => {
-                  const role = ROLES.find(r => r.id === rid);
-                  return (
-                    <div key={rid} style={{ display: "flex", alignItems: "center", gap: 6, padding: "6px 14px", background: "rgba(0,229,255,.06)", borderRadius: 20, border: "1px solid rgba(0,229,255,.2)" }}>
-                      <span>{role?.icon}</span>
-                      <span style={{ fontSize: 12, fontWeight: 700, color: "var(--ac)" }}>{role?.name}</span>
-                    </div>
-                  );
-                })}
-              </div>
-              <div style={{ fontSize: 13, color: "var(--tx2)", marginBottom: 16 }}>
-                {trialRoles.length} role{trialRoles.length > 1 ? "s" : ""} selected · Beginner difficulty · 2 total attempts
-              </div>
-              <button className="btn bp" style={{ width: "100%", padding: "14px 0", fontSize: 15 }}
-                onClick={() => {
-                  const init = {};
-                  trialRoles.forEach(rid => { init[rid] = 0; });
-                  setRoleAttempts(init);
-                  setSubscribedRoles(trialRoles);
-                  setIsPaid(false);
-                  localStorage.setItem('subscribedRoles', JSON.stringify(trialRoles));
-                  localStorage.setItem('trialRoles', JSON.stringify(trialRoles));
-                  localStorage.setItem('roleAttempts', JSON.stringify(init));
-                  localStorage.setItem('cyberprep_freetrial', 'true');
-                  localStorage.setItem('cyberprep_usertype', 'b2c');
-                  localStorage.setItem('cyberprep_session_start', Date.now().toString());
-                  // CRITICAL: Clear any leftover isPaid flag from previous sessions
-                  localStorage.removeItem('isPaid');
-                  setView("dashboard");
-                  setDashTab("home");
-                  showToast("Free trial started! 2 total attempts on Beginner only.", "success");
-                }}>
-                Start Free Trial →
-              </button>
-            </div>
-          )}
-        </div>
-      </div></div>
-    </div>
+    <TrialRoleSelectView
+      trialRoles={trialRoles}
+      setTrialRoles={setTrialRoles}
+      setRoleAttempts={setRoleAttempts}
+      setSubscribedRoles={setSubscribedRoles}
+      setIsPaid={setIsPaid}
+      setView={setView}
+      setDashTab={setDashTab}
+      goBack={goBack}
+    />
   );
+
 
   // ═══════════════════════════════════════════════════════════
   // PAGE: TRIAL COMPLETE (Shown after 2 trial attempts are used)
   // ═══════════════════════════════════════════════════════════
+  
   if (view === "trial-complete") return (
-    <div className="app"><style>{CSS}</style><div className="scanbar" /><div className="gridbg" />
-      <ToastContainer />
-      <div className="page" style={{ display: "flex", alignItems: "center", justifyContent: "center", minHeight: "100vh" }}>
-        <div className="card fadeUp" style={{ maxWidth: 520, width: "90%", padding: 40, textAlign: "center", borderColor: "var(--ac)" }}>
-          <div style={{ fontSize: 64, marginBottom: 12 }}>🎉</div>
-          <div className="lbl" style={{ marginBottom: 8, color: "var(--ok)" }}>FREE TRIAL COMPLETE</div>
-          <h2 style={{ fontSize: 24, fontWeight: 800, marginBottom: 10 }}>You've Used All Your Free Attempts</h2>
-          <p style={{ fontSize: 12, color: "var(--tx2)", marginBottom: 16 }}>
-            Sign up and subscribe to any roles you want — pick as many as you need.
-          </p>
-
-          {results && (
-            <div style={{ background: "var(--s2)", borderRadius: 12, padding: 16, marginBottom: 20 }}>
-              <div style={{ fontSize: 13, color: "var(--tx2)", marginBottom: 4 }}>Last Assessment Score</div>
-              <div className="mono" style={{ fontSize: 44, fontWeight: 700, color: results.overall_score >= 7 ? "var(--ok)" : results.overall_score >= 5 ? "var(--wn)" : "var(--dn)" }}>
-                {results.overall_score}<span style={{ fontSize: 18, color: "var(--tx2)" }}>/10</span>
-              </div>
-              <div style={{ fontSize: 13, color: "var(--tx2)", marginTop: 4 }}>
-                {results.badge} · {ROLES.find(r => r.id === activeRole)?.name || activeRole}
-              </div>
-            </div>
-          )}
-
-          <p style={{ fontSize: 13, color: "var(--tx2)", lineHeight: 1.7, marginBottom: 24 }}>
-            Subscribe to unlock <strong style={{ color: "var(--tx1)" }}>all 4 difficulty levels</strong> — Beginner, Intermediate, Advanced, Expert — for every role, with unlimited attempts and full performance tracking.
-          </p>
-
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(2,1fr)", gap: 8, marginBottom: 24, textAlign: "left" }}>
-            {[
-              ["🔓", "All 4 difficulty levels"],
-              ["♾️", "Unlimited attempts"],
-              ["📊", "Full score history"],
-              ["🏅", "Verified badges"]
-            ].map(([icon, text], i) => (
-              <div key={i} style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 12px", background: "var(--s2)", borderRadius: 8 }}>
-                <span style={{ fontSize: 16 }}>{icon}</span>
-                <span style={{ fontSize: 13, fontWeight: 600 }}>{text}</span>
-              </div>
-            ))}
-          </div>
-
-          <button className="btn bp" style={{ width: "100%", padding: 16, fontSize: 15, marginBottom: 10 }}
-            onClick={() => {
-              if (user) {
-                setDashTab("billing");
-                setView("dashboard");
-              } else {
-                setAuthMode("signup");
-                setView("auth");
-              }
-            }}>
-            {user ? "Go to Subscription →" : "Create Account & Subscribe →"}
-          </button>
-
-          <button className="btn bs" style={{ width: "100%", padding: 12, fontSize: 12 }}
-            onClick={() => setView("dashboard")}>
-            Back to Home
-          </button>
-        </div>
-      </div>
-    </div>
+    <TrialCompleteView
+      results={results}
+      activeRole={activeRole}
+      user={user}
+      setView={setView}
+      setDashTab={setDashTab}
+      setAuthMode={setAuthMode}
+    />
   );
 
   // ═══════════════════════════════════════════════════════════
@@ -3163,78 +2231,20 @@ export default function ThreatReady() {
   // ═══════════════════════════════════════════════════════════
   // DIFFICULTY SELECTION
   // ═══════════════════════════════════════════════════════════
-  if (view === "difficulty") {
-    const role = ROLES.find(r => r.id === activeRole);
-    return (
-      <div className="app"><style>{CSS}</style><div className="scanbar" /><div className="gridbg" />
-        <HomeBtn />
-        <div className="page"><div className="cnt" style={{ paddingTop: 48 }}>
-          <div className="fadeUp" style={{ textAlign: "center", marginBottom: 28 }}>
-            <span style={{ fontSize: 48 }}>{role?.icon}</span>
-            <h2 style={{ fontSize: 24, fontWeight: 800, marginTop: 8 }}>{role?.name}</h2>
-            <p style={{ fontSize: 12, color: "var(--tx2)", marginTop: 4 }}>Select difficulty level</p>
-            {!isPaid && (
-              <div style={{ fontSize: 13, color: "var(--wn)", marginTop: 8 }}>
-                ⚠️ Free trial: {getRemainingAttempts(activeRole)} attempt{getRemainingAttempts(activeRole) !== 1 ? "s" : ""} remaining for {ROLES.find(r => r.id === activeRole)?.name} (Beginner only)
-              </div>
-            )}
-          </div>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(2,1fr)", gap: 14 }}>
-            {DIFFICULTIES.map((d, i) => {
-              // In free trial: ONLY beginner unlocked. Paid: all levels unlocked
-              const locked = !isPaid && d.id !== "beginner";
-              const trialExhausted = !isPaid && d.id === "beginner" && getRemainingAttempts(activeRole) === 0;
-              const disabled = locked || trialExhausted;
-              return (
-                <div key={d.id} className={`card fadeUp ${disabled ? "" : "card-glow"}`}
-                  style={{ padding: 20, textAlign: "center", animationDelay: `${i * .08}s`, opacity: disabled ? 0.6 : 1, cursor: locked ? "default" : (disabled ? "not-allowed" : "pointer"), borderColor: disabled ? "var(--bd)" : d.color + "40" }}
-                  onClick={() => {
-                    if (locked) return; // button inside handles this
-                    if (trialExhausted) { setView("trial-complete"); return; }
-                    const scs = SCENARIOS[activeRole];
-                    if (scs?.length) startScenario(scs[Math.floor(Math.random() * scs.length)], d.id);
-                  }}>
-                  <div style={{ fontSize: 32, marginBottom: 8 }}>{d.icon}</div>
-                  <div style={{ fontSize: 15, fontWeight: 700, color: d.color, marginBottom: 4 }}>{d.name}</div>
-                  <div style={{ fontSize: 12, color: "var(--tx2)", marginBottom: 8 }}>{d.questions} adaptive questions · {d.time}</div>
-                  <div style={{ fontSize: 11, color: "var(--tx2)" }}>
-                    Hints: {d.hints === true ? "Full" : d.hints === "reduced" ? "Reduced" : d.hints === "minimal" ? "Minimal" : "None"}
-                  </div>
-                  {locked && (
-                    <button
-                      className="btn bp"
-                      style={{ marginTop: 12, padding: "8px 18px", fontSize: 13, cursor: "pointer" }}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        if (!user) {
-                          // Save current view so Back button on auth page returns here
-                          localStorage.setItem('cyberprep_prev_view', 'difficulty');
-                          // Free trial guest → send to signup
-                          setAuthMode("signup");
-                          setView("auth");
-                          showToast("Create an account to subscribe", "info");
-                        } else {
-                          // Logged in but not paid → send to Billing tab
-                          setView("dashboard");
-                          setDashTab("billing");
-                        }
-                      }}>
-                      🔒 Subscribe to Unlock
-                    </button>
-                  )}
-                  {trialExhausted && <div style={{ fontSize: 12, color: "var(--dn)", marginTop: 8 }}>⚠️ No attempts left — subscribe</div>}
-                  {!locked && !trialExhausted && !isPaid && <div style={{ fontSize: 12, color: "var(--ok)", marginTop: 8 }}>🆓 {getRemainingAttempts(activeRole)} free attempt{getRemainingAttempts(activeRole) !== 1 ? "s" : ""} left</div>}
-                  {!locked && !trialExhausted && isPaid && <div style={{ fontSize: 12, color: "var(--ok)", marginTop: 8 }}>🔓 Unlocked</div>}
-                </div>
-              );
-            })}
-          </div>
-        </div></div>
-      </div>
-    );
-  }
-
-
+ 
+  if (view === "difficulty") return (
+    <DifficultyView
+      activeRole={activeRole}
+      isPaid={isPaid}
+      user={user}
+      setView={setView}
+      setDashTab={setDashTab}
+      setAuthMode={setAuthMode}
+      goHome={goHome}
+      getRemainingAttempts={getRemainingAttempts}
+      startScenario={startScenario}
+    />
+  );
 
   // ═══════════════════════════════════════════════════════════
   // PAGE 3: SCENARIO INTERFACE (Adaptive + Anti-Gaming)
@@ -3587,71 +2597,22 @@ export default function ThreatReady() {
   // ═══════════════════════════════════════════════════════════
   // ROLE SELECTION (Pricing)
   // ═══════════════════════════════════════════════════════════
+  
   if (view === "roles") return (
-    <div className="app"><style>{CSS}</style><div className="scanbar" /><div className="gridbg" />
-      <HomeBtn />
-      <div className="page"><div className="cnt" style={{ paddingTop: 48 }}>
-        <div style={{ textAlign: "center", marginBottom: 28 }} className="fadeUp">
-          <div className="lbl" style={{ marginBottom: 10 }}>CHOOSE YOUR TRACKS</div>
-          <h2 style={{ fontSize: 26, fontWeight: 800 }}>Select Security Roles</h2>
-          <p style={{ fontSize: 13, color: "var(--tx2)", marginTop: 6 }}>
-            {isPaid ? "2 roles = 18% off · 3+ roles = 30% off" : "Free trial · Select up to 2 roles"}
-          </p>
-          {!isPaid && (
-            <div style={{ background: "rgba(0,229,255,.06)", border: "1px solid rgba(0,229,255,.2)", borderRadius: 10, padding: "10px 16px", marginTop: 12, fontSize: 13, color: "var(--ac)" }}>
-              🎯 Free Trial — Select up to 2 roles · Beginner difficulty only · 2 attempts total
-            </div>
-          )}
-        </div>
-        <div className="rgrid">
-          {ROLES.map((r, i) => {
-            const sel = selectedRoles.includes(r.id);
-            return (
-              <div key={r.id} className={`sub-card fadeUp ${sel ? "sel" : ""}`}
-                style={{
-                  animationDelay: `${i * .04}s`,
-                  borderColor: sel ? r.color : undefined,
-                  opacity: 1,
-                  cursor: "pointer",
-                  pointerEvents: "auto"
-                }}
-                onClick={() => toggleRole(r.id)}>
-
-                {sel && <div style={{ position: "absolute", top: 10, right: 10, width: 22, height: 22, borderRadius: "50%", background: "var(--ac)", color: "#000", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12, fontWeight: 700 }}>✓</div>}
-                <div style={{ fontSize: 32, marginBottom: 8 }}>{r.icon}</div>
-                <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 3 }}>{r.name}</div>
-                <div style={{ fontSize: 13, color: "var(--tx2)", lineHeight: 1.5, marginBottom: 10, fontWeight: 500 }}>{r.desc}</div>
-                <div className="mono" style={{ fontSize: 16, fontWeight: 700, color: sel ? r.color : "var(--tx2)" }}>₹{r.price}<span style={{ fontSize: 11, fontWeight: 400 }}>/mo</span></div>
-              </div>
-            );
-          })}
-        </div>
-        {selectedRoles.length > 0 && (
-          <div className="card fadeUp" style={{ marginTop: 20, padding: 20, textAlign: "center", borderColor: "var(--ac)" }}>
-            <div style={{ display: "flex", justifyContent: "center", alignItems: "center", gap: 20, flexWrap: "wrap" }}>
-              <span style={{ fontSize: 13, color: "var(--tx2)" }}>{selectedRoles.length} role{selectedRoles.length > 1 ? "s" : ""}</span>
-              {getDiscount() > 0 && <span className="tag" style={{ background: "rgba(0,224,150,.1)", color: "var(--ok)", borderColor: "rgba(0,224,150,.2)" }}>{getDiscount()}% OFF</span>}
-              <span className="mono" style={{ fontSize: 24, fontWeight: 700, color: "var(--ac)" }}>₹{getPrice()}<span style={{ fontSize: 13, fontWeight: 400, color: "var(--tx2)" }}>/mo</span></span>
-
-              <button className="btn bp" onClick={() => {
-                if (!isPaid && selectedRoles.length > 0) {
-                  // Free trial - no payment needed
-                  setSubscribedRoles(selectedRoles);
-                  setFreeAttempts(2);
-                  setView("dashboard");
-                } else {
-                  subscribe();
-                }
-              }} style={{ padding: "10px 28px" }}>
-                {isPaid ? "Subscribe →" : "Start Free Trial →"}
-              </button>
-
-            </div>
-          </div>
-        )}
-      </div></div>
-    </div>
+    <RolesView
+      isPaid={isPaid}
+      selectedRoles={selectedRoles}
+      setSubscribedRoles={setSubscribedRoles}
+      setFreeAttempts={setFreeAttempts}
+      setView={setView}
+      goHome={goHome}
+      toggleRole={toggleRole}
+      getDiscount={getDiscount}
+      getPrice={getPrice}
+      subscribe={subscribe}
+    />
   );
+
   // ═══════════════════════════════════════════════════════════
   // PAGE 5: B2C ENGINEER DASHBOARD (C1-C8 via tabs)
   // ═══════════════════════════════════════════════════════════
