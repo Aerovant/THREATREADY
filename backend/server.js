@@ -203,7 +203,7 @@ const razorpay = new Razorpay({
 });
 
 const calculatePrice = (roleCount, billingPeriod = 'monthly') => {
-  const base = roleCount * 1;
+  const base = roleCount * 1;  // TEST MODE — change to 399 when going live
   let discounted;
   if (roleCount >= 3) discounted = Math.round(base * 0.7);
   else if (roleCount >= 2) discounted = Math.round(base * 0.82);
