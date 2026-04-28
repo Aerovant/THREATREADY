@@ -772,24 +772,35 @@ export default function ThreatReady() {
     const savedUser = localStorage.getItem('cyberprep_user');
     const savedUserType = localStorage.getItem('cyberprep_usertype');
     const isFreeTrial = localStorage.getItem('cyberprep_freetrial') === 'true';
+    const savedView = localStorage.getItem('cyberprep_view');
 
-    if (token && savedUser) {
-      const savedView = localStorage.getItem('cyberprep_view');
-      if (savedView && !['interview', 'results', 'auth', 'landing'].includes(savedView)) {
-        return savedView;
+    // ── UNIVERSAL REFRESH BEHAVIOR ──
+    // If a saved view exists and is restorable, ALWAYS restore it.
+    // Only interview/results can't be restored (they need scenario state).
+    // This means refresh stays on the same page — landing, auth, trial-role-select,
+    // dashboard, b2b-dashboard, etc. — without ever bouncing the user elsewhere.
+    if (savedView && !['interview', 'results'].includes(savedView)) {
+      // Check that the view is appropriate for the current auth state
+      // (e.g., logged-out users should not land on dashboard)
+      if (token && savedUser) {
+        // Logged-in: any view except 'landing' (logged-in users skip landing)
+        if (savedView !== 'landing') return savedView;
+      } else if (isFreeTrial) {
+        // Free trial: any view except 'landing'
+        if (savedView !== 'landing') return savedView;
+      } else {
+        // Not logged in, no trial: allow landing, auth, trial-role-select, candidate-assess
+        if (['landing', 'auth', 'trial-role-select', 'candidate-assess'].includes(savedView)) {
+          return savedView;
+        }
       }
+    }
+
+    // ── FALLBACK based on auth state ──
+    if (token && savedUser) {
       return savedUserType === 'b2b' ? 'b2b-dashboard' : 'dashboard';
     }
-
-    // Free trial user — no token but has trial flag
-    if (isFreeTrial) {
-      const savedView = localStorage.getItem('cyberprep_view');
-      if (savedView && !['interview', 'results', 'auth', 'landing'].includes(savedView)) {
-        return savedView;
-      }
-      return 'dashboard';
-    }
-
+    if (isFreeTrial) return 'dashboard';
     return 'landing';
   });
 
@@ -798,7 +809,52 @@ export default function ThreatReady() {
     if (!['interview', 'results'].includes(newView)) {
       localStorage.setItem('cyberprep_view', newView);
     }
-    setViewState(newView);
+    // Track navigation history for proper back button behavior
+    setViewState(prevView => {
+      if (prevView && prevView !== newView && !['interview', 'results'].includes(prevView)) {
+        try {
+          const histRaw = localStorage.getItem('cyberprep_nav_history');
+          const hist = histRaw ? JSON.parse(histRaw) : [];
+          // Avoid pushing duplicate consecutive entries
+          if (hist[hist.length - 1] !== prevView) {
+            hist.push(prevView);
+            // Cap history to last 20 entries
+            if (hist.length > 20) hist.shift();
+            localStorage.setItem('cyberprep_nav_history', JSON.stringify(hist));
+          }
+        } catch (e) {}
+      }
+      return newView;
+    });
+  };
+
+  // Universal "back" — pops navigation history; falls back to dashboard or landing
+  const goBack = () => {
+    try {
+      const histRaw = localStorage.getItem('cyberprep_nav_history');
+      const hist = histRaw ? JSON.parse(histRaw) : [];
+      if (hist.length > 0) {
+        const prevView = hist.pop();
+        localStorage.setItem('cyberprep_nav_history', JSON.stringify(hist));
+        if (prevView && !['interview', 'results'].includes(prevView)) {
+          localStorage.setItem('cyberprep_view', prevView);
+          setViewState(prevView);
+          return;
+        }
+      }
+    } catch (e) {}
+    // Fallback: go to dashboard if logged-in/free-trial, else landing
+    const token = localStorage.getItem('token');
+    const isFreeTrial = localStorage.getItem('cyberprep_freetrial') === 'true';
+    const userType = localStorage.getItem('cyberprep_usertype');
+    if (token || isFreeTrial) {
+      const fallback = userType === 'b2b' ? 'b2b-dashboard' : 'dashboard';
+      localStorage.setItem('cyberprep_view', fallback);
+      setViewState(fallback);
+    } else {
+      localStorage.setItem('cyberprep_view', 'landing');
+      setViewState('landing');
+    }
   };
 
 
@@ -2278,6 +2334,7 @@ export default function ThreatReady() {
     localStorage.removeItem('cyberprep_view');
     localStorage.removeItem('cyberprep_tab');
     localStorage.removeItem('cyberprep_b2btab');
+    localStorage.removeItem('cyberprep_nav_history');  // Clear nav history on logout
     localStorage.removeItem('subscribedRoles');
     localStorage.removeItem('freeAttempts');
     localStorage.removeItem('roleAttempts');
@@ -2298,6 +2355,10 @@ export default function ThreatReady() {
     setIsPaid(false); setFreeAttempts(2); setRoleAttempts({});
     setSubscribedRoles([]); setTrialRoles([]);
     setIsHrPaid(false);
+    // Clear all login form fields so next user doesn't see previous credentials
+    setAuthEmail(''); setAuthPassword(''); setAuthName('');
+    setAuthError(''); setOtpCode(''); setOtpError('');
+    setAuthMode('login'); setAuthStep('form');
     setView("landing");
   };
   const logout = () => showConfirm('Are you sure you want to logout?', doLogout);
@@ -2480,7 +2541,7 @@ export default function ThreatReady() {
   if (view === "trial-role-select") return (
     <div className="app"><style>{CSS}</style><div className="scanbar" /><div className="gridbg" />
       <ToastContainer />
-      <button className="home-btn" onClick={() => setView("landing")}>← Back</button>
+      <button className="home-btn" onClick={goBack}>← Back</button>
       <div className="page"><div className="cnt" style={{ paddingTop: 60 }}>
         <div style={{ textAlign: "center", marginBottom: 28 }} className="fadeUp">
           <div className="lbl" style={{ marginBottom: 10 }}>FREE TRIAL</div>
@@ -2636,22 +2697,10 @@ export default function ThreatReady() {
     <div className="app"><style>{CSS}</style><div className="scanbar" /><div className="gridbg" />
       <ToastContainer />
       <button className="home-btn" onClick={() => {
-        // Go back to previous view (e.g., if came from difficulty page, return there)
-        const prevView = localStorage.getItem('cyberprep_prev_view');
-        const isFreeTrialUser = localStorage.getItem('cyberprep_freetrial') === 'true';
-
         setAuthStep("form");
         setAuthError("");
-
-        if (prevView && prevView !== 'auth') {
-          // Return to whatever page user came from (e.g., difficulty)
-          setView(prevView);
-          localStorage.removeItem('cyberprep_prev_view');
-        } else if (isFreeTrialUser) {
-          setView("dashboard");
-        } else {
-          setView("landing");
-        }
+        // Use universal goBack which respects navigation history
+        goBack();
       }}>← Back</button>
       <div className="page" style={{ display: "flex", alignItems: "center", justifyContent: "center", minHeight: "100vh" }}>
         <div className="card fadeUp" style={{ width: "100%", maxWidth: 420, padding: 36 }}>
@@ -3881,50 +3930,71 @@ export default function ThreatReady() {
 
             {!isPaid && <button className="btn bp" style={{ width: "100%", marginTop: 12, padding: 12 }} onClick={() => { setDashTab("billing"); localStorage.setItem('cyberprep_tab', 'billing'); }}>+ Add More Tracks</button>}
 
-            {/* Leaderboard Preview */}
-            <div className="card fadeUp" style={{ marginTop: 16, padding: 16 }}>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
-                <div className="lbl">WEEKLY LEADERBOARD</div>
-                {myRank && <span style={{ fontSize: 12, color: "var(--ac)" }}>Your rank: #{myRank}</span>}
-              </div>
-              {leaderboard.length === 0 ? (
-                <div style={{ fontSize: 13, color: "var(--tx2)", textAlign: "center", padding: 12 }}>
-                  Complete assessments this week to appear on the leaderboard!
+            {/* Leaderboard Preview — only for PAID users */}
+            {isPaid ? (
+              <div className="card fadeUp" style={{ marginTop: 16, padding: 16 }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
+                  <div className="lbl">WEEKLY LEADERBOARD</div>
+                  {myRank && <span style={{ fontSize: 12, color: "var(--ac)" }}>Your rank: #{myRank}</span>}
                 </div>
-              ) : (
-                leaderboard.slice(0, 5).map((p, i) => (
-                  <div key={p.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 0", borderBottom: i < leaderboard.slice(0, 5).length - 1 ? "1px solid var(--bd)" : "none" }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                      <span className="mono" style={{
-                        fontSize: 12, fontWeight: 700,
-                        color: i === 0 ? "#f59e0b" : i === 1 ? "#94a3b8" : i === 2 ? "#b45309" : "var(--tx2)"
-                      }}>
-                        {i === 0 ? "🥇" : i === 1 ? "🥈" : i === 2 ? "🥉" : `#${i + 1}`}
-                      </span>
-                      <span style={{ fontSize: 12, color: p.id === user?.id ? "var(--ac)" : "var(--tx1)", fontWeight: p.id === user?.id ? 700 : 400 }}>
-                        {p.id === user?.id ? "You" : p.name || "Anonymous"}
-                      </span>
-                      {p.badge && <span style={{ fontSize: 11, color: "var(--wn)" }}>{p.badge}</span>}
-                    </div>
-                    <div style={{ textAlign: "right" }}>
-                      {(() => {
-                        const score = p.best_score ?? p.avg_score ?? p.score;
-                        const numScore = parseFloat(score);
-                        const isValid = score != null && !isNaN(numScore);
-                        return (
-                          <>
-                            <span className="mono" style={{ fontSize: 13, fontWeight: 700, color: isValid && numScore >= 7 ? "var(--ok)" : "var(--wn)" }}>
-                              {isValid ? numScore.toFixed(1) : "—"}
-                            </span>
-                            <span style={{ fontSize: 11, color: "var(--tx2)" }}>/10</span>
-                          </>
-                        );
-                      })()}
-                    </div>
+                {leaderboard.length === 0 ? (
+                  <div style={{ fontSize: 13, color: "var(--tx2)", textAlign: "center", padding: 12 }}>
+                    Complete assessments this week to appear on the leaderboard!
                   </div>
-                ))
-              )}
-            </div>
+                ) : (
+                  leaderboard.slice(0, 5).map((p, i) => (
+                    <div key={p.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 0", borderBottom: i < leaderboard.slice(0, 5).length - 1 ? "1px solid var(--bd)" : "none" }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                        <span className="mono" style={{
+                          fontSize: 12, fontWeight: 700,
+                          color: i === 0 ? "#f59e0b" : i === 1 ? "#94a3b8" : i === 2 ? "#b45309" : "var(--tx2)"
+                        }}>
+                          {i === 0 ? "🥇" : i === 1 ? "🥈" : i === 2 ? "🥉" : `#${i + 1}`}
+                        </span>
+                        <span style={{ fontSize: 12, color: p.id === user?.id ? "var(--ac)" : "var(--tx1)", fontWeight: p.id === user?.id ? 700 : 400 }}>
+                          {p.id === user?.id ? "You" : p.name || "Anonymous"}
+                        </span>
+                        {p.badge && <span style={{ fontSize: 11, color: "var(--wn)" }}>{p.badge}</span>}
+                      </div>
+                      <div style={{ textAlign: "right" }}>
+                        {(() => {
+                          const score = p.best_score ?? p.avg_score ?? p.score;
+                          const numScore = parseFloat(score);
+                          const isValid = score != null && !isNaN(numScore);
+                          return (
+                            <>
+                              <span className="mono" style={{ fontSize: 13, fontWeight: 700, color: isValid && numScore >= 7 ? "var(--ok)" : "var(--wn)" }}>
+                                {isValid ? numScore.toFixed(1) : "—"}
+                              </span>
+                              <span style={{ fontSize: 11, color: "var(--tx2)" }}>/10</span>
+                            </>
+                          );
+                        })()}
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            ) : (
+              /* Locked leaderboard teaser for free trial users */
+              <div className="card fadeUp" style={{ marginTop: 16, padding: 20, textAlign: "center", border: "1px dashed var(--bd)" }}>
+                <div style={{ fontSize: 28, marginBottom: 6 }}>🔒</div>
+                <div className="lbl" style={{ marginBottom: 6 }}>WEEKLY LEADERBOARD</div>
+                <div style={{ fontSize: 13, color: "var(--tx2)", marginBottom: 12, lineHeight: 1.5 }}>
+                  Compete with other security professionals and climb the rankings.<br/>
+                  Subscribe to unlock leaderboard access.
+                </div>
+                <button className="btn bp" style={{ padding: "8px 18px", fontSize: 13 }}
+                  onClick={() => { 
+                    localStorage.setItem('cyberprep_prev_view', 'dashboard');
+                    setAuthMode("login");
+                    setAuthStep("form");
+                    setView("auth"); 
+                  }}>
+                  🚀 Sign In to Unlock
+                </button>
+              </div>
+            )}
           </>)}
 
           {/* ── C2: SCORES & HISTORY ── */}

@@ -203,7 +203,7 @@ const razorpay = new Razorpay({
 });
 
 const calculatePrice = (roleCount, billingPeriod = 'monthly') => {
-  const base = roleCount * 1;
+  const base = roleCount * 399;
   let discounted;
   if (roleCount >= 3) discounted = Math.round(base * 0.7);
   else if (roleCount >= 2) discounted = Math.round(base * 0.82);
@@ -447,6 +447,30 @@ app.post('/api/payment/verify', auth, async (req, res) => {
       endDate.setMonth(endDate.getMonth() + 1);
     }
 
+    // ─── CRITICAL: Merge with existing subscribed roles ───
+    // Without this, each new payment WIPES OUT previously-subscribed roles!
+    let mergedRoles = roles;
+    try {
+      const existing = await pool.query(
+        'SELECT subscribed_roles FROM subscriptions WHERE user_id = $1',
+        [req.user.id]
+      );
+      if (existing.rows.length > 0 && existing.rows[0].subscribed_roles) {
+        const raw = existing.rows[0].subscribed_roles;
+        let existingRoles = [];
+        if (Array.isArray(raw)) existingRoles = raw;
+        else if (typeof raw === 'string') {
+          try { const v = JSON.parse(raw); existingRoles = Array.isArray(v) ? v : []; } catch (e) {}
+        }
+        // Merge: combine existing + new, dedupe
+        mergedRoles = [...new Set([...existingRoles, ...roles])];
+        console.log('Merging roles. Existing:', existingRoles, 'New:', roles, 'Merged:', mergedRoles);
+      }
+    } catch (mergeErr) {
+      console.error('Could not fetch existing roles for merge:', mergeErr.message);
+      // Fall back to using just new roles (safer than losing payment)
+    }
+
     // ─── Activate / extend subscription ───
     try {
       await pool.query(
@@ -455,7 +479,7 @@ app.post('/api/payment/verify', auth, async (req, res) => {
          ON CONFLICT (user_id) DO UPDATE SET
            plan = 'paid', status = 'active', subscribed_roles = $2,
            payment_id = $3, end_date = $4, billing_period = $5`,
-        [req.user.id, JSON.stringify(roles), razorpay_payment_id, endDate, billing_period]
+        [req.user.id, JSON.stringify(mergedRoles), razorpay_payment_id, endDate, billing_period]
       );
     } catch (subErr) {
       console.error('⚠️ SUBSCRIPTION UPSERT FAILED (payment was captured):', subErr.message);
@@ -465,8 +489,8 @@ app.post('/api/payment/verify', auth, async (req, res) => {
       });
     }
 
-    console.log('✅ PAYMENT VERIFIED! Subscription activated for user:', req.user.id, 'Period:', billing_period, 'Until:', endDate.toISOString().split('T')[0]);
-    res.json({ success: true, subscribed_roles: roles, valid_until: endDate, billing_period });
+    console.log('✅ PAYMENT VERIFIED! Subscription activated for user:', req.user.id, 'Period:', billing_period, 'Until:', endDate.toISOString().split('T')[0], 'Total roles:', mergedRoles.length);
+    res.json({ success: true, subscribed_roles: mergedRoles, valid_until: endDate, billing_period });
   } catch (e) {
     console.error('Payment verify error:', e.message, e.stack);
     res.status(500).json({ error: 'Payment verification error: ' + e.message });
