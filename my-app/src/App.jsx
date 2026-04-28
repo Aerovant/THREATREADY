@@ -52,6 +52,7 @@ import HomeTab from "./views/tabs/HomeTab.jsx";
 //HR
 
 import B2BOverviewTab from "./views/tabs/B2BOverviewTab.jsx";
+import B2BCandidatesTab from "./views/tabs/B2BCandidatesTab.jsx";
 
 
 // ═══════════════════════════════════════════════════════════════
@@ -137,7 +138,7 @@ export default function ThreatReady() {
             if (hist.length > 20) hist.shift();
             localStorage.setItem('cyberprep_nav_history', JSON.stringify(hist));
           }
-        } catch (e) {}
+        } catch (e) { }
       }
       return newView;
     });
@@ -158,8 +159,8 @@ export default function ThreatReady() {
         }
 
       }
-      
-    } catch (e) {}
+
+    } catch (e) { }
     // Fallback: go to dashboard if logged-in/free-trial, else landing
     const token = localStorage.getItem('token');
     const isFreeTrial = localStorage.getItem('cyberprep_freetrial') === 'true';
@@ -236,7 +237,7 @@ export default function ThreatReady() {
   const [interviewPersona, setInterviewPersona] = useState('standard');
   const [leaderboard, setLeaderboard] = useState([]);
   const [myRank, setMyRank] = useState(null);
-  const [dailyChallenge, setDailyChallenge] = useState(null);  const [dailyAnswered, setDailyAnswered] = useState(false);
+  const [dailyChallenge, setDailyChallenge] = useState(null); const [dailyAnswered, setDailyAnswered] = useState(false);
   const [dailyChallengeError, setDailyChallengeError] = useState(false);
   const [dailyAnswer, setDailyAnswer] = useState('');
   const [dailyResult, setDailyResult] = useState(null);
@@ -422,9 +423,9 @@ export default function ThreatReady() {
   // Enterprise:   50+ people   → Custom pricing (Contact Sales)
   // Yearly = Monthly × 12 × 0.8 (20% discount)
   const HR_PRICING = {
-    '5-10':    { monthly: 2999,  yearly: 28790,  label: 'Team Starter · 5-10 people', planName: 'Team Starter' },
-    '11-50':   { monthly: 7999,  yearly: 76790,  label: 'Team Pro · 11-50 people',    planName: 'Team Pro' },
-    '50+':     { monthly: 0,     yearly: 0,      label: 'Enterprise · 50+ people (Contact Sales)', planName: 'Enterprise', contactSales: true }
+    '5-10': { monthly: 2999, yearly: 28790, label: 'Team Starter · 5-10 people', planName: 'Team Starter' },
+    '11-50': { monthly: 7999, yearly: 76790, label: 'Team Pro · 11-50 people', planName: 'Team Pro' },
+    '50+': { monthly: 0, yearly: 0, label: 'Enterprise · 50+ people (Contact Sales)', planName: 'Enterprise', contactSales: true }
   };
   const [newAssessJD, setNewAssessJD] = useState('');
   const [jdAnalysis, setJdAnalysis] = useState(null);
@@ -458,7 +459,7 @@ export default function ThreatReady() {
     const token = localStorage.getItem('token');
     if (!token) return;
 
-// Check subscription on restore
+    // Check subscription on restore
     fetch('https://threatready-db.onrender.com/api/auth/me', {
       headers: { 'Authorization': `Bearer ${token}` }
     }).then(r => r.json()).then(data => {
@@ -655,9 +656,9 @@ export default function ThreatReady() {
       });
       const computedBadges = Object.entries(bestByRole).map(([role_id, data]) => {
         const tier = data.score >= 8 ? "platinum"
-                   : data.score >= 7 ? "gold"
-                   : data.score >= 6 ? "silver"
-                   : "bronze";
+          : data.score >= 7 ? "gold"
+            : data.score >= 6 ? "silver"
+              : "bronze";
         const roleName = ROLES.find(r => r.id === role_id)?.name || role_id;
         const tierLabel = tier.charAt(0).toUpperCase() + tier.slice(1);
         return {
@@ -732,7 +733,7 @@ export default function ThreatReady() {
               setNotifications(data.notifications);
               setUnreadCount(data.unread_count || 0);
             }
-          }).catch(() => {});
+          }).catch(() => { });
       }, 30000);
       return () => clearInterval(interval);
     }
@@ -1148,31 +1149,31 @@ export default function ThreatReady() {
   };
 
   // ── CONFIRM USER TYPE ──
- const confirmUserType = async (type) => {
-  setUserType(type);
-  localStorage.setItem('cyberprep_usertype', type);
+  const confirmUserType = async (type) => {
+    setUserType(type);
+    localStorage.setItem('cyberprep_usertype', type);
 
-  if (type === 'b2b') {
-    // B2B Flow: Go to Company Name + Team Size step BEFORE sending OTP
-    // Pre-fill if we already have values
-    if (!hrModalCompanyName) setHrModalCompanyName(companyName || '');
-    if (!hrModalTeamSize) setHrModalTeamSize(teamSize || '5-10');
-    setAuthStep("company-info");
-    return;
-  }
+    if (type === 'b2b') {
+      // B2B Flow: Go to Company Name + Team Size step BEFORE sending OTP
+      // Pre-fill if we already have values
+      if (!hrModalCompanyName) setHrModalCompanyName(companyName || '');
+      if (!hrModalTeamSize) setHrModalTeamSize(teamSize || '5-10');
+      setAuthStep("company-info");
+      return;
+    }
 
-  // B2C Flow: Send OTP directly and go to verify
-  try {
-    await fetch("https://threatready-db.onrender.com/api/auth/send-otp", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email: authEmail })
-    });
-  } catch(e) {}
-  setOtpCode("");
-  setOtpError("");
-  setAuthStep("verify");
-};
+    // B2C Flow: Send OTP directly and go to verify
+    try {
+      await fetch("https://threatready-db.onrender.com/api/auth/send-otp", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: authEmail })
+      });
+    } catch (e) { }
+    setOtpCode("");
+    setOtpError("");
+    setAuthStep("verify");
+  };
 
   // ── CONFIRM COMPANY INFO (B2B step) ──
   const confirmCompanyInfo = async () => {
@@ -1197,7 +1198,7 @@ export default function ThreatReady() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email: authEmail })
       });
-    } catch(e) {}
+    } catch (e) { }
     setOtpCode("");
     setOtpError("");
     setAuthStep("verify");
@@ -1641,7 +1642,7 @@ export default function ThreatReady() {
     setView("dashboard");
   };
 
-  
+
   const doLogout = () => {
     // Mark that user logged out → next login won't auto-load resume/career data
     localStorage.setItem('cyberprep_just_logged_out', 'true');
@@ -1718,8 +1719,8 @@ export default function ThreatReady() {
   // ═══════════════════════════════════════════════════════════
   // PAGE 1: LANDING PAGE (Dynamic Hooks + Random Demo)
   // ═══════════════════════════════════════════════════════════
-  
-  
+
+
   if (view === "landing") return (
     <LandingView
       hookHeadline={hookHeadline}
@@ -1747,7 +1748,7 @@ export default function ThreatReady() {
   // ═══════════════════════════════════════════════════════════
   // PAGE: TRIAL ROLE SELECT (Free Trial Entry — Pick exactly 2 roles)
   // ═══════════════════════════════════════════════════════════
-  
+
   if (view === "trial-role-select") return (
     <TrialRoleSelectView
       trialRoles={trialRoles}
@@ -1765,7 +1766,7 @@ export default function ThreatReady() {
   // ═══════════════════════════════════════════════════════════
   // PAGE: TRIAL COMPLETE (Shown after 2 trial attempts are used)
   // ═══════════════════════════════════════════════════════════
-  
+
   if (view === "trial-complete") return (
     <TrialCompleteView
       results={results}
@@ -1835,7 +1836,7 @@ export default function ThreatReady() {
   // ═══════════════════════════════════════════════════════════
   // DIFFICULTY SELECTION
   // ═══════════════════════════════════════════════════════════
- 
+
   if (view === "difficulty") return (
     <DifficultyView
       activeRole={activeRole}
@@ -1908,7 +1909,7 @@ export default function ThreatReady() {
   // ═══════════════════════════════════════════════════════════
   // ROLE SELECTION (Pricing)
   // ═══════════════════════════════════════════════════════════
-  
+
   if (view === "roles") return (
     <RolesView
       isPaid={isPaid}
@@ -1972,7 +1973,7 @@ export default function ThreatReady() {
                 </button>
 
                 {showNotifs && (
-                  <div style={{ position: "absolute", zIndex: 1000, right: 0, top: 36, width: 280,  background: "#111827", border: "1px solid #1e2536", borderRadius: 12, boxShadow: "0 16px 48px rgba(0,0,0,.6)", maxHeight: 300, overflowY: "auto" }}>
+                  <div style={{ position: "absolute", zIndex: 1000, right: 0, top: 36, width: 280, background: "#111827", border: "1px solid #1e2536", borderRadius: 12, boxShadow: "0 16px 48px rgba(0,0,0,.6)", maxHeight: 300, overflowY: "auto" }}>
                     <div style={{ padding: "10px 14px", borderBottom: "1px solid #1e2536", fontSize: 13, fontWeight: 700, color: "var(--ac)", display: "flex", justifyContent: "space-between" }}>
                       <span>NOTIFICATIONS</span>
                       <span style={{ cursor: "pointer", opacity: 1 }} onClick={() => setShowNotifs(false)}>×</span>
@@ -1996,7 +1997,7 @@ export default function ThreatReady() {
             </div>
           </div>
 
-         {/* Nav Tabs */}
+          {/* Nav Tabs */}
           <div className="nav-tabs">
             {tabs.map(t => (
               <div key={t.id}
@@ -2048,7 +2049,7 @@ export default function ThreatReady() {
           )}
 
           {/* ── C2: SCORES & HISTORY ── */}
-          
+
           {dashTab === "scores" && (
             <ScoresTab
               user={user}
@@ -2061,7 +2062,7 @@ export default function ThreatReady() {
           )}
 
           {/* ── C3: BADGES ── */}
-          
+
           {dashTab === "badges" && (
             <BadgesTab
               user={user}
@@ -2072,7 +2073,7 @@ export default function ThreatReady() {
           )}
 
           {/* ── C4: PROFILE ── */}
-         
+
           {dashTab === "profile" && (
             <ProfileTab
               user={user}
@@ -2122,7 +2123,7 @@ export default function ThreatReady() {
           )}
 
           {/* ── C7: SETTINGS ── */}
-          
+
           {dashTab === "settings" && (
             <SettingsTab
               user={user}
@@ -2141,7 +2142,7 @@ export default function ThreatReady() {
           )}
 
           {/* ── C8: HELP ── */}
-          
+
           {dashTab === "help" && (
             <HelpTab
               feedbackText={feedbackText}
@@ -2186,11 +2187,11 @@ export default function ThreatReady() {
           const avgStrength = evals.filter(e => e.score >= 7).length;
           const avgWeak = evals.filter(e => e.score < 5).length;
           const verdict = score >= 8 ? "Excellent candidate — strongly recommended for interview" :
-                         score >= 7 ? "Strong candidate — recommended for next round" :
-                         score >= 6 ? "Good candidate — consider for interview" :
-                         score >= 5 ? "Average — more assessment needed" :
-                         score >= 4 ? "Below expectations — not recommended" :
-                         "Not ready — significant skill gaps";
+            score >= 7 ? "Strong candidate — recommended for next round" :
+              score >= 6 ? "Good candidate — consider for interview" :
+                score >= 5 ? "Average — more assessment needed" :
+                  score >= 4 ? "Below expectations — not recommended" :
+                    "Not ready — significant skill gaps";
           const verdictColor = score >= 7 ? "var(--ok)" : score >= 5 ? "var(--wn)" : "var(--dn)";
           const badgeColor = score >= 8 ? "#e2e8f0" : score >= 7 ? "#f59e0b" : score >= 6 ? "#94a3b8" : score >= 4 ? "#cd7f32" : "#ff5252";
 
@@ -2345,7 +2346,7 @@ export default function ThreatReady() {
                       style={{
                         position: "absolute", zIndex: 1000,
                         inset: 0,
-                        
+
                         background: "rgba(0,0,0,0.7)",
                         backdropFilter: "blur(2px)"
                       }}
@@ -2363,7 +2364,7 @@ export default function ThreatReady() {
                       border: "1px solid var(--ac)",
                       borderRadius: 12,
                       boxShadow: "0 20px 60px rgba(0,0,0,.9), 0 0 30px rgba(0,229,255,0.15)",
-                      
+
                     }}>
                       <div style={{ padding: "12px 16px", borderBottom: "1px solid #1e2536", fontSize: 13, fontWeight: 700, color: "var(--ac)", letterSpacing: 1, display: "flex", justifyContent: "space-between", alignItems: "center", background: "#0a0e1a", position: "sticky", top: 0 }}>
                         <span>NOTIFICATIONS ({notifications.length})</span>
@@ -2384,7 +2385,7 @@ export default function ThreatReady() {
                 )}
               </div>
 
-              
+
               <button className="btn bs" style={{ padding: "5px 10px", fontSize: 12 }} onClick={logout}>Logout</button>
             </div>
           </div>
@@ -2406,1265 +2407,731 @@ export default function ThreatReady() {
             transition: "opacity 0.3s"
           }}>
 
-          {/* ── B1: HOME ── */}
+            {/* ── B1: HOME ── */}
 
-          {b2bTab === "overview" && (
-            <B2BOverviewTab
-              b2bStats={b2bStats}
-              b2bLoading={b2bLoading}
-              candidates={candidates}
-              setB2bTab={setB2bTab}
-            />
-          )}
+            {b2bTab === "overview" && (
+              <B2BOverviewTab
+                b2bStats={b2bStats}
+                b2bLoading={b2bLoading}
+                candidates={candidates}
+                setB2bTab={setB2bTab}
+              />
+            )}
 
-          {/* ── B2: SCORES (Candidate skill scores — empty state guard) ── */}
-          {b2bTab === "candidates" && (<>
-            {/* ── INVITE CANDIDATE FORM ── */}
-            <div className="card fadeUp" style={{ padding: 22, marginBottom: 16, borderColor: "var(--ac)", background: "rgba(0,229,255,.02)" }}>
-              <div className="lbl" style={{ marginBottom: 12 }}>📧 INVITE CANDIDATES</div>
+            {/* ── B2: SCORES (Candidate skill scores — empty state guard) ── */}
 
-              {/* Mode selector tabs */}
-              <div style={{ display: "flex", gap: 6, marginBottom: 14 }}>
-                <button className={`btn ${inviteMode === "individual" ? "bp" : "bs"}`} style={{ padding: "6px 14px", fontSize: 13 }} onClick={() => { setInviteMode("individual"); setInviteMsg(''); }}>👤 Individual</button>
-                <button className={`btn ${inviteMode === "multiple" ? "bp" : "bs"}`} style={{ padding: "6px 14px", fontSize: 13 }} onClick={() => { setInviteMode("multiple"); setInviteMsg(''); }}>👥 Paste Multiple</button>
-                <button className={`btn ${inviteMode === "csv" ? "bp" : "bs"}`} style={{ padding: "6px 14px", fontSize: 13 }} onClick={() => { setInviteMode("csv"); setInviteMsg(''); }}>📄 Upload CSV</button>
-              </div>
+            {b2bTab === "candidates" && (
+              <B2BCandidatesTab
+                candidates={candidates}
+                assessments={assessments}
+                selectedCandidates={selectedCandidates}
+                setSelectedCandidates={setSelectedCandidates}
+                b2bLoading={b2bLoading}
+                inviteMode={inviteMode}
+                setInviteMode={setInviteMode}
+                inviteEmail={inviteEmail}
+                setInviteEmail={setInviteEmail}
+                inviteMultipleEmails={inviteMultipleEmails}
+                setInviteMultipleEmails={setInviteMultipleEmails}
+                inviteCsvFile={inviteCsvFile}
+                setInviteCsvFile={setInviteCsvFile}
+                inviteParsedEmails={inviteParsedEmails}
+                setInviteParsedEmails={setInviteParsedEmails}
+                inviteAssessmentId={inviteAssessmentId}
+                setInviteAssessmentId={setInviteAssessmentId}
+                inviteRole={inviteRole}
+                setInviteRole={setInviteRole}
+                inviteDiff={inviteDiff}
+                setInviteDiff={setInviteDiff}
+                inviteMsg={inviteMsg}
+                setInviteMsg={setInviteMsg}
+                candidatesSearch={candidatesSearch}
+                setCandidatesSearch={setCandidatesSearch}
+                setReportModal={setReportModal}
+                loadB2bData={loadB2bData}
+                filterBySearch={filterBySearch}
+                showConfirm={showConfirm}
+              />
+            )}
 
-              {/* MODE: Individual email */}
-              {inviteMode === "individual" && (
-                <input id="invite-email-input" className="input" type="email" placeholder="candidate@company.com"
-                  value={inviteEmail} onChange={e => setInviteEmail(e.target.value)} style={{ marginBottom: 10 }} />
-              )}
-
-              {/* MODE: Paste multiple emails */}
-              {inviteMode === "multiple" && (
-                <div style={{ marginBottom: 10 }}>
-                  <textarea className="input" placeholder={"Paste emails (one per line OR comma-separated)\n\nExample:\njohn@company.com\njane@company.com\nbob@company.com"}
-                    value={inviteMultipleEmails}
-                    onChange={e => setInviteMultipleEmails(e.target.value)}
-                    style={{ minHeight: 120, fontFamily: "monospace", fontSize: 13 }} />
-                  {inviteMultipleEmails.trim() && (() => {
-                    const emails = inviteMultipleEmails.split(/[\n,;]+/).map(e => e.trim()).filter(e => e && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e));
+            {/* ── TEAM SKILLS TAB ── */}
+            {b2bTab === "teamskills" && (<>
+              {candidates.filter(c => c.status === "completed" && c.overall_score).length === 0 ? (
+                <div className="card fadeUp" style={{ padding: 48, textAlign: "center" }}>
+                  <div style={{ fontSize: 56, marginBottom: 16 }}>📊</div>
+                  <h3 style={{ fontSize: 18, fontWeight: 800, marginBottom: 8 }}>No Scores Yet</h3>
+                  <p style={{ fontSize: 12, color: "var(--tx2)", marginBottom: 20, lineHeight: 1.7 }}>
+                    Invite candidates and have them complete assessments to see scores here.
+                  </p>
+                  <button className="btn bp" style={{ padding: "10px 28px" }} onClick={() => { setB2bTab("candidates"); localStorage.setItem('cyberprep_b2btab', 'candidates'); }}>
+                    Invite Candidates →
+                  </button>
+                </div>
+              ) : (<>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12, gap: 10, flexWrap: "wrap" }}>
+                  <div className="lbl">CANDIDATE SKILL SCORES ({filterBySearch(teamMembers, teamSkillsSearch, m => m.name, m => m.email, m => m.completed_at).length})</div>
+                  <div style={{ display: "flex", gap: 8, alignItems: "center", flex: 1, maxWidth: 400, minWidth: 250 }}>
+                    <input className="input" type="text" placeholder="🔍 Search name, email, or date..."
+                      value={teamSkillsSearch} onChange={e => setTeamSkillsSearch(e.target.value)}
+                      style={{ fontSize: 13, padding: "6px 12px", flex: 1 }} />
+                    {teamSkillsSearch && (
+                      <button className="btn bs" style={{ fontSize: 12, padding: "4px 10px" }} onClick={() => setTeamSkillsSearch('')}>✕</button>
+                    )}
+                  </div>
+                  <button className="btn bs" style={{ fontSize: 12, padding: "4px 10px" }} onClick={loadB2bData}>🔄 Refresh</button>
+                </div>
+                {b2bLoading && <div style={{ textAlign: "center", padding: 20 }}><div className="loader" /></div>}
+                <div className="card fadeUp" style={{ padding: 0, overflow: "hidden", marginBottom: 16 }}>
+                  <div style={{ display: "grid", gridTemplateColumns: "1.5fr 1fr 1fr 1fr 1fr", padding: "10px 14px", background: "var(--s2)", fontSize: 11, fontWeight: 700, color: "var(--ac)", letterSpacing: 1, textTransform: "uppercase" }}>
+                    <span>Candidate</span><span style={{ textAlign: "center" }}>Role</span><span style={{ textAlign: "center" }}>Difficulty</span><span style={{ textAlign: "center" }}>Score</span><span style={{ textAlign: "center" }}>Badge</span>
+                  </div>
+                  {filterBySearch(teamMembers, teamSkillsSearch, m => m.name, m => m.email, m => m.completed_at).length === 0 && teamSkillsSearch && (
+                    <div style={{ padding: 20, textAlign: "center", color: "var(--tx2)", fontSize: 12 }}>No candidates match "{teamSkillsSearch}"</div>
+                  )}
+                  {filterBySearch(teamMembers, teamSkillsSearch, m => m.name, m => m.email, m => m.completed_at).map((m, i) => {
+                    const score = m.score;
+                    const badge = score >= 8 ? "Platinum" : score >= 7 ? "Gold" : score >= 6 ? "Silver" : score >= 4 ? "Bronze" : "Not Ready";
+                    const badgeColor = score >= 8 ? "#e2e8f0" : score >= 7 ? "#f59e0b" : score >= 6 ? "#94a3b8" : score >= 4 ? "#b45309" : "var(--dn)";
+                    const role = ROLES.find(r => r.id === m.role);
                     return (
-                      <div style={{ fontSize: 12, color: emails.length > 0 ? "var(--ok)" : "var(--wn)", marginTop: 6 }}>
-                        {emails.length > 0 ? `✓ ${emails.length} valid email${emails.length !== 1 ? "s" : ""} detected` : "⚠️ No valid emails detected yet"}
+                      <div key={m.id} style={{ display: "grid", gridTemplateColumns: "1.5fr 1fr 1fr 1fr 1fr", padding: "12px 14px", borderTop: "1px solid var(--bd)", fontSize: 13, alignItems: "center" }}>
+                        <div>
+                          <div style={{ fontWeight: 600 }}>{m.name}</div>
+                          <div style={{ fontSize: 11, color: "var(--tx2)", marginTop: 2 }}>{m.completed_at?.substring(0, 10)}</div>
+                        </div>
+                        <div style={{ textAlign: "center" }}>
+                          <span style={{ fontSize: 16 }}>{role?.icon || "🔒"}</span>
+                          <div style={{ fontSize: 11, color: "var(--tx2)" }}>{role?.name || m.role}</div>
+                        </div>
+                        <div style={{ textAlign: "center" }}>
+                          <span className={`diff diff-${m.difficulty}`} style={{ fontSize: 8 }}>{m.difficulty}</span>
+                        </div>
+                        <div style={{ textAlign: "center" }}>
+                          <span className="mono" style={{ fontSize: 18, fontWeight: 800, color: score >= 7 ? "var(--ok)" : score >= 5 ? "var(--wn)" : "var(--dn)" }}>
+                            {score.toFixed(1)}
+                          </span>
+                          <div style={{ fontSize: 11, color: "var(--tx2)" }}>/10</div>
+                        </div>
+                        <div style={{ textAlign: "center" }}>
+                          <span style={{ fontSize: 11, fontWeight: 700, color: badgeColor }}>{badge}</span>
+                        </div>
                       </div>
                     );
-                  })()}
+                  })}
                 </div>
-              )}
-
-              {/* MODE: CSV upload */}
-              {inviteMode === "csv" && (
-                <div style={{ marginBottom: 10 }}>
-                  <div style={{ padding: 14, border: "1px dashed var(--bd)", borderRadius: 8, background: "var(--s2)", textAlign: "center" }}>
-                    <input type="file" id="csv-invite-upload" accept=".csv,.txt" style={{ display: "none" }}
-                      onChange={async e => {
-                        const file = e.target.files[0];
-                        if (!file) return;
-                        setInviteCsvFile(file);
-                        const text = await file.text();
-                        // Parse CSV — extract all valid email patterns from any column
-                        const emailRegex = /[a-zA-Z0-9._+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/g;
-                        const matches = text.match(emailRegex) || [];
-                        const uniqueEmails = [...new Set(matches.map(e => e.toLowerCase()))];
-                        setInviteParsedEmails(uniqueEmails);
-                        setInviteMsg(uniqueEmails.length > 0 ? `✅ Found ${uniqueEmails.length} email${uniqueEmails.length !== 1 ? "s" : ""} in file` : '❌ No valid emails found in file');
-                        setTimeout(() => setInviteMsg(''), 3000);
-                      }} />
-                    <label htmlFor="csv-invite-upload" style={{ cursor: "pointer", display: "inline-block" }}>
-                      <div style={{ fontSize: 24, marginBottom: 6 }}>📄</div>
-                      <div style={{ fontSize: 12, color: "var(--tx)", fontWeight: 600 }}>
-                        {inviteCsvFile ? inviteCsvFile.name : "Click to upload CSV"}
-                      </div>
-                      <div style={{ fontSize: 12, color: "var(--tx2)", marginTop: 4 }}>
-                        Any column with email addresses works · .csv or .txt
-                      </div>
-                    </label>
-                  </div>
-                  {inviteParsedEmails.length > 0 && (
-                    <div style={{ marginTop: 10, padding: 10, background: "rgba(0,224,150,.04)", border: "1px solid rgba(0,224,150,.2)", borderRadius: 6, maxHeight: 120, overflowY: "auto" }}>
-                      <div style={{ fontSize: 12, color: "var(--ok)", fontWeight: 700, marginBottom: 6 }}>
-                        {inviteParsedEmails.length} EMAIL{inviteParsedEmails.length !== 1 ? "S" : ""} READY TO INVITE
-                      </div>
-                      <div style={{ fontSize: 12, color: "var(--tx2)", fontFamily: "monospace", lineHeight: 1.6 }}>
-                        {inviteParsedEmails.slice(0, 20).join(", ")}
-                        {inviteParsedEmails.length > 20 && ` ... and ${inviteParsedEmails.length - 20} more`}
-                      </div>
-                    </div>
+                <div className="card fadeUp" style={{ padding: 14, fontSize: 13, lineHeight: 1.8, color: "var(--tx2)" }}>
+                  <div className="lbl" style={{ marginBottom: 8 }}>INSIGHTS</div>
+                  {teamMembers.filter(m => m.score >= 7).length > 0 && (
+                    <div>✅ <strong style={{ color: "var(--ok)" }}>{teamMembers.filter(m => m.score >= 7).length} candidate(s)</strong> scored 7+ — strong hires</div>
+                  )}
+                  {teamMembers.filter(m => m.score >= 5 && m.score < 7).length > 0 && (
+                    <div>⚡ <strong style={{ color: "var(--wn)" }}>{teamMembers.filter(m => m.score >= 5 && m.score < 7).length} candidate(s)</strong> scored 5–7 — needs more practice</div>
+                  )}
+                  {teamMembers.filter(m => m.score < 5).length > 0 && (
+                    <div>❌ <strong style={{ color: "var(--dn)" }}>{teamMembers.filter(m => m.score < 5).length} candidate(s)</strong> scored below 5 — not ready</div>
                   )}
                 </div>
-              )}
+              </>)}
+            </>)}
 
-              {/* Assessment Selector — links to saved assessment with custom questions */}
-              <div style={{ marginBottom: 12 }}>
-                <div style={{ fontSize: 12, color: "var(--tx2)", marginBottom: 4 }}>ASSESSMENT (Optional — links to saved assessment)</div>
-                <select className="input" value={inviteAssessmentId}
-                  onChange={e => {
-                    const id = e.target.value;
-                    setInviteAssessmentId(id);
-                    if (id) {
-                      const a = assessments.find(x => String(x.id) === String(id));
-                      if (a) {
-                        setInviteRole(a.role_id);
-                        setInviteDiff(a.difficulty);
-                      }
-                    }
-                  }}>
-                  <option value="">— Generate new questions (5 default) —</option>
-                  {assessments.map(a => (
-                    <option key={a.id} value={a.id}>
-                      {a.name} · {ROLES.find(r => r.id === a.role_id)?.name} · {a.difficulty} · {a.question_count || 5} Q
-                    </option>
-                  ))}
-                </select>
-                {inviteAssessmentId && (
-                  <div style={{ fontSize: 11, color: "var(--ok)", marginTop: 4 }}>
-                    ✅ Candidates will receive the full set of questions from this assessment
+
+
+
+            {/* ── B3: BADGES (Reports) ── */}
+            {b2bTab === "reports" && (<>
+              <div className="lbl" style={{ marginBottom: 12 }}>ASSESSMENT REPORTS</div>
+
+              {/* Hiring Report */}
+              <div className="card card-glow fadeUp" style={{ padding: 16, marginBottom: 10 }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                  <div>
+                    <div style={{ fontSize: 13, fontWeight: 700 }}>📊 Hiring Report</div>
+                    <div style={{ fontSize: 12, color: "var(--tx2)", marginTop: 3 }}>Top candidates ranked with scorecards</div>
+                  </div>
+                  <button className="btn bp" style={{ fontSize: 12, padding: "6px 14px" }}
+                    onClick={() => {
+                      const completed = candidates.filter(c => c.status === 'completed' && c.overall_score);
+                      if (completed.length === 0) { showToast('No completed assessments to report yet.', 'warning'); return; }
+                      const rows = completed
+                        .sort((a, b) => (b.overall_score || 0) - (a.overall_score || 0))
+                        .map((c, i) => {
+                          const score = parseFloat(c.overall_score || 0);
+                          const badge = score >= 8 ? 'Platinum' : score >= 7 ? 'Gold' : score >= 6 ? 'Silver' : score >= 4 ? 'Bronze' : 'Not Ready';
+                          const role = ROLES.find(r => r.id === c.role_id)?.name || c.role_id;
+                          return `${i + 1},${c.candidate_name || c.candidate_email},${c.candidate_email},${role},${c.difficulty},${score}/10,${badge},${c.completed_at?.substring(0, 10) || ''}`;
+                        });
+                      const csv = ['Rank,Name,Email,Role,Difficulty,Score,Badge,Completed Date', ...rows].join('\n');
+                      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+                      const url = URL.createObjectURL(blob);
+                      const a = document.createElement('a');
+                      a.href = url;
+                      a.download = `hiring-report-${new Date().toISOString().substring(0, 10)}.csv`;
+                      document.body.appendChild(a);
+                      a.click();
+                      document.body.removeChild(a);
+                      URL.revokeObjectURL(url);
+                      showToast('Hiring report downloaded!', 'success');
+                    }}>
+                    Download CSV
+                  </button>
+                </div>
+                {candidates.filter(c => c.status === 'completed').length > 0 && (
+                  <div style={{ marginTop: 12 }}>
+                    <div style={{ fontSize: 12, color: "var(--tx2)", marginBottom: 6 }}>TOP CANDIDATES</div>
+                    {candidates
+                      .filter(c => c.status === 'completed' && c.overall_score)
+                      .sort((a, b) => (b.overall_score || 0) - (a.overall_score || 0))
+                      .slice(0, 3)
+                      .map((c, i) => {
+                        const score = parseFloat(c.overall_score || 0);
+                        return (
+                          <div key={c.id} style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0', borderBottom: i < 2 ? '1px solid var(--bd)' : 'none', fontSize: 13 }}>
+                            <span><span style={{ color: 'var(--ac)', fontWeight: 700, marginRight: 8 }}>#{i + 1}</span>{c.candidate_name || c.candidate_email}</span>
+                            <span className="mono" style={{ fontWeight: 700, color: score >= 7 ? 'var(--ok)' : score >= 5 ? 'var(--wn)' : 'var(--dn)' }}>{score.toFixed(1)}/10</span>
+                          </div>
+                        );
+                      })}
                   </div>
                 )}
               </div>
 
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 12 }}>
-                <div>
-                  <div style={{ fontSize: 12, color: "var(--tx2)", marginBottom: 4 }}>ROLE</div>
-                  <select className="input" value={inviteRole} onChange={e => setInviteRole(e.target.value)} disabled={!!inviteAssessmentId}>
-                    {ROLES.map(r => <option key={r.id} value={r.id}>{r.icon} {r.name}</option>)}
-                  </select>
-                </div>
-                <div>
-                  <div style={{ fontSize: 12, color: "var(--tx2)", marginBottom: 4 }}>DIFFICULTY</div>
-                  <select className="input" value={inviteDiff} onChange={e => setInviteDiff(e.target.value)} disabled={!!inviteAssessmentId}>
-                    {DIFFICULTIES.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
-                  </select>
+              {/* Team Skills Report */}
+              <div className="card card-glow fadeUp" style={{ padding: 16, marginBottom: 10, animationDelay: "0.05s" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                  <div>
+                    <div style={{ fontSize: 13, fontWeight: 700 }}>🏢 Team Skills Report</div>
+                    <div style={{ fontSize: 12, color: "var(--tx2)", marginTop: 3 }}>Skill gap analysis across all candidates</div>
+                  </div>
+                  <button className="btn bp" style={{ fontSize: 12, padding: "6px 14px" }}
+                    onClick={() => {
+                      if (candidates.length === 0) { showToast('No candidates data yet.', 'warning'); return; }
+                      const roleGroups = {};
+                      candidates.filter(c => c.status === 'completed' && c.overall_score).forEach(c => {
+                        const role = ROLES.find(r => r.id === c.role_id)?.name || c.role_id || 'Unknown';
+                        if (!roleGroups[role]) roleGroups[role] = [];
+                        roleGroups[role].push(parseFloat(c.overall_score));
+                      });
+                      const rows = Object.entries(roleGroups).map(([role, scores]) => {
+                        const avg = (scores.reduce((s, v) => s + v, 0) / scores.length).toFixed(1);
+                        return `${role},${scores.length},${avg}/10,${Math.max(...scores).toFixed(1)}/10,${Math.min(...scores).toFixed(1)}/10`;
+                      });
+                      const csv = ['Role,Candidates,Avg Score,Best,Lowest', ...rows].join('\n');
+                      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+                      const url = URL.createObjectURL(blob);
+                      const a = document.createElement('a');
+                      a.href = url;
+                      a.download = `team-skills-${new Date().toISOString().substring(0, 10)}.csv`;
+                      document.body.appendChild(a);
+                      a.click();
+                      document.body.removeChild(a);
+                      URL.revokeObjectURL(url);
+                      showToast('Team skills report downloaded!', 'success');
+                    }}>
+                    Download CSV
+                  </button>
                 </div>
               </div>
-              {inviteMsg && (
-                <div style={{ padding: 9, borderRadius: 8, marginBottom: 10, fontSize: 13, background: inviteMsg.includes("✅") ? "rgba(0,224,150,.1)" : "rgba(255,82,82,.1)", color: inviteMsg.includes("✅") ? "var(--ok)" : "var(--dn)" }}>
-                  {inviteMsg}
+
+              {/* Benchmark Report */}
+              <div className="card card-glow fadeUp" style={{ padding: 16, animationDelay: "0.1s" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                  <div>
+                    <div style={{ fontSize: 13, fontWeight: 700 }}>📈 Benchmark Report</div>
+                    <div style={{ fontSize: 12, color: "var(--tx2)", marginTop: 3 }}>Your candidates vs. industry average (7.2/10)</div>
+                  </div>
+                  <button className="btn bp" style={{ fontSize: 12, padding: "6px 14px" }}
+                    onClick={() => {
+                      const completed = candidates.filter(c => c.status === 'completed' && c.overall_score);
+                      if (completed.length === 0) { showToast('No completed assessments yet.', 'warning'); return; }
+                      const INDUSTRY_AVG = 7.2;
+                      const rows = completed.map(c => {
+                        const score = parseFloat(c.overall_score || 0);
+                        const diff = (score - INDUSTRY_AVG).toFixed(1);
+                        const role = ROLES.find(r => r.id === c.role_id)?.name || c.role_id;
+                        return `${c.candidate_name || c.candidate_email},${role},${score}/10,${INDUSTRY_AVG}/10,${score >= INDUSTRY_AVG ? '+' + diff : diff} vs avg`;
+                      });
+                      const csv = ['Candidate,Role,Score,Industry Avg,Benchmark', ...rows].join('\n');
+                      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+                      const url = URL.createObjectURL(blob);
+                      const a = document.createElement('a');
+                      a.href = url;
+                      a.download = `benchmark-${new Date().toISOString().substring(0, 10)}.csv`;
+                      document.body.appendChild(a);
+                      a.click();
+                      document.body.removeChild(a);
+                      URL.revokeObjectURL(url);
+                      showToast('Benchmark report downloaded!', 'success');
+                    }}>
+                    Download CSV
+                  </button>
                 </div>
-              )}
-              <button className="btn bp" style={{ width: "100%", padding: 12, fontSize: 14 }}
-                disabled={(() => {
-                  if (inviteMode === "individual") return !inviteEmail.trim();
-                  if (inviteMode === "multiple") {
-                    const emails = inviteMultipleEmails.split(/[\n,;]+/).map(e => e.trim()).filter(e => e && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e));
-                    return emails.length === 0;
-                  }
-                  if (inviteMode === "csv") return inviteParsedEmails.length === 0;
-                  return true;
-                })()}
-                onClick={async () => {
-                  // Collect emails based on current mode
-                  let emailsToSend = [];
-                  if (inviteMode === "individual") {
-                    if (!inviteEmail.trim()) return;
-                    emailsToSend = [inviteEmail.trim()];
-                  } else if (inviteMode === "multiple") {
-                    emailsToSend = inviteMultipleEmails.split(/[\n,;]+/).map(e => e.trim()).filter(e => e && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e));
-                    if (emailsToSend.length === 0) { setInviteMsg('❌ No valid emails found'); return; }
-                  } else if (inviteMode === "csv") {
-                    emailsToSend = inviteParsedEmails;
-                    if (emailsToSend.length === 0) { setInviteMsg('❌ Upload a CSV first'); return; }
-                  }
-
-                  setInviteMsg(`Sending invite${emailsToSend.length > 1 ? `s to ${emailsToSend.length} candidates` : ''}...`);
-                  try {
-                    const token = localStorage.getItem('token');
-                    const payload = {
-                      role_id: inviteRole,
-                      difficulty: inviteDiff
-                    };
-                    if (emailsToSend.length === 1) {
-                      payload.candidate_email = emailsToSend[0];
-                    } else {
-                      payload.candidate_emails = emailsToSend;
-                    }
-                    if (inviteAssessmentId) payload.assessment_id = parseInt(inviteAssessmentId);
-                    const res = await fetch('https://threatready-db.onrender.com/api/b2b/invite', {
-                      method: 'POST',
-                      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-                      body: JSON.stringify(payload)
-                    });
-                    const data = await res.json();
-                    if (data.candidate || data.candidates) {
-                      const sentCount = data.candidates ? data.candidates.length : 1;
-                      setInviteMsg(`✅ Invite${sentCount > 1 ? `s` : ''} sent to ${sentCount} candidate${sentCount > 1 ? 's' : ''}`);
-                      // Clear form
-                      setInviteEmail('');
-                      setInviteMultipleEmails('');
-                      setInviteCsvFile(null);
-                      setInviteParsedEmails([]);
-                      loadB2bData();
-                      setTimeout(() => setInviteMsg(''), 4000);
-                    } else {
-                      setInviteMsg('❌ ' + (data.error || 'Failed'));
-                    }
-                  } catch (e) { setInviteMsg('❌ ' + e.message); }
-                }}>
-                📧 {inviteMode === "individual" ? "Send Assessment Invite" :
-                     inviteMode === "multiple" ? `Send Invites to All${(() => {
-                       const emails = inviteMultipleEmails.split(/[\n,;]+/).map(e => e.trim()).filter(e => e && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e));
-                       return emails.length > 0 ? ` (${emails.length})` : '';
-                     })()}` :
-                     `Send Invites to All${inviteParsedEmails.length > 0 ? ` (${inviteParsedEmails.length})` : ''}`}
-              </button>
-            </div>
-
-            {/* ── ALL CANDIDATES TABLE ── */}
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10, gap: 10, flexWrap: "wrap" }}>
-              <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
-                <div className="lbl">ALL CANDIDATES ({filterBySearch(candidates, candidatesSearch, c => c.candidate_name, c => c.candidate_email, c => c.invited_at).length})</div>
-                {selectedCandidates.length > 0 && (
-                  <>
-                    <button className="btn" style={{ fontSize: 12, padding: "4px 10px", background: "rgba(0,224,150,.15)", border: "1px solid var(--ok)", color: "var(--ok)" }}
-                      onClick={async () => {
-                        const token = localStorage.getItem('token');
-                        const selectedCompleted = candidates.filter(c => selectedCandidates.includes(c.id) && c.status === 'completed');
-                        if (selectedCompleted.length === 0) {
-                          showToast('No completed assessments in selection', 'error');
-                          return;
-                        }
-                        showToast(`Generating ${selectedCompleted.length} PDF(s)...`, 'info');
-                        for (const c of selectedCompleted) {
-                          try {
-                            const res = await fetch(`https://threatready-db.onrender.com/api/b2b/candidates/${c.id}/report`, {
-                              headers: { 'Authorization': `Bearer ${token}` }
-                            });
-                            const data = await res.json();
-                            if (!data.candidate) continue;
-                            const cand = data.candidate;
-                            const score = parseFloat(cand.overall_score) || 0;
-                            const scoreColor = score >= 7 ? '#00e096' : score >= 5 ? '#f59e0b' : '#ff5252';
-                            const badgeColor = score >= 8 ? '#e2e8f0' : score >= 7 ? '#f59e0b' : score >= 6 ? '#94a3b8' : score >= 4 ? '#cd7f32' : '#ff5252';
-                            const verdict = score >= 8 ? "Excellent candidate — strongly recommended for interview" :
-                                           score >= 7 ? "Strong candidate — recommended for next round" :
-                                           score >= 6 ? "Good candidate — consider for interview" :
-                                           score >= 5 ? "Average — more assessment needed" :
-                                           score >= 4 ? "Below expectations — not recommended" :
-                                           "Not ready — significant skill gaps";
-                            const evals = cand.evaluations || [];
-                            const strongCount = evals.filter(e => e.score >= 7).length;
-                            const weakCount = evals.filter(e => e.score < 5).length;
-                            const roleName = ROLES.find(r => r.id === cand.role_id)?.name || cand.role_id;
-                            const escape = s => (s || '').toString().replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\n/g, '<br/>');
-                            const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Report - ${escape(cand.name)}</title>
-<style>
-@page { size: A4; margin: 20mm; }
-body { font-family: -apple-system, 'Segoe UI', Arial, sans-serif; color: #1a1a1a; line-height: 1.5; margin: 0; padding: 0; background: #fff; }
-.header { border-bottom: 3px solid #00b8d4; padding-bottom: 16px; margin-bottom: 24px; }
-.brand { color: #00b8d4; font-size: 22px; font-weight: 900; letter-spacing: 2px; margin-bottom: 4px; }
-.subtitle { color: #666; font-size: 11px; margin-bottom: 12px; }
-h1 { font-size: 20px; margin: 0 0 6px 0; }
-.meta { color: #666; font-size: 12px; }
-.score-card { background: linear-gradient(135deg, #0a0e1a 0%, #1a1f2e 100%); color: #fff; padding: 30px; border-radius: 12px; text-align: center; margin: 24px 0; }
-.score-label { font-size: 11px; color: #8890b0; letter-spacing: 2px; font-weight: 700; margin-bottom: 12px; }
-.score-value { font-size: 56px; font-weight: 900; color: ${scoreColor}; line-height: 1; margin-bottom: 8px; }
-.score-max { font-size: 22px; color: #8890b0; }
-.badge { display: inline-block; border: 2px solid ${badgeColor}; color: ${badgeColor}; padding: 6px 20px; border-radius: 20px; font-size: 12px; font-weight: 800; letter-spacing: 2px; margin: 12px 0; }
-.verdict { font-size: 13px; color: ${scoreColor}; font-weight: 600; margin-top: 8px; }
-.stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin: 20px 0; }
-.stat { background: #f5f7fa; padding: 12px; border-radius: 8px; text-align: center; }
-.stat-label { font-size: 9px; color: #666; letter-spacing: 1px; margin-bottom: 4px; font-weight: 700; }
-.stat-val { font-size: 13px; font-weight: 700; }
-.summary { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin: 20px 0; }
-.sum-box { padding: 14px; border-radius: 10px; border: 1px solid; }
-.sum-strong { background: #e6faf1; border-color: #00c48a; }
-.sum-weak { background: #fff0f0; border-color: #ff5252; }
-.sum-count { font-size: 26px; font-weight: 900; }
-.sum-label { font-size: 11px; font-weight: 700; letter-spacing: 1px; margin-bottom: 4px; }
-.sum-desc { font-size: 10px; color: #666; margin-top: 2px; }
-.section-title { font-size: 13px; color: #00b8d4; font-weight: 700; letter-spacing: 2px; margin: 28px 0 14px; text-transform: uppercase; border-bottom: 2px solid #00b8d4; padding-bottom: 6px; }
-.q-block { margin-bottom: 16px; padding: 14px; background: #f9fafb; border-radius: 10px; border-left: 4px solid #ccc; page-break-inside: avoid; }
-.q-block.good { border-left-color: #00c48a; }
-.q-block.avg { border-left-color: #f59e0b; }
-.q-block.bad { border-left-color: #ff5252; }
-.q-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; padding-bottom: 8px; border-bottom: 1px solid #e5e7eb; }
-.q-num { font-size: 10px; color: #666; font-weight: 700; letter-spacing: 1px; }
-.q-score { font-size: 14px; font-weight: 900; }
-.q-question { font-size: 13px; font-weight: 700; margin-bottom: 10px; }
-.q-answer { background: #fff; padding: 10px; border-radius: 6px; border-left: 3px solid #999; font-size: 11px; margin-bottom: 10px; color: #333; }
-.q-tag { font-size: 9px; font-weight: 700; letter-spacing: 1px; color: #666; margin-bottom: 4px; }
-.q-str { background: #e6faf1; padding: 8px; border-radius: 6px; border-left: 3px solid #00c48a; font-size: 11px; margin-bottom: 6px; color: #1a5f3f; }
-.q-wk { background: #fff0f0; padding: 8px; border-radius: 6px; border-left: 3px solid #ff5252; font-size: 11px; margin-bottom: 6px; color: #8b1a1a; }
-.q-ideal { background: #e7f5ff; padding: 8px; border-radius: 6px; border-left: 3px solid #00b8d4; font-size: 11px; color: #0a4d68; }
-.footer { margin-top: 30px; padding-top: 14px; border-top: 1px solid #ccc; font-size: 10px; color: #999; text-align: center; }
-</style></head>
-<body>
-<div class="header">
-<div class="brand">⚡ THREATREADY</div>
-<div class="subtitle">Cybersecurity Assessment Platform · Candidate Report</div>
-<h1>${escape(cand.name)}</h1>
-<div class="meta">${escape(cand.email)} · ${escape(cand.assessment_name || roleName + ' Assessment')}</div>
-</div>
-<div class="score-card">
-<div class="score-label">OVERALL SCORE</div>
-<div class="score-value">${score.toFixed(1)}<span class="score-max">/10</span></div>
-<div class="badge">${escape((cand.badge || '').toUpperCase())}</div>
-<div class="verdict">${escape(verdict)}</div>
-</div>
-<div class="stats">
-<div class="stat"><div class="stat-label">ROLE</div><div class="stat-val">${escape(roleName)}</div></div>
-<div class="stat"><div class="stat-label">DIFFICULTY</div><div class="stat-val" style="text-transform:capitalize">${escape(cand.difficulty)}</div></div>
-<div class="stat"><div class="stat-label">QUESTIONS</div><div class="stat-val">${evals.length} answered</div></div>
-<div class="stat"><div class="stat-label">COMPLETED</div><div class="stat-val">${escape(cand.completed_at?.substring(0, 10) || '—')}</div></div>
-</div>
-<div class="summary">
-<div class="sum-box sum-strong"><div class="sum-label" style="color:#00a878">✓ STRONG ANSWERS</div><div class="sum-count" style="color:#00a878">${strongCount}</div><div class="sum-desc">Questions scored 7+ / 10</div></div>
-<div class="sum-box sum-weak"><div class="sum-label" style="color:#d32f2f">✗ WEAK AREAS</div><div class="sum-count" style="color:#d32f2f">${weakCount}</div><div class="sum-desc">Questions scored below 5 / 10</div></div>
-</div>
-<div class="section-title">📝 Detailed Question Breakdown</div>
-${evals.map((ev, i) => {
-  const cls = ev.score >= 7 ? 'good' : ev.score >= 5 ? 'avg' : 'bad';
-  const col = ev.score >= 7 ? '#00a878' : ev.score >= 5 ? '#d97706' : '#d32f2f';
-  return `<div class="q-block ${cls}">
-    <div class="q-header"><span class="q-num">QUESTION ${i + 1} · ${escape(ev.category || 'General')}</span><span class="q-score" style="color:${col}">${ev.score}/10</span></div>
-    <div class="q-question">❓ ${escape(ev.question)}</div>
-    <div class="q-tag">CANDIDATE'S ANSWER</div>
-    <div class="q-answer">${escape(ev.answer || '(No answer provided)')}</div>
-    ${ev.strengths ? `<div class="q-str"><strong>✓ Strengths:</strong> ${escape(ev.strengths)}</div>` : ''}
-    ${ev.weaknesses ? `<div class="q-wk"><strong>✗ Weaknesses:</strong> ${escape(ev.weaknesses)}</div>` : ''}
-    ${ev.improved_answer && ev.improved_answer !== '-' ? `<div class="q-ideal"><strong>💡 Ideal Answer:</strong> ${escape(ev.improved_answer)}</div>` : ''}
-  </div>`;
-}).join('')}
-<div class="footer">Generated by ThreatReady · ${new Date().toLocaleString()}</div>
-<script>window.onload = function() { setTimeout(function() { window.print(); }, 500); };</script>
-</body></html>`;
-                            const w = window.open('', '_blank');
-                            if (!w) { showToast('Please allow popups for bulk download', 'error'); return; }
-                            w.document.write(html);
-                            w.document.close();
-                            await new Promise(r => setTimeout(r, 800));
-                          } catch (e) { console.error('PDF error:', e); }
-                        }
-                        showToast(`${selectedCompleted.length} PDF(s) opened!`, 'success');
-                      }}>📥 Download PDFs ({selectedCandidates.length})</button>
-                    <button className="btn bdn" style={{ fontSize: 12, padding: "4px 10px" }}
-                      onClick={() => {
-                        showConfirm(`Delete ${selectedCandidates.length} selected candidate(s)?`, async () => {
-                          const token = localStorage.getItem('token');
-                          await Promise.all(selectedCandidates.map(id =>
-                            fetch(`https://threatready-db.onrender.com/api/b2b/candidates/${id}`, {
-                              method: 'DELETE', headers: { 'Authorization': `Bearer ${token}` }
-                            })
-                          ));
-                          setSelectedCandidates([]);
-                          loadB2bData();
-                          showToast(`${selectedCandidates.length} candidates deleted.`, 'success');
-                        });
-                      }}>🗑 Delete Selected ({selectedCandidates.length})</button>
-                  </>
-                )}
-              </div>
-              <div style={{ display: "flex", gap: 8, alignItems: "center", flex: 1, maxWidth: 400, minWidth: 250 }}>
-                <input className="input" type="text" placeholder="🔍 Search name, email, or date..."
-                  value={candidatesSearch} onChange={e => setCandidatesSearch(e.target.value)}
-                  style={{ fontSize: 13, padding: "6px 12px", flex: 1 }} />
-                {candidatesSearch && (
-                  <button className="btn bs" style={{ fontSize: 12, padding: "4px 10px" }} onClick={() => setCandidatesSearch('')}>✕</button>
-                )}
-              </div>
-              <button className="btn bs" style={{ fontSize: 12, padding: "4px 10px" }}
-                onClick={() => {
-                  const filtered = filterBySearch(candidates, candidatesSearch, c => c.candidate_name, c => c.candidate_email, c => c.invited_at);
-                  const csv = ['Name,Email,Role,Difficulty,Score,Status,Invited']
-                    .concat(filtered.map(c => `${c.candidate_name || ''},${c.candidate_email || ''},${c.role_id || ''},${c.difficulty || ''},${c.overall_score || ''},${c.status || ''},${c.invited_at?.substring(0, 10) || ''}`))
-                    .join('\n');
-                  const a = document.createElement('a');
-                  a.href = 'data:text/csv,' + encodeURIComponent(csv);
-                  a.download = 'candidates.csv'; a.click();
-                }}>📥 Export CSV</button>
-            </div>
-            {b2bLoading && <div style={{ textAlign: "center", padding: 20 }}><div className="loader" /></div>}
-            <div className="card fadeUp" style={{ padding: 0, overflow: "hidden" }}>
-              <div style={{ display: "grid", gridTemplateColumns: "30px 2fr 2fr 1fr 1fr 1fr 1fr 0.5fr", padding: "10px 14px", background: "var(--s2)", fontSize: 11, fontWeight: 700, color: "var(--ac)", letterSpacing: 1, textTransform: "uppercase" }}>
-                <span>
-                  <input type="checkbox" style={{ cursor: "pointer" }}
-                    checked={selectedCandidates.length === filterBySearch(candidates, candidatesSearch, c => c.candidate_name, c => c.candidate_email, c => c.invited_at).length && candidates.length > 0}
-                    onChange={e => {
-                      const filtered = filterBySearch(candidates, candidatesSearch, c => c.candidate_name, c => c.candidate_email, c => c.invited_at);
-                      setSelectedCandidates(e.target.checked ? filtered.map(c => c.id) : []);
-                    }} />
-                </span>
-                <span>Name</span><span>Email</span><span>Role</span><span>Score</span><span>Status</span><span>Report</span><span></span>
-              </div>
-              {candidates.length === 0 && !b2bLoading && (
-                <div style={{ padding: 20, textAlign: "center", color: "var(--tx2)", fontSize: 12 }}>No candidates yet. Use the invite form above.</div>
-              )}
-              {candidates.length > 0 && filterBySearch(candidates, candidatesSearch, c => c.candidate_name, c => c.candidate_email, c => c.invited_at).length === 0 && (
-                <div style={{ padding: 20, textAlign: "center", color: "var(--tx2)", fontSize: 12 }}>No candidates match "{candidatesSearch}"</div>
-              )}
-              {filterBySearch(candidates, candidatesSearch, c => c.candidate_name, c => c.candidate_email, c => c.invited_at).map((c, i) => (
-                <div key={c.id} style={{ display: "grid", gridTemplateColumns: "30px 2fr 2fr 1fr 1fr 1fr 1fr 0.5fr", padding: "10px 14px", borderTop: "1px solid var(--bd)", fontSize: 13, alignItems: "center", background: selectedCandidates.includes(c.id) ? "rgba(0,229,255,0.05)" : undefined }}>
-                  <span>
-                    <input type="checkbox" style={{ cursor: "pointer" }}
-                      checked={selectedCandidates.includes(c.id)}
-                      onChange={e => setSelectedCandidates(prev => e.target.checked ? [...prev, c.id] : prev.filter(id => id !== c.id))} />
-                  </span>
-                  <span style={{ fontWeight: 600 }}>{c.candidate_name || c.candidate_email?.split("@")[0] || '—'}</span>
-                  <span style={{ color: "var(--tx2)", fontSize: 12 }}>{c.candidate_email}</span>
-                  <span>{c.role_id ? (ROLES.find(r => r.id === c.role_id)?.icon || c.role_id) : "—"}</span>
-                  <span className="mono" style={{ fontWeight: 700, color: c.overall_score ? (c.overall_score >= 7 ? "var(--ok)" : c.overall_score >= 5 ? "var(--wn)" : "var(--dn)") : "var(--tx2)" }}>
-                    {c.overall_score ? `${c.overall_score}/10` : "—"}
-                  </span>
-                  <span style={{ fontSize: 11, fontWeight: 600, color: c.status === "completed" ? "var(--ok)" : c.status === "in_progress" ? "var(--wn)" : "var(--tx2)" }}>
-                    {c.status === "completed" ? "✓ Done" : c.status === "in_progress" ? "● Active" : "○ Pending"}
-                  </span>
-                  <span style={{ display: "flex", gap: 6 }}>
-                    {c.status === "completed" ? (
-                      <>
-                        <button style={{ background: "rgba(0,229,255,.1)", border: "1px solid var(--ac)", cursor: "pointer", fontSize: 12, color: "var(--ac)", padding: "3px 8px", borderRadius: 4 }}
-                          title="View Report"
-                          onClick={async () => {
-                            try {
-                              const token = localStorage.getItem('token');
-                              const res = await fetch(`https://threatready-db.onrender.com/api/b2b/candidates/${c.id}/report`, {
-                                headers: { 'Authorization': `Bearer ${token}` }
-                              });
-                              const data = await res.json();
-                              if (data.candidate) setReportModal(data.candidate);
-                              else showToast('Report not available', 'error');
-                            } catch (e) { showToast('Error loading report', 'error'); }
-                          }}>👁 View</button>
-                        <button style={{ background: "rgba(0,224,150,.1)", border: "1px solid var(--ok)", cursor: "pointer", fontSize: 12, color: "var(--ok)", padding: "3px 8px", borderRadius: 4 }}
-                          title="Download PDF"
-                          onClick={async () => {
-                            try {
-                              const token = localStorage.getItem('token');
-                              const res = await fetch(`https://threatready-db.onrender.com/api/b2b/candidates/${c.id}/report`, {
-                                headers: { 'Authorization': `Bearer ${token}` }
-                              });
-                              const data = await res.json();
-                              if (!data.candidate) { showToast('Report not available', 'error'); return; }
-                              const cand = data.candidate;
-                              const score = parseFloat(cand.overall_score) || 0;
-                              const scoreColor = score >= 7 ? '#00e096' : score >= 5 ? '#f59e0b' : '#ff5252';
-                              const badgeColor = score >= 8 ? '#e2e8f0' : score >= 7 ? '#f59e0b' : score >= 6 ? '#94a3b8' : score >= 4 ? '#cd7f32' : '#ff5252';
-                              const verdict = score >= 8 ? "Excellent candidate — strongly recommended for interview" :
-                                             score >= 7 ? "Strong candidate — recommended for next round" :
-                                             score >= 6 ? "Good candidate — consider for interview" :
-                                             score >= 5 ? "Average — more assessment needed" :
-                                             score >= 4 ? "Below expectations — not recommended" :
-                                             "Not ready — significant skill gaps";
-                              const evals = cand.evaluations || [];
-                              const strongCount = evals.filter(e => e.score >= 7).length;
-                              const weakCount = evals.filter(e => e.score < 5).length;
-                              const roleName = ROLES.find(r => r.id === cand.role_id)?.name || cand.role_id;
-                              const escape = s => (s || '').toString().replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\n/g, '<br/>');
-
-                              const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Assessment Report - ${escape(cand.name)}</title>
-<style>
-  @page { size: A4; margin: 20mm; }
-  body { font-family: -apple-system, 'Segoe UI', Arial, sans-serif; color: #1a1a1a; line-height: 1.5; margin: 0; padding: 0; background: #fff; }
-  .header { border-bottom: 3px solid #00b8d4; padding-bottom: 16px; margin-bottom: 24px; }
-  .brand { color: #00b8d4; font-size: 22px; font-weight: 900; letter-spacing: 2px; margin-bottom: 4px; }
-  .subtitle { color: #666; font-size: 11px; margin-bottom: 12px; }
-  h1 { font-size: 20px; margin: 0 0 6px 0; color: #1a1a1a; }
-  .meta { color: #666; font-size: 12px; }
-  .score-card { background: linear-gradient(135deg, #0a0e1a 0%, #1a1f2e 100%); color: #fff; padding: 30px; border-radius: 12px; text-align: center; margin: 24px 0; }
-  .score-label { font-size: 11px; color: #8890b0; letter-spacing: 2px; font-weight: 700; margin-bottom: 12px; }
-  .score-value { font-size: 56px; font-weight: 900; color: ${scoreColor}; line-height: 1; margin-bottom: 8px; }
-  .score-max { font-size: 22px; color: #8890b0; }
-  .badge { display: inline-block; border: 2px solid ${badgeColor}; color: ${badgeColor}; padding: 6px 20px; border-radius: 20px; font-size: 12px; font-weight: 800; letter-spacing: 2px; margin: 12px 0; }
-  .verdict { font-size: 13px; color: ${scoreColor}; font-weight: 600; margin-top: 8px; }
-  .stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin: 20px 0; }
-  .stat { background: #f5f7fa; padding: 12px; border-radius: 8px; text-align: center; }
-  .stat-label { font-size: 9px; color: #666; letter-spacing: 1px; margin-bottom: 4px; font-weight: 700; }
-  .stat-val { font-size: 13px; font-weight: 700; color: #1a1a1a; }
-  .summary { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin: 20px 0; }
-  .sum-box { padding: 14px; border-radius: 10px; border: 1px solid; }
-  .sum-strong { background: #e6faf1; border-color: #00c48a; }
-  .sum-weak { background: #fff0f0; border-color: #ff5252; }
-  .sum-count { font-size: 26px; font-weight: 900; }
-  .sum-label { font-size: 11px; font-weight: 700; letter-spacing: 1px; margin-bottom: 4px; }
-  .sum-desc { font-size: 10px; color: #666; margin-top: 2px; }
-  .section-title { font-size: 13px; color: #00b8d4; font-weight: 700; letter-spacing: 2px; margin: 28px 0 14px; text-transform: uppercase; border-bottom: 2px solid #00b8d4; padding-bottom: 6px; }
-  .q-block { margin-bottom: 16px; padding: 14px; background: #f9fafb; border-radius: 10px; border-left: 4px solid #ccc; page-break-inside: avoid; }
-  .q-block.good { border-left-color: #00c48a; }
-  .q-block.avg { border-left-color: #f59e0b; }
-  .q-block.bad { border-left-color: #ff5252; }
-  .q-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; padding-bottom: 8px; border-bottom: 1px solid #e5e7eb; }
-  .q-num { font-size: 10px; color: #666; font-weight: 700; letter-spacing: 1px; }
-  .q-score { font-size: 14px; font-weight: 900; }
-  .q-question { font-size: 13px; font-weight: 700; color: #1a1a1a; margin-bottom: 10px; }
-  .q-answer { background: #fff; padding: 10px; border-radius: 6px; border-left: 3px solid #999; font-size: 11px; margin-bottom: 10px; color: #333; }
-  .q-tag { font-size: 9px; font-weight: 700; letter-spacing: 1px; color: #666; margin-bottom: 4px; }
-  .q-str { background: #e6faf1; padding: 8px; border-radius: 6px; border-left: 3px solid #00c48a; font-size: 11px; margin-bottom: 6px; color: #1a5f3f; }
-  .q-wk { background: #fff0f0; padding: 8px; border-radius: 6px; border-left: 3px solid #ff5252; font-size: 11px; margin-bottom: 6px; color: #8b1a1a; }
-  .q-ideal { background: #e7f5ff; padding: 8px; border-radius: 6px; border-left: 3px solid #00b8d4; font-size: 11px; color: #0a4d68; }
-  .footer { margin-top: 30px; padding-top: 14px; border-top: 1px solid #ccc; font-size: 10px; color: #999; text-align: center; }
-</style></head>
-<body>
-  <div class="header">
-    <div class="brand">⚡ THREATREADY</div>
-    <div class="subtitle">Cybersecurity Assessment Platform · Candidate Report</div>
-    <h1>${escape(cand.name)}</h1>
-    <div class="meta">${escape(cand.email)} · ${escape(cand.assessment_name || roleName + ' Assessment')}</div>
-  </div>
-
-  <div class="score-card">
-    <div class="score-label">OVERALL SCORE</div>
-    <div class="score-value">${score.toFixed(1)}<span class="score-max">/10</span></div>
-    <div class="badge">${escape((cand.badge || '').toUpperCase())}</div>
-    <div class="verdict">${escape(verdict)}</div>
-  </div>
-
-  <div class="stats">
-    <div class="stat"><div class="stat-label">ROLE</div><div class="stat-val">${escape(roleName)}</div></div>
-    <div class="stat"><div class="stat-label">DIFFICULTY</div><div class="stat-val" style="text-transform:capitalize">${escape(cand.difficulty)}</div></div>
-    <div class="stat"><div class="stat-label">QUESTIONS</div><div class="stat-val">${evals.length} answered</div></div>
-    <div class="stat"><div class="stat-label">COMPLETED</div><div class="stat-val">${escape(cand.completed_at?.substring(0, 10) || '—')}</div></div>
-  </div>
-
-  <div class="summary">
-    <div class="sum-box sum-strong">
-      <div class="sum-label" style="color:#00a878">✓ STRONG ANSWERS</div>
-      <div class="sum-count" style="color:#00a878">${strongCount}</div>
-      <div class="sum-desc">Questions scored 7+ / 10</div>
-    </div>
-    <div class="sum-box sum-weak">
-      <div class="sum-label" style="color:#d32f2f">✗ WEAK AREAS</div>
-      <div class="sum-count" style="color:#d32f2f">${weakCount}</div>
-      <div class="sum-desc">Questions scored below 5 / 10</div>
-    </div>
-  </div>
-
-  <div class="section-title">📝 Detailed Question Breakdown</div>
-  ${evals.map((ev, i) => {
-    const cls = ev.score >= 7 ? 'good' : ev.score >= 5 ? 'avg' : 'bad';
-    const col = ev.score >= 7 ? '#00a878' : ev.score >= 5 ? '#d97706' : '#d32f2f';
-    return `<div class="q-block ${cls}">
-      <div class="q-header">
-        <span class="q-num">QUESTION ${i + 1} · ${escape(ev.category || 'General')}</span>
-        <span class="q-score" style="color:${col}">${ev.score}/10</span>
-      </div>
-      <div class="q-question">❓ ${escape(ev.question)}</div>
-      <div class="q-tag">CANDIDATE'S ANSWER</div>
-      <div class="q-answer">${escape(ev.answer || '(No answer provided)')}</div>
-      ${ev.strengths ? `<div class="q-str"><strong>✓ Strengths:</strong> ${escape(ev.strengths)}</div>` : ''}
-      ${ev.weaknesses ? `<div class="q-wk"><strong>✗ Weaknesses:</strong> ${escape(ev.weaknesses)}</div>` : ''}
-      ${ev.improved_answer && ev.improved_answer !== '-' ? `<div class="q-ideal"><strong>💡 Ideal Answer:</strong> ${escape(ev.improved_answer)}</div>` : ''}
-    </div>`;
-  }).join('')}
-
-  <div class="footer">Generated by ThreatReady · ${new Date().toLocaleString()}</div>
-  <script>
-    window.onload = function() {
-      setTimeout(function() { window.print(); }, 500);
-    };
-  </script>
-</body></html>`;
-
-                              const w = window.open('', '_blank');
-                              if (!w) { showToast('Please allow popups for PDF download', 'error'); return; }
-                              w.document.write(html);
-                              w.document.close();
-                              showToast("Opening PDF... use your browser's Save as PDF option", 'success');
-                            } catch (e) { showToast('Error downloading: ' + e.message, 'error'); }
-                          }}>📥</button>
-                      </>
-                    ) : (
-                      <span style={{ fontSize: 11, color: "var(--tx2)" }}>—</span>
-                    )}
-                  </span>
-                  <span>
-                    <button style={{ background: "none", border: "none", cursor: "pointer", fontSize: 14, color: "var(--dn)", padding: "2px 6px" }}
-                      title="Delete"
-                      onClick={() => {
-                        showConfirm(`Delete ${c.candidate_name || c.candidate_email}? This cannot be undone.`, async () => {
-                          const token = localStorage.getItem('token');
-                          const res = await fetch(`https://threatready-db.onrender.com/api/b2b/candidates/${c.id}`, {
-                            method: 'DELETE', headers: { 'Authorization': `Bearer ${token}` }
-                          });
-                          const data = await res.json();
-                          if (data.success) { loadB2bData(); showToast('Deleted.', 'success'); }
-                          else showToast('Delete failed', 'error');
-                        });
-                      }}>🗑</button>
-                  </span>
-                </div>
-              ))}
-            </div>
-          </>)}
-
-          {/* ── TEAM SKILLS TAB ── */}
-          {b2bTab === "teamskills" && (<>
-            {candidates.filter(c => c.status === "completed" && c.overall_score).length === 0 ? (
-              <div className="card fadeUp" style={{ padding: 48, textAlign: "center" }}>
-                <div style={{ fontSize: 56, marginBottom: 16 }}>📊</div>
-                <h3 style={{ fontSize: 18, fontWeight: 800, marginBottom: 8 }}>No Scores Yet</h3>
-                <p style={{ fontSize: 12, color: "var(--tx2)", marginBottom: 20, lineHeight: 1.7 }}>
-                  Invite candidates and have them complete assessments to see scores here.
-                </p>
-                <button className="btn bp" style={{ padding: "10px 28px" }} onClick={() => { setB2bTab("candidates"); localStorage.setItem('cyberprep_b2btab', 'candidates'); }}>
-                  Invite Candidates →
-                </button>
-              </div>
-            ) : (<>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12, gap: 10, flexWrap: "wrap" }}>
-                <div className="lbl">CANDIDATE SKILL SCORES ({filterBySearch(teamMembers, teamSkillsSearch, m => m.name, m => m.email, m => m.completed_at).length})</div>
-                <div style={{ display: "flex", gap: 8, alignItems: "center", flex: 1, maxWidth: 400, minWidth: 250 }}>
-                  <input className="input" type="text" placeholder="🔍 Search name, email, or date..."
-                    value={teamSkillsSearch} onChange={e => setTeamSkillsSearch(e.target.value)}
-                    style={{ fontSize: 13, padding: "6px 12px", flex: 1 }} />
-                  {teamSkillsSearch && (
-                    <button className="btn bs" style={{ fontSize: 12, padding: "4px 10px" }} onClick={() => setTeamSkillsSearch('')}>✕</button>
-                  )}
-                </div>
-                <button className="btn bs" style={{ fontSize: 12, padding: "4px 10px" }} onClick={loadB2bData}>🔄 Refresh</button>
-              </div>
-              {b2bLoading && <div style={{ textAlign: "center", padding: 20 }}><div className="loader" /></div>}
-              <div className="card fadeUp" style={{ padding: 0, overflow: "hidden", marginBottom: 16 }}>
-                <div style={{ display: "grid", gridTemplateColumns: "1.5fr 1fr 1fr 1fr 1fr", padding: "10px 14px", background: "var(--s2)", fontSize: 11, fontWeight: 700, color: "var(--ac)", letterSpacing: 1, textTransform: "uppercase" }}>
-                  <span>Candidate</span><span style={{ textAlign: "center" }}>Role</span><span style={{ textAlign: "center" }}>Difficulty</span><span style={{ textAlign: "center" }}>Score</span><span style={{ textAlign: "center" }}>Badge</span>
-                </div>
-                {filterBySearch(teamMembers, teamSkillsSearch, m => m.name, m => m.email, m => m.completed_at).length === 0 && teamSkillsSearch && (
-                  <div style={{ padding: 20, textAlign: "center", color: "var(--tx2)", fontSize: 12 }}>No candidates match "{teamSkillsSearch}"</div>
-                )}
-                {filterBySearch(teamMembers, teamSkillsSearch, m => m.name, m => m.email, m => m.completed_at).map((m, i) => {
-                  const score = m.score;
-                  const badge = score >= 8 ? "Platinum" : score >= 7 ? "Gold" : score >= 6 ? "Silver" : score >= 4 ? "Bronze" : "Not Ready";
-                  const badgeColor = score >= 8 ? "#e2e8f0" : score >= 7 ? "#f59e0b" : score >= 6 ? "#94a3b8" : score >= 4 ? "#b45309" : "var(--dn)";
-                  const role = ROLES.find(r => r.id === m.role);
+                {candidates.filter(c => c.status === 'completed' && c.overall_score).length > 0 && (() => {
+                  const completed = candidates.filter(c => c.status === 'completed' && c.overall_score);
+                  const avgScore = completed.reduce((s, c) => s + parseFloat(c.overall_score || 0), 0) / completed.length;
+                  const INDUSTRY_AVG = 7.2;
+                  const aboveAvg = completed.filter(c => parseFloat(c.overall_score) >= INDUSTRY_AVG).length;
                   return (
-                    <div key={m.id} style={{ display: "grid", gridTemplateColumns: "1.5fr 1fr 1fr 1fr 1fr", padding: "12px 14px", borderTop: "1px solid var(--bd)", fontSize: 13, alignItems: "center" }}>
-                      <div>
-                        <div style={{ fontWeight: 600 }}>{m.name}</div>
-                        <div style={{ fontSize: 11, color: "var(--tx2)", marginTop: 2 }}>{m.completed_at?.substring(0, 10)}</div>
-                      </div>
-                      <div style={{ textAlign: "center" }}>
-                        <span style={{ fontSize: 16 }}>{role?.icon || "🔒"}</span>
-                        <div style={{ fontSize: 11, color: "var(--tx2)" }}>{role?.name || m.role}</div>
-                      </div>
-                      <div style={{ textAlign: "center" }}>
-                        <span className={`diff diff-${m.difficulty}`} style={{ fontSize: 8 }}>{m.difficulty}</span>
-                      </div>
-                      <div style={{ textAlign: "center" }}>
-                        <span className="mono" style={{ fontSize: 18, fontWeight: 800, color: score >= 7 ? "var(--ok)" : score >= 5 ? "var(--wn)" : "var(--dn)" }}>
-                          {score.toFixed(1)}
-                        </span>
-                        <div style={{ fontSize: 11, color: "var(--tx2)" }}>/10</div>
-                      </div>
-                      <div style={{ textAlign: "center" }}>
-                        <span style={{ fontSize: 11, fontWeight: 700, color: badgeColor }}>{badge}</span>
+                    <div style={{ marginTop: 12 }}>
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 8 }}>
+                        {[["Your Avg", avgScore.toFixed(1) + "/10", avgScore >= INDUSTRY_AVG ? "var(--ok)" : "var(--dn)"],
+                        ["Industry", "7.2/10", "var(--ac)"],
+                        ["Above Avg", aboveAvg + "/" + completed.length, "var(--wn)"]
+                        ].map(([l, v, c], i) => (
+                          <div key={i} className="statbox" style={{ padding: 10 }}>
+                            <div className="statval" style={{ color: c, fontSize: 14 }}>{v}</div>
+                            <div className="statlbl">{l}</div>
+                          </div>
+                        ))}
                       </div>
                     </div>
                   );
-                })}
-              </div>
-              <div className="card fadeUp" style={{ padding: 14, fontSize: 13, lineHeight: 1.8, color: "var(--tx2)" }}>
-                <div className="lbl" style={{ marginBottom: 8 }}>INSIGHTS</div>
-                {teamMembers.filter(m => m.score >= 7).length > 0 && (
-                  <div>✅ <strong style={{ color: "var(--ok)" }}>{teamMembers.filter(m => m.score >= 7).length} candidate(s)</strong> scored 7+ — strong hires</div>
-                )}
-                {teamMembers.filter(m => m.score >= 5 && m.score < 7).length > 0 && (
-                  <div>⚡ <strong style={{ color: "var(--wn)" }}>{teamMembers.filter(m => m.score >= 5 && m.score < 7).length} candidate(s)</strong> scored 5–7 — needs more practice</div>
-                )}
-                {teamMembers.filter(m => m.score < 5).length > 0 && (
-                  <div>❌ <strong style={{ color: "var(--dn)" }}>{teamMembers.filter(m => m.score < 5).length} candidate(s)</strong> scored below 5 — not ready</div>
-                )}
+                })()}
               </div>
             </>)}
-          </>)}
 
+            {/* ── B4: PROFILE ── */}
 
-           
-            
-          {/* ── B3: BADGES (Reports) ── */}
-          {b2bTab === "reports" && (<>
-            <div className="lbl" style={{ marginBottom: 12 }}>ASSESSMENT REPORTS</div>
+            {/* ── B5: INTERVIEW (Create Assessment + Invite Candidates) ── */}
+            {b2bTab === "create" && (<>
 
-            {/* Hiring Report */}
-            <div className="card card-glow fadeUp" style={{ padding: 16, marginBottom: 10 }}>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                <div>
-                  <div style={{ fontSize: 13, fontWeight: 700 }}>📊 Hiring Report</div>
-                  <div style={{ fontSize: 12, color: "var(--tx2)", marginTop: 3 }}>Top candidates ranked with scorecards</div>
-                </div>
-                <button className="btn bp" style={{ fontSize: 12, padding: "6px 14px" }}
-                  onClick={() => {
-                    const completed = candidates.filter(c => c.status === 'completed' && c.overall_score);
-                    if (completed.length === 0) { showToast('No completed assessments to report yet.', 'warning'); return; }
-                    const rows = completed
-                      .sort((a, b) => (b.overall_score || 0) - (a.overall_score || 0))
-                      .map((c, i) => {
-                        const score = parseFloat(c.overall_score || 0);
-                        const badge = score >= 8 ? 'Platinum' : score >= 7 ? 'Gold' : score >= 6 ? 'Silver' : score >= 4 ? 'Bronze' : 'Not Ready';
-                        const role = ROLES.find(r => r.id === c.role_id)?.name || c.role_id;
-                        return `${i + 1},${c.candidate_name || c.candidate_email},${c.candidate_email},${role},${c.difficulty},${score}/10,${badge},${c.completed_at?.substring(0, 10) || ''}`;
-                      });
-                    const csv = ['Rank,Name,Email,Role,Difficulty,Score,Badge,Completed Date', ...rows].join('\n');
-                    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-                    const url = URL.createObjectURL(blob);
-                    const a = document.createElement('a');
-                    a.href = url;
-                    a.download = `hiring-report-${new Date().toISOString().substring(0, 10)}.csv`;
-                    document.body.appendChild(a);
-                    a.click();
-                    document.body.removeChild(a);
-                    URL.revokeObjectURL(url);
-                    showToast('Hiring report downloaded!', 'success');
-                  }}>
-                  Download CSV
-                </button>
-              </div>
-              {candidates.filter(c => c.status === 'completed').length > 0 && (
-                <div style={{ marginTop: 12 }}>
-                  <div style={{ fontSize: 12, color: "var(--tx2)", marginBottom: 6 }}>TOP CANDIDATES</div>
-                  {candidates
-                    .filter(c => c.status === 'completed' && c.overall_score)
-                    .sort((a, b) => (b.overall_score || 0) - (a.overall_score || 0))
-                    .slice(0, 3)
-                    .map((c, i) => {
-                      const score = parseFloat(c.overall_score || 0);
-                      return (
-                        <div key={c.id} style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0', borderBottom: i < 2 ? '1px solid var(--bd)' : 'none', fontSize: 13 }}>
-                          <span><span style={{ color: 'var(--ac)', fontWeight: 700, marginRight: 8 }}>#{i + 1}</span>{c.candidate_name || c.candidate_email}</span>
-                          <span className="mono" style={{ fontWeight: 700, color: score >= 7 ? 'var(--ok)' : score >= 5 ? 'var(--wn)' : 'var(--dn)' }}>{score.toFixed(1)}/10</span>
-                        </div>
-                      );
-                    })}
-                </div>
-              )}
-            </div>
+              {/* Create Assessment form */}
+              <div className="card fadeUp" style={{ padding: 20, marginBottom: 14, borderColor: jdAnalysis ? "var(--ok)" : "var(--bd)" }}>
+                <div className="lbl" style={{ marginBottom: 8 }}>CREATE ASSESSMENT</div>
 
-            {/* Team Skills Report */}
-            <div className="card card-glow fadeUp" style={{ padding: 16, marginBottom: 10, animationDelay: "0.05s" }}>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                <div>
-                  <div style={{ fontSize: 13, fontWeight: 700 }}>🏢 Team Skills Report</div>
-                  <div style={{ fontSize: 12, color: "var(--tx2)", marginTop: 3 }}>Skill gap analysis across all candidates</div>
-                </div>
-                <button className="btn bp" style={{ fontSize: 12, padding: "6px 14px" }}
-                  onClick={() => {
-                    if (candidates.length === 0) { showToast('No candidates data yet.', 'warning'); return; }
-                    const roleGroups = {};
-                    candidates.filter(c => c.status === 'completed' && c.overall_score).forEach(c => {
-                      const role = ROLES.find(r => r.id === c.role_id)?.name || c.role_id || 'Unknown';
-                      if (!roleGroups[role]) roleGroups[role] = [];
-                      roleGroups[role].push(parseFloat(c.overall_score));
-                    });
-                    const rows = Object.entries(roleGroups).map(([role, scores]) => {
-                      const avg = (scores.reduce((s, v) => s + v, 0) / scores.length).toFixed(1);
-                      return `${role},${scores.length},${avg}/10,${Math.max(...scores).toFixed(1)}/10,${Math.min(...scores).toFixed(1)}/10`;
-                    });
-                    const csv = ['Role,Candidates,Avg Score,Best,Lowest', ...rows].join('\n');
-                    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-                    const url = URL.createObjectURL(blob);
-                    const a = document.createElement('a');
-                    a.href = url;
-                    a.download = `team-skills-${new Date().toISOString().substring(0, 10)}.csv`;
-                    document.body.appendChild(a);
-                    a.click();
-                    document.body.removeChild(a);
-                    URL.revokeObjectURL(url);
-                    showToast('Team skills report downloaded!', 'success');
-                  }}>
-                  Download CSV
-                </button>
-              </div>
-            </div>
-
-            {/* Benchmark Report */}
-            <div className="card card-glow fadeUp" style={{ padding: 16, animationDelay: "0.1s" }}>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                <div>
-                  <div style={{ fontSize: 13, fontWeight: 700 }}>📈 Benchmark Report</div>
-                  <div style={{ fontSize: 12, color: "var(--tx2)", marginTop: 3 }}>Your candidates vs. industry average (7.2/10)</div>
-                </div>
-                <button className="btn bp" style={{ fontSize: 12, padding: "6px 14px" }}
-                  onClick={() => {
-                    const completed = candidates.filter(c => c.status === 'completed' && c.overall_score);
-                    if (completed.length === 0) { showToast('No completed assessments yet.', 'warning'); return; }
-                    const INDUSTRY_AVG = 7.2;
-                    const rows = completed.map(c => {
-                      const score = parseFloat(c.overall_score || 0);
-                      const diff = (score - INDUSTRY_AVG).toFixed(1);
-                      const role = ROLES.find(r => r.id === c.role_id)?.name || c.role_id;
-                      return `${c.candidate_name || c.candidate_email},${role},${score}/10,${INDUSTRY_AVG}/10,${score >= INDUSTRY_AVG ? '+' + diff : diff} vs avg`;
-                    });
-                    const csv = ['Candidate,Role,Score,Industry Avg,Benchmark', ...rows].join('\n');
-                    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-                    const url = URL.createObjectURL(blob);
-                    const a = document.createElement('a');
-                    a.href = url;
-                    a.download = `benchmark-${new Date().toISOString().substring(0, 10)}.csv`;
-                    document.body.appendChild(a);
-                    a.click();
-                    document.body.removeChild(a);
-                    URL.revokeObjectURL(url);
-                    showToast('Benchmark report downloaded!', 'success');
-                  }}>
-                  Download CSV
-                </button>
-              </div>
-              {candidates.filter(c => c.status === 'completed' && c.overall_score).length > 0 && (() => {
-                const completed = candidates.filter(c => c.status === 'completed' && c.overall_score);
-                const avgScore = completed.reduce((s, c) => s + parseFloat(c.overall_score || 0), 0) / completed.length;
-                const INDUSTRY_AVG = 7.2;
-                const aboveAvg = completed.filter(c => parseFloat(c.overall_score) >= INDUSTRY_AVG).length;
-                return (
-                  <div style={{ marginTop: 12 }}>
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 8 }}>
-                      {[["Your Avg", avgScore.toFixed(1) + "/10", avgScore >= INDUSTRY_AVG ? "var(--ok)" : "var(--dn)"],
-                      ["Industry", "7.2/10", "var(--ac)"],
-                      ["Above Avg", aboveAvg + "/" + completed.length, "var(--wn)"]
-                      ].map(([l, v, c], i) => (
-                        <div key={i} className="statbox" style={{ padding: 10 }}>
-                          <div className="statval" style={{ color: c, fontSize: 14 }}>{v}</div>
-                          <div className="statlbl">{l}</div>
-                        </div>
-                      ))}
-                    </div>
+                {/* JD Upload */}
+                <div style={{ marginBottom: 14 }}>
+                  <div style={{ fontSize: 13, color: "var(--tx2)", marginBottom: 8 }}>
+                    Paste a job description — AI will auto-suggest the role and difficulty.
                   </div>
-                );
-              })()}
-            </div>
-          </>)}
-
-          {/* ── B4: PROFILE ── */}
-
-          {/* ── B5: INTERVIEW (Create Assessment + Invite Candidates) ── */}
-          {b2bTab === "create" && (<>
-            
-            {/* Create Assessment form */}
-            <div className="card fadeUp" style={{ padding: 20, marginBottom: 14, borderColor: jdAnalysis ? "var(--ok)" : "var(--bd)" }}>
-              <div className="lbl" style={{ marginBottom: 8 }}>CREATE ASSESSMENT</div>
-
-              {/* JD Upload */}
-              <div style={{ marginBottom: 14 }}>
-                <div style={{ fontSize: 13, color: "var(--tx2)", marginBottom: 8 }}>
-                  Paste a job description — AI will auto-suggest the role and difficulty.
-                </div>
-                <input type="file" id="jd-file-input" accept=".pdf,.txt,.doc,.docx"
-                  style={{ display: "none" }}
-                  onChange={async (e) => {
-                    const file = e.target.files[0];
-                    if (!file) return;
-                    setJdAnalysis(null);
-                    if (file.type === 'text/plain' || file.name.endsWith('.txt')) {
-                      const reader = new FileReader();
-                      reader.onload = ev => { setNewAssessJD(ev.target.result); showToast('File loaded!', 'success'); };
-                      reader.readAsText(file);
-                    } else if (file.name.endsWith('.pdf')) {
-                      showToast('Reading PDF...', 'info');
-                      const reader = new FileReader();
-                      reader.onload = async (ev) => {
-                        try {
-                          const pdfjsLib = window['pdfjs-dist/build/pdf'];
-                          if (pdfjsLib) {
-                            pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
-                            const pdf = await pdfjsLib.getDocument({ data: ev.target.result }).promise;
-                            let text = '';
-                            for (let i = 1; i <= pdf.numPages; i++) {
-                              const page = await pdf.getPage(i);
-                              const ct = await page.getTextContent();
-                              text += ct.items.map(x => x.str).join(' ') + '\n';
+                  <input type="file" id="jd-file-input" accept=".pdf,.txt,.doc,.docx"
+                    style={{ display: "none" }}
+                    onChange={async (e) => {
+                      const file = e.target.files[0];
+                      if (!file) return;
+                      setJdAnalysis(null);
+                      if (file.type === 'text/plain' || file.name.endsWith('.txt')) {
+                        const reader = new FileReader();
+                        reader.onload = ev => { setNewAssessJD(ev.target.result); showToast('File loaded!', 'success'); };
+                        reader.readAsText(file);
+                      } else if (file.name.endsWith('.pdf')) {
+                        showToast('Reading PDF...', 'info');
+                        const reader = new FileReader();
+                        reader.onload = async (ev) => {
+                          try {
+                            const pdfjsLib = window['pdfjs-dist/build/pdf'];
+                            if (pdfjsLib) {
+                              pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+                              const pdf = await pdfjsLib.getDocument({ data: ev.target.result }).promise;
+                              let text = '';
+                              for (let i = 1; i <= pdf.numPages; i++) {
+                                const page = await pdf.getPage(i);
+                                const ct = await page.getTextContent();
+                                text += ct.items.map(x => x.str).join(' ') + '\n';
+                              }
+                              setNewAssessJD(text.trim());
+                              showToast('PDF loaded!', 'success');
                             }
-                            setNewAssessJD(text.trim());
-                            showToast('PDF loaded!', 'success');
-                          }
-                        } catch (err) { showToast('Could not read PDF. Paste text instead.', 'error'); }
-                      };
-                      reader.readAsArrayBuffer(file);
-                    }
-                    e.target.value = '';
-                  }}
-                />
-                <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
-                  <button className="btn bs" style={{ fontSize: 13, padding: "6px 14px" }} onClick={() => document.getElementById('jd-file-input').click()}>📎 Upload JD</button>
-                  <span style={{ fontSize: 12, color: "var(--tx2)", fontWeight: 600 }}>PDF · TXT · DOC</span>
-                  {newAssessJD && <button className="btn bs" style={{ marginLeft: "auto", fontSize: 12, padding: "4px 8px", color: "var(--dn)", borderColor: "var(--dn)" }} onClick={() => { setNewAssessJD(''); setJdAnalysis(null); }}>✕ Clear</button>}
-                </div>
-                <textarea className="input" placeholder="Or paste job description text here..." value={newAssessJD}
-                  onChange={e => { setNewAssessJD(e.target.value); setJdAnalysis(null); }}
-                  style={{ minHeight: 80, marginBottom: 10, fontSize: 12 }} />
-                <button className="btn bp" style={{ fontSize: 13, padding: "8px 20px" }}
-                  disabled={!newAssessJD.trim() || jdAnalyzing}
-                  onClick={async () => {
-                    setJdAnalyzing(true); setJdAnalysis(null);
-                    try {
-                      const token = localStorage.getItem('token');
-                      const res = await fetch('https://threatready-db.onrender.com/api/b2b/analyze-jd', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-                        body: JSON.stringify({ jd_text: newAssessJD })
-                      });
-                      const data = await res.json();
-                      if (data.analysis) {
-                        setJdAnalysis(data.analysis);
-                        if (data.analysis.recommended_role) setNewAssessRole(data.analysis.recommended_role);
-                        if (data.analysis.recommended_difficulty) setNewAssessDiff(data.analysis.recommended_difficulty);
-                        if (data.analysis.suggested_name) setNewAssessName(data.analysis.suggested_name);
+                          } catch (err) { showToast('Could not read PDF. Paste text instead.', 'error'); }
+                        };
+                        reader.readAsArrayBuffer(file);
                       }
-                    } catch (e) { console.log('JD analyze error:', e.message); }
-                    setJdAnalyzing(false);
-                  }}>
-                  {jdAnalyzing ? <><span className="loader" style={{ width: 12, height: 12 }} /> Analyzing...</> : "🤖 Analyze JD →"}
-                </button>
-                {jdAnalysis && (
-                  <div style={{ marginTop: 10, padding: 12, background: "rgba(0,224,150,.07)", borderRadius: 10, border: "1px solid rgba(0,224,150,.2)", fontSize: 13 }}>
-                    <div style={{ color: "var(--ok)", fontWeight: 700, marginBottom: 6 }}>✅ AI Analysis Complete</div>
-                    {jdAnalysis.summary && <div style={{ color: "var(--tx2)", marginBottom: 4 }}>{jdAnalysis.summary}</div>}
-                    {jdAnalysis.key_skills?.length > 0 && (
-                      <div style={{ display: "flex", flexWrap: "wrap", gap: 4, marginTop: 6 }}>
-                        {jdAnalysis.key_skills.map((s, i) => <span key={i} className="tag" style={{ fontSize: 11 }}>{s}</span>)}
-                      </div>
-                    )}
+                      e.target.value = '';
+                    }}
+                  />
+                  <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+                    <button className="btn bs" style={{ fontSize: 13, padding: "6px 14px" }} onClick={() => document.getElementById('jd-file-input').click()}>📎 Upload JD</button>
+                    <span style={{ fontSize: 12, color: "var(--tx2)", fontWeight: 600 }}>PDF · TXT · DOC</span>
+                    {newAssessJD && <button className="btn bs" style={{ marginLeft: "auto", fontSize: 12, padding: "4px 8px", color: "var(--dn)", borderColor: "var(--dn)" }} onClick={() => { setNewAssessJD(''); setJdAnalysis(null); }}>✕ Clear</button>}
                   </div>
-                )}
-              </div>
-
-              {/* Assessment Config */}
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 12 }}>
-                <div>
-                  <div style={{ fontSize: 12, color: "var(--tx2)", marginBottom: 4 }}>ASSESSMENT NAME</div>
-                  <input className="input" placeholder="e.g. Senior Cloud Engineer Q2" value={newAssessName} onChange={e => setNewAssessName(e.target.value)} style={{ fontSize: 12 }} />
-                </div>
-                <div>
-                  <div style={{ fontSize: 12, color: "var(--tx2)", marginBottom: 4 }}>ROLE</div>
-                  <select className="input" value={newAssessRole} onChange={e => setNewAssessRole(e.target.value)} style={{ fontSize: 12 }}>
-                    {ROLES.map(r => <option key={r.id} value={r.id}>{r.icon} {r.name}</option>)}
-                  </select>
-                </div>
-              </div>
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 14 }}>
-                <div>
-                  <div style={{ fontSize: 12, color: "var(--tx2)", marginBottom: 4 }}>DIFFICULTY</div>
-                  <select className="input" value={newAssessDiff} onChange={e => setNewAssessDiff(e.target.value)} style={{ fontSize: 12 }}>
-                    {DIFFICULTIES.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
-                  </select>
-                </div>
-                <div>
-                  <div style={{ fontSize: 12, color: "var(--tx2)", marginBottom: 4 }}>TYPE</div>
-                  <select className="input" value={newAssessType} onChange={e => setNewAssessType(e.target.value)} style={{ fontSize: 12 }}>
-                    <option value="standard">Standard</option>
-                    <option value="timed">Timed Challenge</option>
-                    <option value="take_home">Take Home</option>
-                  </select>
-                </div>
-              </div>
-
-              {/* Custom Question Count */}
-              <div style={{ marginBottom: 14 }}>
-                <div style={{ fontSize: 12, color: "var(--tx2)", marginBottom: 6 }}>NUMBER OF QUESTIONS</div>
-                <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 8 }}>
-                  {[5, 10, 15, 20, 25].map(n => (
-                    <button key={n} type="button"
-                      className={`btn ${newAssessQuestionCount === n ? 'bp' : 'bs'}`}
-                      style={{ fontSize: 13, padding: "6px 14px" }}
-                      onClick={() => setNewAssessQuestionCount(n)}>
-                      {n} Q
-                    </button>
-                  ))}
-                </div>
-                <input type="number" className="input" min="1" max="50" value={newAssessQuestionCount}
-                  onChange={e => {
-                    const v = parseInt(e.target.value) || 1;
-                    setNewAssessQuestionCount(Math.max(1, Math.min(50, v)));
-                  }}
-                  placeholder="Or enter custom number (1-50)"
-                  style={{ fontSize: 12 }} />
-                <div style={{ fontSize: 11, color: "var(--tx2)", marginTop: 4 }}>
-                  AI will generate exactly {newAssessQuestionCount} question{newAssessQuestionCount !== 1 ? 's' : ''} for this assessment
-                </div>
-              </div>
-
-              {assessMsg && (
-                <div style={{ padding: 9, borderRadius: 8, marginBottom: 10, fontSize: 13, background: assessMsg.includes("✅") ? "rgba(0,224,150,.1)" : "rgba(255,82,82,.1)", color: assessMsg.includes("✅") ? "var(--ok)" : "var(--dn)" }}>{assessMsg}</div>
-              )}
-              <button className="btn bp" style={{ width: "100%", padding: 12, fontSize: 13 }}
-                disabled={!newAssessName.trim()}
-                onClick={async () => {
-                  setAssessMsg('Creating assessment with ' + newAssessQuestionCount + ' questions...');
-                  try {
-                    const token = localStorage.getItem('token');
-                    const res = await fetch('https://threatready-db.onrender.com/api/b2b/assessments', {
-                      method: 'POST',
-                      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-                      body: JSON.stringify({
-                        name: newAssessName,
-                        role_id: newAssessRole,
-                        difficulty: newAssessDiff,
-                        assessment_type: newAssessType,
-                        jd_text: newAssessJD,
-                        question_count: newAssessQuestionCount
-                      })
-                    });
-                    const data = await res.json();
-                    if (data.assessment) {
-                      setAssessMsg('✅ Assessment created with ' + newAssessQuestionCount + ' questions! Redirecting to Library...');
-                      setNewAssessName(''); setNewAssessJD(''); setJdAnalysis(null);
-                      setNewAssessQuestionCount(5);
-                      loadB2bData();
-                      setTimeout(() => {
-                        setAssessMsg('');
-                        setB2bTab("library");
-                        localStorage.setItem('cyberprep_b2btab', 'library');
-                      }, 1500);
-                    } else {
-                      setAssessMsg('❌ ' + (data.error || 'Failed to create assessment'));
-                    }
-                  } catch (e) { setAssessMsg('❌ ' + e.message); }
-                }}>
-                Create Assessment →
-              </button>           
-               </div>
-
-          </>)}
-
-          {/* ── B6: LIBRARY (Saved Assessments + Invite Candidate) ── */}
-          {b2bTab === "library" && (<>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12, gap: 10, flexWrap: "wrap" }}>
-              <div className="lbl">SAVED ASSESSMENTS ({filterBySearch(assessments, librarySearch, a => a.name, a => '', a => a.created_at).length})</div>
-              <div style={{ display: "flex", gap: 8, alignItems: "center", flex: 1, maxWidth: 400, minWidth: 250 }}>
-                <input className="input" type="text" placeholder="🔍 Search name or date..."
-                  value={librarySearch} onChange={e => setLibrarySearch(e.target.value)}
-                  style={{ fontSize: 13, padding: "6px 12px", flex: 1 }} />
-                {librarySearch && (
-                  <button className="btn bs" style={{ fontSize: 12, padding: "4px 10px" }} onClick={() => setLibrarySearch('')}>✕</button>
-                )}
-              </div>
-              <button className="btn bp" style={{ fontSize: 13, padding: "6px 14px" }}
-                onClick={() => { setB2bTab("create"); localStorage.setItem('cyberprep_b2btab', 'create'); }}>
-                + New Assessment
-              </button>
-            </div>
-            {b2bLoading && <div style={{ textAlign: "center", padding: 20 }}><div className="loader" /></div>}
-            {assessments.length === 0 && !b2bLoading && (
-              <div className="card fadeUp" style={{ padding: 40, textAlign: "center" }}>
-                <div style={{ fontSize: 40, marginBottom: 12 }}>📚</div>
-                <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 6 }}>No saved assessments yet</div>
-                <div style={{ fontSize: 12, color: "var(--tx2)", marginBottom: 16 }}>Create an assessment and it will appear here.</div>
-                <button className="btn bp" style={{ fontSize: 12, padding: "10px 24px" }}
-                  onClick={() => { setB2bTab("create"); localStorage.setItem('cyberprep_b2btab', 'create'); }}>
-                  Create First Assessment →
-                </button>
-              </div>
-            )}
-            {assessments.length > 0 && filterBySearch(assessments, librarySearch, a => a.name, a => '', a => a.created_at).length === 0 && (
-              <div className="card fadeUp" style={{ padding: 20, textAlign: "center", color: "var(--tx2)", fontSize: 12 }}>
-                No assessments match "{librarySearch}"
-              </div>
-            )}
-            {filterBySearch(assessments, librarySearch, a => a.name, a => '', a => a.created_at).map((a, i) => (
-              <div key={a.id} className="card card-glow fadeUp" style={{ padding: 14, marginBottom: 10, animationDelay: `${i * .04}s` }}>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                  <div>
-                    <div style={{ fontSize: 13, fontWeight: 700 }}>{a.name}</div>
-                    <div style={{ fontSize: 12, color: "var(--tx2)", marginTop: 3 }}>
-                      {ROLES.find(r => r.id === a.role_id)?.name || a.role_id} · {a.difficulty} · {a.total_candidates || 0} candidates · {a.created_at?.substring(0, 10)}
-                    </div>
-                    {a.questions?.length > 0 && (
-                      <div style={{ fontSize: 11, color: "var(--ok)", marginTop: 4 }}>✅ {a.questions.length} questions generated</div>
-                    )}
-                  </div>
-                  <div style={{ display: "flex", gap: 6 }}>
-                    <button className="btn bs" style={{ fontSize: 11, padding: "4px 8px" }}
-                      onClick={async () => {
-                        const token = localStorage.getItem('token');
-                        const res = await fetch(`https://threatready-db.onrender.com/api/b2b/assessments/${a.id}/duplicate`, {
-                          method: 'POST', headers: { 'Authorization': `Bearer ${token}` }
-                        });
-                        const data = await res.json();
-                        if (data.assessment) { loadB2bData(); showToast('Assessment duplicated!', 'success'); }
-                        else showToast('Duplicate failed', 'error');
-                      }}>Duplicate</button>
-                    <button className="btn bp" style={{ fontSize: 11, padding: "4px 8px" }}
-                      onClick={() => {
-                        setInviteRole(a.role_id); setInviteDiff(a.difficulty);
-                        setInviteAssessmentId(String(a.id));
-                        setB2bTab("candidates"); localStorage.setItem('cyberprep_b2btab', 'candidates');
-                        setTimeout(() => document.getElementById('invite-email-input')?.focus(), 300);
-                        showToast(`Linked to "${a.name}" (${a.question_count || 5} questions). Enter email to invite.`, 'info');
-                      }}>Invite →</button>
-                    <button className="btn bs" style={{ fontSize: 11, padding: "4px 8px", color: "var(--dn)", borderColor: "var(--dn)" }}
-                      onClick={() => {
-                        showConfirm(`Delete "${a.name}"? This cannot be undone.`, async () => {
-                          const token = localStorage.getItem('token');
-                          const res = await fetch(`https://threatready-db.onrender.com/api/b2b/assessments/${a.id}`, {
-                            method: 'DELETE', headers: { 'Authorization': `Bearer ${token}` }
-                          });
-                          const data = await res.json();
-                          if (data.success) { loadB2bData(); showToast('Assessment deleted.', 'success'); }
-                          else showToast('Delete failed: ' + (data.error || 'Error'), 'error');
-                        });
-                      }}>🗑 Delete</button>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </>)}
-
-          {/* ── B7: SETTINGS ── */}
-          {b2bTab === "settings" && (<>
-          <div className="lbl" style={{ marginBottom: 10 }}>COMPANY PROFILE</div>
-            <div className="card fadeUp" style={{ padding: 16, marginBottom: 16 }}>
-              {companySettingsMsg && (
-                <div style={{ padding: 9, borderRadius: 8, marginBottom: 10, fontSize: 13, background: companySettingsMsg.includes("✅") ? "rgba(0,224,150,.1)" : "rgba(255,82,82,.1)", color: companySettingsMsg.includes("✅") ? "var(--ok)" : "var(--dn)" }}>
-                  {companySettingsMsg}
-                </div>
-              )}
-              <input className="input" placeholder="Company Name" value={companyName} onChange={e => setCompanyName(e.target.value)} style={{ marginBottom: 10 }} />
-              <select className="input" value={teamSize} onChange={e => setTeamSize(e.target.value)} style={{ marginBottom: 14 }}>
-                <option value="5-10">Team Starter · 5-10 people</option>
-                <option value="11-50">Team Pro · 11-50 people</option>
-                <option value="50+">Enterprise · 50+ people</option>
-              </select>
-              <button className="btn bp" style={{ fontSize: 12, padding: "10px 24px" }}
-                onClick={async () => {
-                  setCompanySettingsMsg('Saving...');
-                  try {
-                    const token = localStorage.getItem('token');
-                    const res = await fetch('https://threatready-db.onrender.com/api/b2b/settings', {
-                      method: 'POST',
-                      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-                      body: JSON.stringify({ company_name: companyName, team_size: teamSize })
-                    });
-                    const data = await res.json();
-                    if (data.success) { setCompanySettingsMsg('✅ Saved!'); setTimeout(() => setCompanySettingsMsg(''), 3000); }
-                    else setCompanySettingsMsg('❌ ' + (data.error || 'Failed'));
-                  } catch (e) { setCompanySettingsMsg('❌ ' + e.message); }
-                }}>
-                Save Profile
-              </button>
-            </div>
-
-            {/* Integrations */}
-            <div className="card fadeUp" style={{ padding: 18, marginBottom: 14 }}>
-              <div className="lbl" style={{ marginBottom: 12 }}>INTEGRATIONS</div>
-              {integrationMsg && (
-                <div style={{ padding: 9, borderRadius: 8, marginBottom: 10, fontSize: 13, background: integrationMsg.includes("✅") ? "rgba(0,224,150,.1)" : "rgba(255,82,82,.1)", color: integrationMsg.includes("✅") ? "var(--ok)" : "var(--dn)" }}>
-                  {integrationMsg}
-                </div>
-              )}
-              <div style={{ paddingBottom: 14, marginBottom: 14, borderBottom: "1px solid var(--bd)" }}>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
-                  <div>
-                    <div style={{ fontSize: 12, fontWeight: 700 }}>💬 Slack Notifications</div>
-                    <div style={{ fontSize: 12, color: "var(--tx2)", marginTop: 2 }}>Get notified when candidates complete assessments</div>
-                  </div>
-                  <span style={{ fontSize: 12, color: slackWebhook ? "var(--ok)" : "var(--tx2)", fontWeight: 600 }}>{slackWebhook ? "✅ Connected" : "Not connected"}</span>
-                </div>
-                <input className="input" placeholder="Slack Webhook URL (https://hooks.slack.com/...)" value={slackWebhook} onChange={e => setSlackWebhook(e.target.value)} style={{ marginBottom: 8, fontSize: 13 }} />
-                <button className="btn bs" style={{ fontSize: 13, padding: "6px 16px" }}
-                  onClick={async () => {
-                    setIntegrationMsg('Saving...');
-                    try {
-                      const token = localStorage.getItem('token');
-                      const res = await fetch('https://threatready-db.onrender.com/api/b2b/settings', { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` }, body: JSON.stringify({ slack_webhook: slackWebhook }) });
-                      const data = await res.json();
-                      if (data.success) { setIntegrationMsg('✅ Slack webhook saved!'); setTimeout(() => setIntegrationMsg(''), 3000); }
-                      else setIntegrationMsg('❌ ' + (data.error || 'Failed'));
-                    } catch (e) { setIntegrationMsg('❌ ' + e.message); }
-                  }}>Save Webhook</button>
-              </div>
-              <div style={{ paddingBottom: 14, marginBottom: 14, borderBottom: "1px solid var(--bd)" }}>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
-                  <div>
-                    <div style={{ fontSize: 12, fontWeight: 700 }}>⚡ ATS Integration (Zapier)</div>
-                    <div style={{ fontSize: 12, color: "var(--tx2)", marginTop: 2 }}>Push candidate results to your ATS automatically</div>
-                  </div>
-                  <span style={{ fontSize: 12, color: zapierWebhook ? "var(--ok)" : "var(--tx2)", fontWeight: 600 }}>{zapierWebhook ? "✅ Connected" : "Not connected"}</span>
-                </div>
-                <input className="input" placeholder="Zapier Webhook URL (https://hooks.zapier.com/...)" value={zapierWebhook} onChange={e => setZapierWebhook(e.target.value)} style={{ marginBottom: 8, fontSize: 13 }} />
-                <button className="btn bs" style={{ fontSize: 13, padding: "6px 16px" }}
-                  onClick={async () => {
-                    setIntegrationMsg('Saving...');
-                    try {
-                      const token = localStorage.getItem('token');
-                      const res = await fetch('https://threatready-db.onrender.com/api/b2b/settings', { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` }, body: JSON.stringify({ zapier_webhook: zapierWebhook }) });
-                      const data = await res.json();
-                      if (data.success) { setIntegrationMsg('✅ Zapier webhook saved!'); setTimeout(() => setIntegrationMsg(''), 3000); }
-                      else setIntegrationMsg('❌ ' + (data.error || 'Failed'));
-                    } catch (e) { setIntegrationMsg('❌ ' + e.message); }
-                  }}>Save Webhook</button>
-              </div>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                <div>
-                  <div style={{ fontSize: 12, fontWeight: 700 }}>🔐 Google Workspace SSO</div>
-                  <div style={{ fontSize: 12, color: "var(--tx2)", marginTop: 2 }}>Let your team sign in with Google Workspace</div>
-                </div>
-                <span style={{ fontSize: 12, color: "var(--ok)", fontWeight: 600 }}>✅ Available via Google Login</span>
-              </div>
-            </div>
-
-            {/* Team Permissions */}
-            <div className="card fadeUp" style={{ padding: 18 }}>
-              <div className="lbl" style={{ marginBottom: 12 }}>TEAM PERMISSIONS</div>
-              {[
-                ["👑 Admin", "Full access — manage everything", "#f59e0b"],
-                ["👔 Hiring Manager", "Create assessments, view results, invite candidates", "var(--ac)"],
-                ["📋 Recruiter", "Invite candidates only", "var(--ok)"],
-                ["👁️ Viewer", "View results only, no actions", "var(--tx2)"]
-              ].map(([role, desc, color], i) => (
-                <div key={i} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 0", borderBottom: i < 3 ? "1px solid var(--bd)" : "none" }}>
-                  <div>
-                    <div style={{ fontSize: 12, fontWeight: 700, color }}>{role}</div>
-                    <div style={{ fontSize: 12, color: "var(--tx2)", marginTop: 2 }}>{desc}</div>
-                  </div>
-                  <span style={{ fontSize: 11, color: "var(--tx2)", background: "var(--s2)", padding: "3px 10px", borderRadius: 20 }}>{i === 0 ? "You" : "Invite via email"}</span>
-                </div>
-              ))}
-              <div style={{ marginTop: 14, padding: 12, background: "rgba(0,229,255,.05)", borderRadius: 10, border: "1px solid rgba(0,229,255,.15)", fontSize: 13, color: "var(--tx2)" }}>
-                💡 Invite team members as candidates with their work email — they'll appear after completing their assessment.
-              </div>
-            </div>
-            
-          </>)}
-
-          {/* ── B8: HELP ── */}
-          {b2bTab === "help" && (<>
-            <div className="lbl" style={{ marginBottom: 12 }}>FREQUENTLY ASKED QUESTIONS</div>
-            {[
-              ["How are candidates assessed?", "Each candidate gets 5 adaptive AI questions for their role and difficulty. Scores are based on technical depth, communication quality, and decision-making."],
-              ["Can I customise assessments?", "Yes — upload a job description and AI will tailor the scenario context. You can also set role, difficulty, and assessment type."],
-              ["Are scores objective?", "AI evaluation is calibrated against industry benchmarks. Scores above 7/10 typically indicate strong candidates. All scores include a transparent breakdown."],
-              ["How do I share results with my team?", "Download CSV reports from the Badges tab, or connect Slack/Zapier in Settings to push results automatically."],
-              ["Can candidates retake assessments?", "By default, each invite is single-use. You can send new invites with different roles or difficulties for re-assessment."]
-            ].map(([q, a], i) => (
-              <div key={i} className="card fadeUp" style={{ padding: 14, marginBottom: 8, animationDelay: `${i * .05}s` }}>
-                <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 4 }}>{q}</div>
-                <div style={{ fontSize: 13, color: "var(--tx2)", lineHeight: 1.6 }}>{a}</div>
-              </div>
-            ))}
-            <div className="card fadeUp" style={{ padding: 16, marginTop: 8 }}>
-              <div className="lbl" style={{ marginBottom: 8 }}>CONTACT SUPPORT</div>
-              {feedbackSent ? (
-                <div style={{ color: "var(--ok)", fontSize: 13, padding: "10px 0" }}>✅ Message sent! We'll respond within 24 hours.</div>
-              ) : (
-                <>
-                  <textarea className="input" placeholder="Describe your issue or question..." style={{ minHeight: 60, marginBottom: 10 }}
-                    value={feedbackText} onChange={e => setFeedbackText(e.target.value)} />
-                  <button className="btn bp" style={{ fontSize: 13 }} disabled={!feedbackText.trim()}
+                  <textarea className="input" placeholder="Or paste job description text here..." value={newAssessJD}
+                    onChange={e => { setNewAssessJD(e.target.value); setJdAnalysis(null); }}
+                    style={{ minHeight: 80, marginBottom: 10, fontSize: 12 }} />
+                  <button className="btn bp" style={{ fontSize: 13, padding: "8px 20px" }}
+                    disabled={!newAssessJD.trim() || jdAnalyzing}
                     onClick={async () => {
+                      setJdAnalyzing(true); setJdAnalysis(null);
                       try {
                         const token = localStorage.getItem('token');
-                        const headers = { 'Content-Type': 'application/json' };
-                        if (token) headers['Authorization'] = `Bearer ${token}`;
-                        await fetch('https://threatready-db.onrender.com/api/feedback', {
+                        const res = await fetch('https://threatready-db.onrender.com/api/b2b/analyze-jd', {
                           method: 'POST',
-                          headers,
-                          body: JSON.stringify({ message: feedbackText })
+                          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                          body: JSON.stringify({ jd_text: newAssessJD })
                         });
-                        setFeedbackSent(true);
-                        setFeedbackText("");
-                        setTimeout(() => setFeedbackSent(false), 4000);
-                      } catch (e) { showToast('Failed to submit. Please try again.', 'error'); }
+                        const data = await res.json();
+                        if (data.analysis) {
+                          setJdAnalysis(data.analysis);
+                          if (data.analysis.recommended_role) setNewAssessRole(data.analysis.recommended_role);
+                          if (data.analysis.recommended_difficulty) setNewAssessDiff(data.analysis.recommended_difficulty);
+                          if (data.analysis.suggested_name) setNewAssessName(data.analysis.suggested_name);
+                        }
+                      } catch (e) { console.log('JD analyze error:', e.message); }
+                      setJdAnalyzing(false);
                     }}>
-                    Submit Message
+                    {jdAnalyzing ? <><span className="loader" style={{ width: 12, height: 12 }} /> Analyzing...</> : "🤖 Analyze JD →"}
                   </button>
-                </>
-              )}
+                  {jdAnalysis && (
+                    <div style={{ marginTop: 10, padding: 12, background: "rgba(0,224,150,.07)", borderRadius: 10, border: "1px solid rgba(0,224,150,.2)", fontSize: 13 }}>
+                      <div style={{ color: "var(--ok)", fontWeight: 700, marginBottom: 6 }}>✅ AI Analysis Complete</div>
+                      {jdAnalysis.summary && <div style={{ color: "var(--tx2)", marginBottom: 4 }}>{jdAnalysis.summary}</div>}
+                      {jdAnalysis.key_skills?.length > 0 && (
+                        <div style={{ display: "flex", flexWrap: "wrap", gap: 4, marginTop: 6 }}>
+                          {jdAnalysis.key_skills.map((s, i) => <span key={i} className="tag" style={{ fontSize: 11 }}>{s}</span>)}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
 
-              {/* Contact email */}
-              <div style={{ marginTop: 16, paddingTop: 14, borderTop: "1px solid var(--bd)", fontSize: 13, color: "var(--tx2)" }}>
-                Or email us directly at: <a href="mailto:admin@aerovanttech.com" style={{ color: "var(--ac)", textDecoration: "none", fontWeight: 600 }}>admin@aerovanttech.com</a>
+                {/* Assessment Config */}
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 12 }}>
+                  <div>
+                    <div style={{ fontSize: 12, color: "var(--tx2)", marginBottom: 4 }}>ASSESSMENT NAME</div>
+                    <input className="input" placeholder="e.g. Senior Cloud Engineer Q2" value={newAssessName} onChange={e => setNewAssessName(e.target.value)} style={{ fontSize: 12 }} />
+                  </div>
+                  <div>
+                    <div style={{ fontSize: 12, color: "var(--tx2)", marginBottom: 4 }}>ROLE</div>
+                    <select className="input" value={newAssessRole} onChange={e => setNewAssessRole(e.target.value)} style={{ fontSize: 12 }}>
+                      {ROLES.map(r => <option key={r.id} value={r.id}>{r.icon} {r.name}</option>)}
+                    </select>
+                  </div>
+                </div>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 14 }}>
+                  <div>
+                    <div style={{ fontSize: 12, color: "var(--tx2)", marginBottom: 4 }}>DIFFICULTY</div>
+                    <select className="input" value={newAssessDiff} onChange={e => setNewAssessDiff(e.target.value)} style={{ fontSize: 12 }}>
+                      {DIFFICULTIES.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <div style={{ fontSize: 12, color: "var(--tx2)", marginBottom: 4 }}>TYPE</div>
+                    <select className="input" value={newAssessType} onChange={e => setNewAssessType(e.target.value)} style={{ fontSize: 12 }}>
+                      <option value="standard">Standard</option>
+                      <option value="timed">Timed Challenge</option>
+                      <option value="take_home">Take Home</option>
+                    </select>
+                  </div>
+                </div>
+
+                {/* Custom Question Count */}
+                <div style={{ marginBottom: 14 }}>
+                  <div style={{ fontSize: 12, color: "var(--tx2)", marginBottom: 6 }}>NUMBER OF QUESTIONS</div>
+                  <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 8 }}>
+                    {[5, 10, 15, 20, 25].map(n => (
+                      <button key={n} type="button"
+                        className={`btn ${newAssessQuestionCount === n ? 'bp' : 'bs'}`}
+                        style={{ fontSize: 13, padding: "6px 14px" }}
+                        onClick={() => setNewAssessQuestionCount(n)}>
+                        {n} Q
+                      </button>
+                    ))}
+                  </div>
+                  <input type="number" className="input" min="1" max="50" value={newAssessQuestionCount}
+                    onChange={e => {
+                      const v = parseInt(e.target.value) || 1;
+                      setNewAssessQuestionCount(Math.max(1, Math.min(50, v)));
+                    }}
+                    placeholder="Or enter custom number (1-50)"
+                    style={{ fontSize: 12 }} />
+                  <div style={{ fontSize: 11, color: "var(--tx2)", marginTop: 4 }}>
+                    AI will generate exactly {newAssessQuestionCount} question{newAssessQuestionCount !== 1 ? 's' : ''} for this assessment
+                  </div>
+                </div>
+
+                {assessMsg && (
+                  <div style={{ padding: 9, borderRadius: 8, marginBottom: 10, fontSize: 13, background: assessMsg.includes("✅") ? "rgba(0,224,150,.1)" : "rgba(255,82,82,.1)", color: assessMsg.includes("✅") ? "var(--ok)" : "var(--dn)" }}>{assessMsg}</div>
+                )}
+                <button className="btn bp" style={{ width: "100%", padding: 12, fontSize: 13 }}
+                  disabled={!newAssessName.trim()}
+                  onClick={async () => {
+                    setAssessMsg('Creating assessment with ' + newAssessQuestionCount + ' questions...');
+                    try {
+                      const token = localStorage.getItem('token');
+                      const res = await fetch('https://threatready-db.onrender.com/api/b2b/assessments', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                        body: JSON.stringify({
+                          name: newAssessName,
+                          role_id: newAssessRole,
+                          difficulty: newAssessDiff,
+                          assessment_type: newAssessType,
+                          jd_text: newAssessJD,
+                          question_count: newAssessQuestionCount
+                        })
+                      });
+                      const data = await res.json();
+                      if (data.assessment) {
+                        setAssessMsg('✅ Assessment created with ' + newAssessQuestionCount + ' questions! Redirecting to Library...');
+                        setNewAssessName(''); setNewAssessJD(''); setJdAnalysis(null);
+                        setNewAssessQuestionCount(5);
+                        loadB2bData();
+                        setTimeout(() => {
+                          setAssessMsg('');
+                          setB2bTab("library");
+                          localStorage.setItem('cyberprep_b2btab', 'library');
+                        }, 1500);
+                      } else {
+                        setAssessMsg('❌ ' + (data.error || 'Failed to create assessment'));
+                      }
+                    } catch (e) { setAssessMsg('❌ ' + e.message); }
+                  }}>
+                  Create Assessment →
+                </button>
               </div>
-            </div>
-          </>)}
 
-          {/* ═══ CLOSE fade overlay wrapper ═══ */}
+            </>)}
+
+            {/* ── B6: LIBRARY (Saved Assessments + Invite Candidate) ── */}
+            {b2bTab === "library" && (<>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12, gap: 10, flexWrap: "wrap" }}>
+                <div className="lbl">SAVED ASSESSMENTS ({filterBySearch(assessments, librarySearch, a => a.name, a => '', a => a.created_at).length})</div>
+                <div style={{ display: "flex", gap: 8, alignItems: "center", flex: 1, maxWidth: 400, minWidth: 250 }}>
+                  <input className="input" type="text" placeholder="🔍 Search name or date..."
+                    value={librarySearch} onChange={e => setLibrarySearch(e.target.value)}
+                    style={{ fontSize: 13, padding: "6px 12px", flex: 1 }} />
+                  {librarySearch && (
+                    <button className="btn bs" style={{ fontSize: 12, padding: "4px 10px" }} onClick={() => setLibrarySearch('')}>✕</button>
+                  )}
+                </div>
+                <button className="btn bp" style={{ fontSize: 13, padding: "6px 14px" }}
+                  onClick={() => { setB2bTab("create"); localStorage.setItem('cyberprep_b2btab', 'create'); }}>
+                  + New Assessment
+                </button>
+              </div>
+              {b2bLoading && <div style={{ textAlign: "center", padding: 20 }}><div className="loader" /></div>}
+              {assessments.length === 0 && !b2bLoading && (
+                <div className="card fadeUp" style={{ padding: 40, textAlign: "center" }}>
+                  <div style={{ fontSize: 40, marginBottom: 12 }}>📚</div>
+                  <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 6 }}>No saved assessments yet</div>
+                  <div style={{ fontSize: 12, color: "var(--tx2)", marginBottom: 16 }}>Create an assessment and it will appear here.</div>
+                  <button className="btn bp" style={{ fontSize: 12, padding: "10px 24px" }}
+                    onClick={() => { setB2bTab("create"); localStorage.setItem('cyberprep_b2btab', 'create'); }}>
+                    Create First Assessment →
+                  </button>
+                </div>
+              )}
+              {assessments.length > 0 && filterBySearch(assessments, librarySearch, a => a.name, a => '', a => a.created_at).length === 0 && (
+                <div className="card fadeUp" style={{ padding: 20, textAlign: "center", color: "var(--tx2)", fontSize: 12 }}>
+                  No assessments match "{librarySearch}"
+                </div>
+              )}
+              {filterBySearch(assessments, librarySearch, a => a.name, a => '', a => a.created_at).map((a, i) => (
+                <div key={a.id} className="card card-glow fadeUp" style={{ padding: 14, marginBottom: 10, animationDelay: `${i * .04}s` }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                    <div>
+                      <div style={{ fontSize: 13, fontWeight: 700 }}>{a.name}</div>
+                      <div style={{ fontSize: 12, color: "var(--tx2)", marginTop: 3 }}>
+                        {ROLES.find(r => r.id === a.role_id)?.name || a.role_id} · {a.difficulty} · {a.total_candidates || 0} candidates · {a.created_at?.substring(0, 10)}
+                      </div>
+                      {a.questions?.length > 0 && (
+                        <div style={{ fontSize: 11, color: "var(--ok)", marginTop: 4 }}>✅ {a.questions.length} questions generated</div>
+                      )}
+                    </div>
+                    <div style={{ display: "flex", gap: 6 }}>
+                      <button className="btn bs" style={{ fontSize: 11, padding: "4px 8px" }}
+                        onClick={async () => {
+                          const token = localStorage.getItem('token');
+                          const res = await fetch(`https://threatready-db.onrender.com/api/b2b/assessments/${a.id}/duplicate`, {
+                            method: 'POST', headers: { 'Authorization': `Bearer ${token}` }
+                          });
+                          const data = await res.json();
+                          if (data.assessment) { loadB2bData(); showToast('Assessment duplicated!', 'success'); }
+                          else showToast('Duplicate failed', 'error');
+                        }}>Duplicate</button>
+                      <button className="btn bp" style={{ fontSize: 11, padding: "4px 8px" }}
+                        onClick={() => {
+                          setInviteRole(a.role_id); setInviteDiff(a.difficulty);
+                          setInviteAssessmentId(String(a.id));
+                          setB2bTab("candidates"); localStorage.setItem('cyberprep_b2btab', 'candidates');
+                          setTimeout(() => document.getElementById('invite-email-input')?.focus(), 300);
+                          showToast(`Linked to "${a.name}" (${a.question_count || 5} questions). Enter email to invite.`, 'info');
+                        }}>Invite →</button>
+                      <button className="btn bs" style={{ fontSize: 11, padding: "4px 8px", color: "var(--dn)", borderColor: "var(--dn)" }}
+                        onClick={() => {
+                          showConfirm(`Delete "${a.name}"? This cannot be undone.`, async () => {
+                            const token = localStorage.getItem('token');
+                            const res = await fetch(`https://threatready-db.onrender.com/api/b2b/assessments/${a.id}`, {
+                              method: 'DELETE', headers: { 'Authorization': `Bearer ${token}` }
+                            });
+                            const data = await res.json();
+                            if (data.success) { loadB2bData(); showToast('Assessment deleted.', 'success'); }
+                            else showToast('Delete failed: ' + (data.error || 'Error'), 'error');
+                          });
+                        }}>🗑 Delete</button>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </>)}
+
+            {/* ── B7: SETTINGS ── */}
+            {b2bTab === "settings" && (<>
+              <div className="lbl" style={{ marginBottom: 10 }}>COMPANY PROFILE</div>
+              <div className="card fadeUp" style={{ padding: 16, marginBottom: 16 }}>
+                {companySettingsMsg && (
+                  <div style={{ padding: 9, borderRadius: 8, marginBottom: 10, fontSize: 13, background: companySettingsMsg.includes("✅") ? "rgba(0,224,150,.1)" : "rgba(255,82,82,.1)", color: companySettingsMsg.includes("✅") ? "var(--ok)" : "var(--dn)" }}>
+                    {companySettingsMsg}
+                  </div>
+                )}
+                <input className="input" placeholder="Company Name" value={companyName} onChange={e => setCompanyName(e.target.value)} style={{ marginBottom: 10 }} />
+                <select className="input" value={teamSize} onChange={e => setTeamSize(e.target.value)} style={{ marginBottom: 14 }}>
+                  <option value="5-10">Team Starter · 5-10 people</option>
+                  <option value="11-50">Team Pro · 11-50 people</option>
+                  <option value="50+">Enterprise · 50+ people</option>
+                </select>
+                <button className="btn bp" style={{ fontSize: 12, padding: "10px 24px" }}
+                  onClick={async () => {
+                    setCompanySettingsMsg('Saving...');
+                    try {
+                      const token = localStorage.getItem('token');
+                      const res = await fetch('https://threatready-db.onrender.com/api/b2b/settings', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                        body: JSON.stringify({ company_name: companyName, team_size: teamSize })
+                      });
+                      const data = await res.json();
+                      if (data.success) { setCompanySettingsMsg('✅ Saved!'); setTimeout(() => setCompanySettingsMsg(''), 3000); }
+                      else setCompanySettingsMsg('❌ ' + (data.error || 'Failed'));
+                    } catch (e) { setCompanySettingsMsg('❌ ' + e.message); }
+                  }}>
+                  Save Profile
+                </button>
+              </div>
+
+              {/* Integrations */}
+              <div className="card fadeUp" style={{ padding: 18, marginBottom: 14 }}>
+                <div className="lbl" style={{ marginBottom: 12 }}>INTEGRATIONS</div>
+                {integrationMsg && (
+                  <div style={{ padding: 9, borderRadius: 8, marginBottom: 10, fontSize: 13, background: integrationMsg.includes("✅") ? "rgba(0,224,150,.1)" : "rgba(255,82,82,.1)", color: integrationMsg.includes("✅") ? "var(--ok)" : "var(--dn)" }}>
+                    {integrationMsg}
+                  </div>
+                )}
+                <div style={{ paddingBottom: 14, marginBottom: 14, borderBottom: "1px solid var(--bd)" }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+                    <div>
+                      <div style={{ fontSize: 12, fontWeight: 700 }}>💬 Slack Notifications</div>
+                      <div style={{ fontSize: 12, color: "var(--tx2)", marginTop: 2 }}>Get notified when candidates complete assessments</div>
+                    </div>
+                    <span style={{ fontSize: 12, color: slackWebhook ? "var(--ok)" : "var(--tx2)", fontWeight: 600 }}>{slackWebhook ? "✅ Connected" : "Not connected"}</span>
+                  </div>
+                  <input className="input" placeholder="Slack Webhook URL (https://hooks.slack.com/...)" value={slackWebhook} onChange={e => setSlackWebhook(e.target.value)} style={{ marginBottom: 8, fontSize: 13 }} />
+                  <button className="btn bs" style={{ fontSize: 13, padding: "6px 16px" }}
+                    onClick={async () => {
+                      setIntegrationMsg('Saving...');
+                      try {
+                        const token = localStorage.getItem('token');
+                        const res = await fetch('https://threatready-db.onrender.com/api/b2b/settings', { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` }, body: JSON.stringify({ slack_webhook: slackWebhook }) });
+                        const data = await res.json();
+                        if (data.success) { setIntegrationMsg('✅ Slack webhook saved!'); setTimeout(() => setIntegrationMsg(''), 3000); }
+                        else setIntegrationMsg('❌ ' + (data.error || 'Failed'));
+                      } catch (e) { setIntegrationMsg('❌ ' + e.message); }
+                    }}>Save Webhook</button>
+                </div>
+                <div style={{ paddingBottom: 14, marginBottom: 14, borderBottom: "1px solid var(--bd)" }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+                    <div>
+                      <div style={{ fontSize: 12, fontWeight: 700 }}>⚡ ATS Integration (Zapier)</div>
+                      <div style={{ fontSize: 12, color: "var(--tx2)", marginTop: 2 }}>Push candidate results to your ATS automatically</div>
+                    </div>
+                    <span style={{ fontSize: 12, color: zapierWebhook ? "var(--ok)" : "var(--tx2)", fontWeight: 600 }}>{zapierWebhook ? "✅ Connected" : "Not connected"}</span>
+                  </div>
+                  <input className="input" placeholder="Zapier Webhook URL (https://hooks.zapier.com/...)" value={zapierWebhook} onChange={e => setZapierWebhook(e.target.value)} style={{ marginBottom: 8, fontSize: 13 }} />
+                  <button className="btn bs" style={{ fontSize: 13, padding: "6px 16px" }}
+                    onClick={async () => {
+                      setIntegrationMsg('Saving...');
+                      try {
+                        const token = localStorage.getItem('token');
+                        const res = await fetch('https://threatready-db.onrender.com/api/b2b/settings', { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` }, body: JSON.stringify({ zapier_webhook: zapierWebhook }) });
+                        const data = await res.json();
+                        if (data.success) { setIntegrationMsg('✅ Zapier webhook saved!'); setTimeout(() => setIntegrationMsg(''), 3000); }
+                        else setIntegrationMsg('❌ ' + (data.error || 'Failed'));
+                      } catch (e) { setIntegrationMsg('❌ ' + e.message); }
+                    }}>Save Webhook</button>
+                </div>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                  <div>
+                    <div style={{ fontSize: 12, fontWeight: 700 }}>🔐 Google Workspace SSO</div>
+                    <div style={{ fontSize: 12, color: "var(--tx2)", marginTop: 2 }}>Let your team sign in with Google Workspace</div>
+                  </div>
+                  <span style={{ fontSize: 12, color: "var(--ok)", fontWeight: 600 }}>✅ Available via Google Login</span>
+                </div>
+              </div>
+
+              {/* Team Permissions */}
+              <div className="card fadeUp" style={{ padding: 18 }}>
+                <div className="lbl" style={{ marginBottom: 12 }}>TEAM PERMISSIONS</div>
+                {[
+                  ["👑 Admin", "Full access — manage everything", "#f59e0b"],
+                  ["👔 Hiring Manager", "Create assessments, view results, invite candidates", "var(--ac)"],
+                  ["📋 Recruiter", "Invite candidates only", "var(--ok)"],
+                  ["👁️ Viewer", "View results only, no actions", "var(--tx2)"]
+                ].map(([role, desc, color], i) => (
+                  <div key={i} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 0", borderBottom: i < 3 ? "1px solid var(--bd)" : "none" }}>
+                    <div>
+                      <div style={{ fontSize: 12, fontWeight: 700, color }}>{role}</div>
+                      <div style={{ fontSize: 12, color: "var(--tx2)", marginTop: 2 }}>{desc}</div>
+                    </div>
+                    <span style={{ fontSize: 11, color: "var(--tx2)", background: "var(--s2)", padding: "3px 10px", borderRadius: 20 }}>{i === 0 ? "You" : "Invite via email"}</span>
+                  </div>
+                ))}
+                <div style={{ marginTop: 14, padding: 12, background: "rgba(0,229,255,.05)", borderRadius: 10, border: "1px solid rgba(0,229,255,.15)", fontSize: 13, color: "var(--tx2)" }}>
+                  💡 Invite team members as candidates with their work email — they'll appear after completing their assessment.
+                </div>
+              </div>
+
+            </>)}
+
+            {/* ── B8: HELP ── */}
+            {b2bTab === "help" && (<>
+              <div className="lbl" style={{ marginBottom: 12 }}>FREQUENTLY ASKED QUESTIONS</div>
+              {[
+                ["How are candidates assessed?", "Each candidate gets 5 adaptive AI questions for their role and difficulty. Scores are based on technical depth, communication quality, and decision-making."],
+                ["Can I customise assessments?", "Yes — upload a job description and AI will tailor the scenario context. You can also set role, difficulty, and assessment type."],
+                ["Are scores objective?", "AI evaluation is calibrated against industry benchmarks. Scores above 7/10 typically indicate strong candidates. All scores include a transparent breakdown."],
+                ["How do I share results with my team?", "Download CSV reports from the Badges tab, or connect Slack/Zapier in Settings to push results automatically."],
+                ["Can candidates retake assessments?", "By default, each invite is single-use. You can send new invites with different roles or difficulties for re-assessment."]
+              ].map(([q, a], i) => (
+                <div key={i} className="card fadeUp" style={{ padding: 14, marginBottom: 8, animationDelay: `${i * .05}s` }}>
+                  <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 4 }}>{q}</div>
+                  <div style={{ fontSize: 13, color: "var(--tx2)", lineHeight: 1.6 }}>{a}</div>
+                </div>
+              ))}
+              <div className="card fadeUp" style={{ padding: 16, marginTop: 8 }}>
+                <div className="lbl" style={{ marginBottom: 8 }}>CONTACT SUPPORT</div>
+                {feedbackSent ? (
+                  <div style={{ color: "var(--ok)", fontSize: 13, padding: "10px 0" }}>✅ Message sent! We'll respond within 24 hours.</div>
+                ) : (
+                  <>
+                    <textarea className="input" placeholder="Describe your issue or question..." style={{ minHeight: 60, marginBottom: 10 }}
+                      value={feedbackText} onChange={e => setFeedbackText(e.target.value)} />
+                    <button className="btn bp" style={{ fontSize: 13 }} disabled={!feedbackText.trim()}
+                      onClick={async () => {
+                        try {
+                          const token = localStorage.getItem('token');
+                          const headers = { 'Content-Type': 'application/json' };
+                          if (token) headers['Authorization'] = `Bearer ${token}`;
+                          await fetch('https://threatready-db.onrender.com/api/feedback', {
+                            method: 'POST',
+                            headers,
+                            body: JSON.stringify({ message: feedbackText })
+                          });
+                          setFeedbackSent(true);
+                          setFeedbackText("");
+                          setTimeout(() => setFeedbackSent(false), 4000);
+                        } catch (e) { showToast('Failed to submit. Please try again.', 'error'); }
+                      }}>
+                      Submit Message
+                    </button>
+                  </>
+                )}
+
+                {/* Contact email */}
+                <div style={{ marginTop: 16, paddingTop: 14, borderTop: "1px solid var(--bd)", fontSize: 13, color: "var(--tx2)" }}>
+                  Or email us directly at: <a href="mailto:admin@aerovanttech.com" style={{ color: "var(--ac)", textDecoration: "none", fontWeight: 600 }}>admin@aerovanttech.com</a>
+                </div>
+              </div>
+            </>)}
+
+            {/* ═══ CLOSE fade overlay wrapper ═══ */}
           </div>
 
           {/* ═══════════════════════════════════════════════════════════════ */}
@@ -3804,7 +3271,7 @@ ${evals.map((ev, i) => {
                             headers: { 'Content-Type': 'application/json', ...(token ? { 'Authorization': `Bearer ${token}` } : {}) },
                             body: JSON.stringify({ message: `[HR ENTERPRISE LEAD] Company: ${hrModalCompanyName}, Team size: 50+, Contact: ${user?.email || 'N/A'}` })
                           });
-                        } catch(e) {}
+                        } catch (e) { }
                         return;
                       }
 
