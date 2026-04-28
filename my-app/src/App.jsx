@@ -37,6 +37,9 @@ import DifficultyView from "./views/DifficultyView.jsx";
 import InterviewView from "./views/InterviewView.jsx";
 import ResultsView from "./views/ResultsView.jsx";
 
+import CandidateAssessView from "./views/CandidateAssessView.jsx";
+import AuthView from "./views/AuthView.jsx";
+
 
 // ═══════════════════════════════════════════════════════════════
 // MAIN COMPONENT
@@ -1764,473 +1767,58 @@ export default function ThreatReady() {
   // ═══════════════════════════════════════════════════════════
   // PAGE 2: AUTH (Signup/Login + Email Verification + B2C/B2B Detection)
   // ═══════════════════════════════════════════════════════════
+
   if (view === "auth") return (
-    <div className="app"><style>{CSS}</style><div className="scanbar" /><div className="gridbg" />
-      <ToastContainer />
-      <button className="home-btn" onClick={() => {
-        setAuthStep("form");
-        setAuthError("");
-        // Use universal goBack which respects navigation history
-        goBack();
-      }}>← Back</button>
-      <div className="page" style={{ display: "flex", alignItems: "center", justifyContent: "center", minHeight: "100vh" }}>
-        <div className="card fadeUp" style={{ width: "100%", maxWidth: 420, padding: 36 }}>
-
-          {/* STEP 1: SIGNUP/LOGIN FORM */}
-          {authStep === "form" && (<>
-            <div style={{ textAlign: "center", marginBottom: 28 }}>
-              <div style={{ fontSize: 28, marginBottom: 6 }}>🔐</div>
-              <h2 style={{ fontSize: 22, fontWeight: 800 }}>{authMode === "login" ? "Welcome Back" : "Create Account"}</h2>
-              {authMode === "signup" && <p style={{ fontSize: 13, color: "var(--tx2)", marginTop: 6 }}>2 free attempts · No credit card required</p>}
-            </div>
-            {authError && <div style={{ background: "rgba(255,82,82,.1)", border: "1px solid rgba(255,82,82,.3)", borderRadius: 8, padding: 10, fontSize: 13, color: "var(--dn)", marginBottom: 14 }}>{authError}</div>}
-            {authMode === "signup" && <input className="input" placeholder="Full Name" value={authName} onChange={e => setAuthName(e.target.value)} style={{ marginBottom: 10 }} />}
-            <input className="input" type="email" placeholder="Email" value={authEmail} onChange={e => setAuthEmail(e.target.value)} style={{ marginBottom: 10 }} />
-            <div style={{ position: "relative", marginBottom: 4 }}>
-              <input
-                className="input"
-                type={showAuthPassword ? "text" : "password"}
-                placeholder="Password (min 8 characters)"
-                value={authPassword}
-                onChange={e => setAuthPassword(e.target.value)}
-                style={{ paddingRight: 44 }}
-              />
-              <button
-                type="button"
-                onClick={() => setShowAuthPassword(v => !v)}
-                aria-label={showAuthPassword ? "Hide password" : "Show password"}
-                style={{
-                  position: "absolute", right: 10, top: "50%", transform: "translateY(-50%)",
-                  background: "transparent", border: "none", cursor: "pointer",
-                  padding: 6, color: "var(--tx2)",
-                  display: "flex", alignItems: "center", justifyContent: "center"
-                }}>
-                {showAuthPassword ? (
-                  /* Eye with slash = hide */
-                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24" />
-                    <line x1="1" y1="1" x2="23" y2="23" />
-                  </svg>
-                ) : (
-                  /* Open eye = show */
-                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
-                    <circle cx="12" cy="12" r="3" />
-                  </svg>
-                )}
-              </button>
-            </div>
-            {authMode === "signup" && <PasswordStrength password={authPassword} />}
-            {authMode === "signup" && (
-              <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, color: "var(--tx2)", marginBottom: 14, cursor: "pointer" }}>
-                <input type="checkbox" checked={agreeTerms} onChange={e => setAgreeTerms(e.target.checked)} />
-                I agree to the Terms of Service and Privacy Policy
-              </label>
-            )}
-            {authMode === "login" && <div style={{ textAlign: "right", marginBottom: 10 }}><span style={{ fontSize: 13, color: "var(--ac)", cursor: "pointer" }} onClick={() => { setAuthStep("forgot"); setForgotEmail(authEmail || ""); setForgotMsg(""); }}>Forgot Password?</span></div>}
-            <button
-              className="btn bp"
-              style={{
-                width: "100%",
-                padding: 13,
-                fontSize: 14,
-                opacity: isAuthenticating ? 0.7 : 1,
-                cursor: isAuthenticating ? "not-allowed" : "pointer",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                gap: 8
-              }}
-              onClick={handleAuth}
-              disabled={isAuthenticating}
-            >
-              {isAuthenticating ? (
-                <>
-                  <span style={{
-                    display: "inline-block",
-                    width: 14,
-                    height: 14,
-                    border: "2px solid rgba(0,0,0,0.3)",
-                    borderTopColor: "#000",
-                    borderRadius: "50%",
-                    animation: "spin 0.6s linear infinite"
-                  }} />
-                  {authMode === "login" ? "Signing in..." : "Creating account..."}
-                </>
-              ) : (
-                authMode === "login" ? "Sign In" : "Create Account"
-              )}
-            </button>
-            <div style={{ display: "flex", gap: 8, marginTop: 14 }}>
-              <button className="btn bs" style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }} onClick={() => window.location.href = "https://threatready-db.onrender.com/auth/google"}>
-                <svg width="16" height="16" viewBox="0 0 48 48">
-                  <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z" /><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z" /><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z" /><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z" /></svg> Google</button>
-
-              <button className="btn bs" style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }} onClick={() => window.location.href = "https://threatready-db.onrender.com/auth/github?prompt=login"}>
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="white">
-                  <path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z" /></svg> GitHub</button>
-
-            </div>
-            <div style={{ textAlign: "center", marginTop: 16, fontSize: 12, color: "var(--tx2)" }}>
-              {authMode === "login" ? "No account? " : "Have an account? "}
-              <span style={{ color: "var(--ac)", cursor: "pointer" }} onClick={() => setAuthMode(authMode === "login" ? "signup" : "login")}>
-                {authMode === "login" ? "Sign up" : "Sign in"}
-              </span>
-            </div>
-          </>)}
-
-          {/* STEP 2: EMAIL VERIFICATION */}
-          {authStep === "verify" && (
-            <div style={{ textAlign: "center" }}>
-              <div style={{ fontSize: 48, marginBottom: 16 }}>📧</div>
-              <h2 style={{ fontSize: 20, fontWeight: 800, marginBottom: 8 }}>Check Your Email</h2>
-              <p style={{ fontSize: 12, color: "var(--tx2)", marginBottom: 6 }}>
-                We sent a 6-digit code to{" "}
-                <span style={{ color: "var(--ac)", fontWeight: 600 }}>{authEmail}</span>
-              </p>
-              <p style={{ fontSize: 13, color: "var(--tx2)", marginBottom: 20 }}>
-                Enter the code below. Expires in 15 minutes.
-              </p>
-
-              {otpError && (
-                <div style={{ background: "rgba(255,82,82,.1)", border: "1px solid rgba(255,82,82,.3)", borderRadius: 8, padding: 10, fontSize: 13, color: "var(--dn)", marginBottom: 14 }}>
-                  {otpError}
-                </div>
-              )}
-
-              <input
-                className="input"
-                placeholder="Enter 6-digit code"
-                value={otpCode}
-                onChange={e => setOtpCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
-                style={{ textAlign: "center", fontSize: 24, letterSpacing: 8, marginBottom: 14, fontFamily: "monospace" }}
-                maxLength={6}
-              />
-
-              <button
-                className="btn bp"
-                style={{ width: "100%", padding: 13, marginBottom: 10 }}
-                disabled={otpCode.length !== 6}
-
-                onClick={async () => {
-                  setOtpError("");
-                  try {
-                    const res = await fetch("https://threatready-db.onrender.com/api/auth/verify-otp", {
-                      method: "POST",
-                      headers: { "Content-Type": "application/json" },
-                      body: JSON.stringify({ email: authEmail, otp: otpCode })
-                    });
-                    const data = await res.json();
-                    if (!res.ok) { setOtpError(data.error || "Invalid code"); return; }
-
-                    // OTP verified — go to sign in page
-                    setOtpCode("");
-                    setAuthPassword("");
-                    setAuthMode("login");
-                    setAuthStep("form");
-                    setAuthError("✅ Email verified! Please sign in.");
-                    showToast("Email verified! Now sign in to continue.", "success");
-                  } catch (err) {
-                    setOtpError("Cannot connect to server");
-                  }
-                }}>
-                Verify Email ✓
-              </button>
-
-              <button
-                className="btn bs"
-                style={{ width: "100%", padding: 10, fontSize: 13 }}
-                onClick={async () => {
-                  setOtpError("");
-                  setOtpCode("");
-                  await fetch("https://threatready-db.onrender.com/api/auth/send-otp", {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ email: authEmail })
-                  });
-                  showToast('New verification code sent to your email!', 'success');
-                }}
-              >
-                Didn't get it? Resend Code
-              </button>
-            </div>
-          )}
-
-
-          {/* STEP 3: B2C/B2B DETECTION */}
-          {authStep === "detect" && (
-            <div style={{ textAlign: "center" }}>
-              <div style={{ fontSize: 48, marginBottom: 16 }}>{userType === "b2b" ? "🏢" : "👤"}</div>
-              <h2 style={{ fontSize: 20, fontWeight: 800, marginBottom: 8 }}>
-                {userType === "b2b" ? "Looks Like You're Hiring" : "Ready to Prepare?"}
-              </h2>
-              <p style={{ fontSize: 13, color: "var(--tx2)", marginBottom: 20 }}>
-                {userType === "b2b"
-                  ? "We detected a company email. Are you here to assess candidates or teams?"
-                  : "Are you preparing for security interviews?"}
-              </p>
-              <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-                <button className="btn bp" style={{ padding: 14 }} onClick={() => confirmUserType(userType)}>
-                  {userType === "b2b" ? "Yes, I'm Hiring / Assessing →" : "Yes, I'm Preparing →"}
-                </button>
-                <button className="btn bs" style={{ padding: 12, fontSize: 13 }} onClick={() => confirmUserType(userType === "b2b" ? "b2c" : "b2b")}>
-                  {userType === "b2b" ? "Actually, I'm a candidate preparing" : "Actually, I'm hiring / assessing"}
-                </button>
-              </div>
-            </div>
-          )}
-
-          {/* STEP 3.5: COMPANY INFO (B2B only — between Hiring/Preparing and OTP) */}
-          {authStep === "company-info" && (
-            <div>
-              <div style={{ textAlign: "center", marginBottom: 20 }}>
-                <div style={{ fontSize: 40, marginBottom: 10 }}>🏢</div>
-                <h2 style={{ fontSize: 20, fontWeight: 800, marginBottom: 6 }}>Tell us about your team</h2>
-                <p style={{ fontSize: 13, color: "var(--tx2)" }}>
-                  This helps us set up your hiring dashboard
-                </p>
-              </div>
-
-              <div style={{ marginBottom: 14 }}>
-                <label style={{ fontSize: 13, fontWeight: 600, color: "var(--tx2)", display: "block", marginBottom: 6 }}>
-                  Company Name *
-                </label>
-                <input className="input"
-                  placeholder="e.g., Acme Corp"
-                  value={hrModalCompanyName}
-                  onChange={e => setHrModalCompanyName(e.target.value)}
-                  style={{ fontSize: 14, padding: "12px 14px" }}
-                />
-              </div>
-
-              <div style={{ marginBottom: 18 }}>
-                <label style={{ fontSize: 13, fontWeight: 600, color: "var(--tx2)", display: "block", marginBottom: 6 }}>
-                  Team Size *
-                </label>
-                <select className="input"
-                  value={hrModalTeamSize}
-                  onChange={e => setHrModalTeamSize(e.target.value)}
-                  style={{ fontSize: 14, padding: "12px 14px", cursor: "pointer" }}
-                >
-                  <option value="5-10">5-10 people (Team Starter)</option>
-                  <option value="11-50">11-50 people (Team Pro)</option>
-                  <option value="50+">50+ people (Enterprise)</option>
-                </select>
-              </div>
-
-              <button className="btn bp" style={{ width: "100%", padding: 14, fontSize: 14, fontWeight: 700 }}
-                onClick={confirmCompanyInfo}>
-                Continue → Send OTP
-              </button>
-
-              <button className="btn bs" style={{ width: "100%", padding: 10, fontSize: 12, marginTop: 10, color: "var(--tx2)" }}
-                onClick={() => setAuthStep("detect")}>
-                ← Back
-              </button>
-            </div>
-          )}
-
-          {/* STEP 4: ROLE SELECTION (B2C only) */}
-          {authStep === "roleselect" && (
-            <div>
-              <div style={{ textAlign: "center", marginBottom: 20 }}>
-                <div style={{ fontSize: 28, marginBottom: 6 }}>🎯</div>
-                <h2 style={{ fontSize: 20, fontWeight: 800 }}>Choose Your First Role</h2>
-                <p style={{ fontSize: 13, color: "var(--tx2)", marginTop: 4 }}>You have 2 free attempts across all roles</p>
-              </div>
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 8 }}>
-                {ROLES.map(r => (
-                  <div key={r.id} className="card card-glow" style={{ padding: 12, textAlign: "center", cursor: "pointer" }}
-                    onClick={() => {
-                      setActiveRole(r.id);
-                      setSubscribedRoles([r.id]);
-                      const scs = SCENARIOS[r.id];
-                      if (scs?.length) { startScenario(scs[0], "beginner"); }
-                      else { setView("dashboard"); }
-                    }}>
-                    <div style={{ fontSize: 24 }}>{r.icon}</div>
-                    <div style={{ fontSize: 12, fontWeight: 700, marginTop: 4 }}>{r.name}</div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* ── FORGOT PASSWORD: Step 1 - Enter Email ── */}
-          {authStep === "forgot" && (
-            <div style={{ textAlign: "center" }}>
-              <div style={{ fontSize: 48, marginBottom: 12 }}>🔑</div>
-              <h2 style={{ fontSize: 20, fontWeight: 800, marginBottom: 6 }}>Forgot Password?</h2>
-              <p style={{ fontSize: 12, color: "var(--tx2)", marginBottom: 20, lineHeight: 1.7 }}>
-                Enter your email address and we'll send you a 6-digit reset code.
-              </p>
-              {forgotMsg && (
-                <div style={{
-                  padding: 10, borderRadius: 8, marginBottom: 12, fontSize: 12,
-                  background: forgotMsg.includes("✅") ? "rgba(0,224,150,.1)" : "rgba(255,82,82,.1)",
-                  border: forgotMsg.includes("✅") ? "1px solid rgba(0,224,150,.3)" : "1px solid rgba(255,82,82,.3)",
-                  color: forgotMsg.includes("✅") ? "var(--ok)" : "var(--dn)"
-                }}>
-                  {forgotMsg}
-                </div>
-              )}
-              <input className="input" type="email" placeholder="Your registered email address"
-                value={forgotEmail} onChange={e => setForgotEmail(e.target.value)}
-                style={{ marginBottom: 14 }}
-                onKeyDown={e => e.key === "Enter" && !forgotLoading && document.getElementById("forgot-send-btn").click()}
-              />
-              <button id="forgot-send-btn" className="btn bp" style={{ width: "100%", padding: 13 }}
-                disabled={!forgotEmail.trim() || forgotLoading}
-                onClick={async () => {
-                  setForgotLoading(true);
-                  setForgotMsg("");
-                  try {
-                    const res = await fetch("https://threatready-db.onrender.com/api/auth/forgot-password", {
-                      method: "POST",
-                      headers: { "Content-Type": "application/json" },
-                      body: JSON.stringify({ email: forgotEmail.trim() })
-                    });
-                    const data = await res.json();
-                    if (data.success) {
-                      setForgotMsg("✅ Reset code sent! Check your email inbox.");
-                      setTimeout(() => { setAuthStep("resetcode"); setForgotMsg(""); }, 1800);
-                    } else {
-                      setForgotMsg("❌ " + (data.error || "Failed to send reset code"));
-                    }
-                  } catch (e) {
-                    setForgotMsg("❌ Server error: " + e.message);
-                  }
-                  setForgotLoading(false);
-                }}>
-                {forgotLoading ? "Sending..." : "Send Reset Code →"}
-              </button>
-              <div style={{ marginTop: 16 }}>
-                <span style={{ fontSize: 12, color: "var(--ac)", cursor: "pointer" }}
-                  onClick={() => { setAuthStep("form"); setForgotMsg(""); }}>
-                  ← Back to Login
-                </span>
-              </div>
-            </div>
-          )}
-
-          {/* ── FORGOT PASSWORD: Step 2 - Enter Code + New Password ── */}
-          {authStep === "resetcode" && (
-            <div style={{ textAlign: "center" }}>
-              <div style={{ fontSize: 48, marginBottom: 12 }}>🔐</div>
-              <h2 style={{ fontSize: 20, fontWeight: 800, marginBottom: 6 }}>Reset Password</h2>
-              <p style={{ fontSize: 12, color: "var(--tx2)", marginBottom: 4 }}>Code sent to</p>
-              <p style={{ fontSize: 13, color: "var(--ac)", fontWeight: 700, marginBottom: 20 }}>{forgotEmail}</p>
-              {forgotMsg && (
-                <div style={{
-                  padding: 10, borderRadius: 8, marginBottom: 12, fontSize: 12,
-                  background: forgotMsg.includes("✅") ? "rgba(0,224,150,.1)" : "rgba(255,82,82,.1)",
-                  border: forgotMsg.includes("✅") ? "1px solid rgba(0,224,150,.3)" : "1px solid rgba(255,82,82,.3)",
-                  color: forgotMsg.includes("✅") ? "var(--ok)" : "var(--dn)"
-                }}>
-                  {forgotMsg}
-                </div>
-              )}
-              <input className="input" placeholder="Enter 6-digit code" maxLength={6}
-                value={forgotCode}
-                onChange={e => setForgotCode(e.target.value.replace(/\D/g, ""))}
-                style={{ marginBottom: 10, textAlign: "center", fontSize: 22, letterSpacing: 10, fontFamily: "monospace", fontWeight: 700 }}
-              />
-              <div style={{ position: "relative", marginBottom: 14 }}>
-                <input
-                  className="input"
-                  type={showNewPassword ? "text" : "password"}
-                  placeholder="New password (min 8 characters)"
-                  value={newPassword}
-                  onChange={e => setNewPassword(e.target.value)}
-                  style={{ paddingRight: 44 }}
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowNewPassword(v => !v)}
-                  aria-label={showNewPassword ? "Hide password" : "Show password"}
-                  style={{
-                    position: "absolute", right: 10, top: "50%", transform: "translateY(-50%)",
-                    background: "transparent", border: "none", cursor: "pointer",
-                    padding: 6, color: "var(--tx2)",
-                    display: "flex", alignItems: "center", justifyContent: "center"
-                  }}>
-                  {showNewPassword ? (
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                      <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24" />
-                      <line x1="1" y1="1" x2="23" y2="23" />
-                    </svg>
-                  ) : (
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                      <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
-                      <circle cx="12" cy="12" r="3" />
-                    </svg>
-                  )}
-                </button>
-              </div>
-              <button className="btn bp" style={{ width: "100%", padding: 13 }}
-                disabled={forgotCode.length < 6 || newPassword.length < 8 || forgotLoading}
-                onClick={async () => {
-                  setForgotLoading(true);
-                  setForgotMsg("");
-                  try {
-                    const res = await fetch("https://threatready-db.onrender.com/api/auth/reset-password", {
-                      method: "POST",
-                      headers: { "Content-Type": "application/json" },
-                      body: JSON.stringify({ email: forgotEmail, code: forgotCode, new_password: newPassword })
-                    });
-                    const data = await res.json();
-                    if (data.success) {
-                      setAuthStep("resetdone");
-                    } else {
-                      setForgotMsg("❌ " + (data.error || "Reset failed. Check your code."));
-                    }
-                  } catch (e) {
-                    setForgotMsg("❌ Server error: " + e.message);
-                  }
-                  setForgotLoading(false);
-                }}>
-                {forgotLoading ? "Resetting..." : "Reset Password →"}
-              </button>
-              <div style={{ marginTop: 14, display: "flex", justifyContent: "space-between" }}>
-                <span style={{ fontSize: 12, color: "var(--ac)", cursor: "pointer" }}
-                  onClick={() => { setAuthStep("forgot"); setForgotMsg(""); setForgotCode(""); }}>
-                  ← Resend Code
-                </span>
-                <span style={{ fontSize: 12, color: "var(--ac)", cursor: "pointer" }}
-                  onClick={() => { setAuthStep("form"); setForgotMsg(""); }}>
-                  Back to Login
-                </span>
-              </div>
-            </div>
-          )}
-
-          {/* ── FORGOT PASSWORD: Step 3 - Success ── */}
-          {authStep === "resetdone" && (
-            <div style={{ textAlign: "center" }}>
-              <div style={{ fontSize: 64, marginBottom: 16 }}>✅</div>
-              <h2 style={{ fontSize: 22, fontWeight: 800, marginBottom: 8 }}>Password Reset!</h2>
-              <p style={{ fontSize: 12, color: "var(--tx2)", marginBottom: 24, lineHeight: 1.8 }}>
-                Your password has been updated successfully.<br />
-                You can now login with your new password.
-              </p>
-              <button className="btn bp" style={{ width: "100%", padding: 13 }}
-                onClick={() => {
-                  setAuthStep("form");
-                  setForgotCode("");
-                  setForgotEmail("");
-                  setNewPassword("");
-                  setForgotMsg("");
-                  setAuthMode("login");
-                }}>
-                Go to Login →
-              </button>
-            </div>
-          )}
-
-        </div>
-      </div>
-    </div>
+    <AuthView
+      authMode={authMode}
+      authStep={authStep}
+      authEmail={authEmail}
+      authPassword={authPassword}
+      authName={authName}
+      authError={authError}
+      agreeTerms={agreeTerms}
+      showAuthPassword={showAuthPassword}
+      showNewPassword={showNewPassword}
+      isAuthenticating={isAuthenticating}
+      otpCode={otpCode}
+      otpError={otpError}
+      forgotEmail={forgotEmail}
+      forgotCode={forgotCode}
+      newPassword={newPassword}
+      forgotLoading={forgotLoading}
+      forgotMsg={forgotMsg}
+      userType={userType}
+      hrModalCompanyName={hrModalCompanyName}
+      hrModalTeamSize={hrModalTeamSize}
+      HR_PRICING={HR_PRICING}
+      setAuthMode={setAuthMode}
+      setAuthStep={setAuthStep}
+      setAuthEmail={setAuthEmail}
+      setAuthPassword={setAuthPassword}
+      setAuthName={setAuthName}
+      setAuthError={setAuthError}
+      setAgreeTerms={setAgreeTerms}
+      setShowAuthPassword={setShowAuthPassword}
+      setShowNewPassword={setShowNewPassword}
+      setOtpCode={setOtpCode}
+      setOtpError={setOtpError}
+      setForgotEmail={setForgotEmail}
+      setForgotCode={setForgotCode}
+      setNewPassword={setNewPassword}
+      setForgotLoading={setForgotLoading}
+      setForgotMsg={setForgotMsg}
+      setHrModalCompanyName={setHrModalCompanyName}
+      setHrModalTeamSize={setHrModalTeamSize}
+      setView={setView}
+      handleAuth={handleAuth}
+      verifyEmail={verifyEmail}
+      confirmUserType={confirmUserType}
+      confirmCompanyInfo={confirmCompanyInfo}
+      startScenario={startScenario}
+      goBack={goBack}
+    />
   );
+
   // ═══════════════════════════════════════════════════════════
   // DIFFICULTY SELECTION
   // ═══════════════════════════════════════════════════════════
@@ -5237,283 +4825,29 @@ ${evals.map((ev, i) => {
   // ═══════════════════════════════════════════════════════════
   // CANDIDATE ASSESSMENT PAGE (/assess?token=xxx)
   // ═══════════════════════════════════════════════════════════
+
   if (view === "candidate-assess") return (
-    <div className="app"><style>{CSS}</style><div className="scanbar" /><div className="gridbg" />
-      <ToastContainer />
-      <div className="page" style={{ display: "flex", alignItems: "center", justifyContent: "center", minHeight: "100vh" }}>
-        <div style={{ width: "100%", maxWidth: 620, padding: "0 16px" }}>
-
-          {candidateAssessState === "loading" && (
-            <div className="card fadeUp" style={{ padding: 48, textAlign: "center" }}>
-              <div className="loader" style={{ width: 36, height: 36, margin: "0 auto 20px" }} />
-              <div style={{ fontSize: 14, color: "var(--tx2)" }}>Loading your assessment...</div>
-            </div>
-          )}
-
-          {candidateAssessState === "error" && (
-            <div className="card fadeUp" style={{ padding: 48, textAlign: "center" }}>
-              <div style={{ fontSize: 56, marginBottom: 16 }}>❌</div>
-              <h2 style={{ fontSize: 20, fontWeight: 800, marginBottom: 8 }}>Invalid or Expired Link</h2>
-              <p style={{ fontSize: 12, color: "var(--tx2)", lineHeight: 1.7 }}>{candidateAssessError || "This link is invalid or expired. Please contact the hiring team for a new link."}</p>
-            </div>
-          )}
-
-          {candidateAssessState === "already_done" && (
-            <div className="card fadeUp" style={{ padding: 48, textAlign: "center" }}>
-              <div style={{ fontSize: 56, marginBottom: 16 }}>✅</div>
-              <h2 style={{ fontSize: 20, fontWeight: 800, marginBottom: 8 }}>Already Completed</h2>
-              <p style={{ fontSize: 12, color: "var(--tx2)", lineHeight: 1.7 }}>You have already completed this assessment. Check your email for your detailed results report.</p>
-            </div>
-          )}
-
-          {candidateAssessState === "intro" && candidateAssessData && (
-            <div className="card fadeUp" style={{ padding: 36, textAlign: "center" }}>
-              <div style={{ fontSize: 13, fontWeight: 700, color: "var(--ac)", letterSpacing: 2, marginBottom: 12 }}>⚡ THREATREADY ASSESSMENT</div>
-              <h2 style={{ fontSize: 22, fontWeight: 800, marginBottom: 8 }}>
-                {candidateAssessData.candidate.assessment_name || `${ROLES.find(r => r.id === candidateAssessData.candidate.role_id)?.name} Assessment`}
-              </h2>
-              <p style={{ fontSize: 13, color: "var(--tx2)", marginBottom: 24, lineHeight: 1.7 }}>
-                Hello <strong style={{ color: "var(--tx1)" }}>{candidateAssessData.candidate.name}</strong>! You have been invited to complete a cybersecurity skills assessment.
-              </p>
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 10, marginBottom: 24 }}>
-                {[["📋", "5 Questions", "Scenario-based"], ["🤖", "AI Evaluated", "Instant scoring"], ["📧", "Email Report", "Sent after submit"]].map(([icon, t, d], i) => (
-                  <div key={i} className="card" style={{ padding: 14, textAlign: "center" }}>
-                    <div style={{ fontSize: 24, marginBottom: 6 }}>{icon}</div>
-                    <div style={{ fontSize: 13, fontWeight: 700 }}>{t}</div>
-                    <div style={{ fontSize: 12, color: "var(--tx2)" }}>{d}</div>
-                  </div>
-                ))}
-              </div>
-              <div style={{ display: "flex", gap: 10, alignItems: "center", justifyContent: "center", marginBottom: 24, padding: "10px 16px", background: "var(--s2)", borderRadius: 10, fontSize: 12, color: "var(--tx2)" }}>
-                <span style={{ fontSize: 20 }}>{ROLES.find(r => r.id === candidateAssessData.candidate.role_id)?.icon}</span>
-                <span style={{ fontWeight: 700 }}>{ROLES.find(r => r.id === candidateAssessData.candidate.role_id)?.name}</span>
-                <span>·</span>
-                <span className={`diff diff-${candidateAssessData.candidate.difficulty}`}>{candidateAssessData.candidate.difficulty}</span>
-              </div>
-              <button className="btn bp" style={{ width: "100%", padding: 16, fontSize: 16, fontWeight: 800 }}
-                onClick={() => { setCandidateAssessState("question"); setCandidateQIndex(0); setCandidateAnswers({}); }}>
-                Start Assessment →
-              </button>
-            </div>
-          )}
-
-          {candidateAssessState === "question" && candidateAssessData && (() => {
-            const q = candidateAssessData.questions[candidateQIndex];
-            const total = candidateAssessData.questions.length;
-            const ans = candidateAnswers[candidateQIndex] || "";
-
-            // Auto-speak question once when index changes (tracked via window global)
-            if (q?.question && window.__lastSpokenIdx !== candidateQIndex) {
-              window.__lastSpokenIdx = candidateQIndex;
-              setTimeout(() => {
-                if (window.speechSynthesis && !isMuted) {
-                  window.speechSynthesis.cancel();
-                  const utt = new SpeechSynthesisUtterance(q.question);
-                  const voices = window.speechSynthesis.getVoices();
-                  const useFemale = candidateQIndex % 2 === 0;
-                  // Strict gender match: only names clearly indicating the gender
-                  const femaleVoice = voices.find(v => /samantha|victoria|karen|moira|tessa|zira|susan|fiona|ava|allison/i.test(v.name) && !/male/i.test(v.name.replace(/female/i,'')) && v.lang.startsWith('en'))
-                    || voices.find(v => /female/i.test(v.name) && v.lang.startsWith('en'));
-                  const maleVoice = voices.find(v => /daniel|alex|fred|david|james|tom|oliver|aaron|arthur/i.test(v.name) && !/female/i.test(v.name) && v.lang.startsWith('en'))
-                    || voices.find(v => /\bmale\b/i.test(v.name) && !/female/i.test(v.name) && v.lang.startsWith('en'));
-                  const english = voices.filter(v => v.lang.startsWith('en'));
-                  utt.voice = useFemale ? (femaleVoice || english[0]) : (maleVoice || english.find(v => v !== femaleVoice) || english[0]);
-                  // Pitch differentiation — this GUARANTEES different gender sound even if same voice
-                  utt.rate = useFemale ? 0.95 : 0.9;
-                  utt.pitch = useFemale ? 1.4 : 0.6;
-                  utt.onstart = () => setIsSpeaking(true);
-                  utt.onend = () => setIsSpeaking(false);
-                  utt.onerror = () => setIsSpeaking(false);
-                  window.speechSynthesis.speak(utt);
-                }
-              }, 500);
-            }
-
-            const replayQuestion = () => {
-              if (!window.speechSynthesis) { showToast('Voice not supported in this browser', 'error'); return; }
-              window.speechSynthesis.cancel();
-              const utt = new SpeechSynthesisUtterance(q.question);
-              const voices = window.speechSynthesis.getVoices();
-              const useFemale = candidateQIndex % 2 === 0;
-              const femaleVoice = voices.find(v => /samantha|victoria|karen|moira|tessa|zira|susan|fiona|ava|allison/i.test(v.name) && !/male/i.test(v.name.replace(/female/i,'')) && v.lang.startsWith('en'))
-                || voices.find(v => /female/i.test(v.name) && v.lang.startsWith('en'));
-              const maleVoice = voices.find(v => /daniel|alex|fred|david|james|tom|oliver|aaron|arthur/i.test(v.name) && !/female/i.test(v.name) && v.lang.startsWith('en'))
-                || voices.find(v => /\bmale\b/i.test(v.name) && !/female/i.test(v.name) && v.lang.startsWith('en'));
-              const english = voices.filter(v => v.lang.startsWith('en'));
-              utt.voice = useFemale ? (femaleVoice || english[0]) : (maleVoice || english.find(v => v !== femaleVoice) || english[0]);
-              utt.rate = useFemale ? 0.95 : 0.9;
-              utt.pitch = useFemale ? 1.4 : 0.6;
-              utt.onstart = () => setIsSpeaking(true);
-              utt.onend = () => setIsSpeaking(false);
-              utt.onerror = () => setIsSpeaking(false);
-              window.speechSynthesis.speak(utt);
-            };
-
-            const toggleDictation = () => {
-              const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-              if (!SR) { showToast('Voice input not supported. Use Chrome/Edge.', 'error'); return; }
-              if (voice.recording) {
-                voice.stop();
-                if (voice.transcript?.trim()) {
-                  setCandidateAnswers(p => ({
-                    ...p,
-                    [candidateQIndex]: (p[candidateQIndex] ? p[candidateQIndex] + ' ' : '') + voice.transcript.trim()
-                  }));
-                  voice.reset();
-                }
-              } else {
-                voice.reset();
-                voice.start();
-              }
-            };
-
-            return (
-              <div className="card fadeUp" style={{ padding: 28 }}>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
-                  <span className="tag">Q{candidateQIndex + 1} of {total} · {q.category || "Security"}</span>
-                  <div style={{ display: "flex", gap: 5 }}>
-                    {Array.from({ length: total }).map((_, i) => (
-                      <div key={i} style={{ width: 10, height: 10, borderRadius: "50%", background: i < candidateQIndex ? "var(--ok)" : i === candidateQIndex ? "var(--ac)" : "var(--s3)", transition: "background .3s" }} />
-                    ))}
-                  </div>
-                </div>
-
-                {/* Avatar on top */}
-                <div style={{ display: "flex", justifyContent: "center", marginBottom: 16 }}>
-                  <AIAvatar isSpeaking={isSpeaking} isMuted={isMuted} qIndex={candidateQIndex} />
-                </div>
-
-                {/* Question box */}
-                <div style={{ padding: "18px 22px", background: "var(--s2)", borderRadius: 10, border: "1px solid var(--bd)", marginBottom: 20 }}>
-                  <div style={{ fontSize: 15, fontWeight: 700, lineHeight: 1.7 }}>{q.question}</div>
-                  <div style={{ display: "flex", gap: 6, marginTop: 12 }}>
-                    <button className="btn bs" style={{ fontSize: 12, padding: "4px 10px" }} onClick={replayQuestion}>
-                      🔊 Replay Question
-                    </button>
-                    <button className="btn bs" style={{ fontSize: 12, padding: "4px 10px" }}
-                      onClick={() => { window.speechSynthesis.cancel(); setIsSpeaking(false); setIsMuted(m => !m); }}>
-                      {isMuted ? "🔇 Unmute" : "🔈 Mute"}
-                    </button>
-                  </div>
-                </div>
-
-                {candidateAssessData.candidate.difficulty === "beginner" && q.hint && (
-                  <div style={{ padding: "8px 14px", background: "rgba(0,229,255,.05)", borderRadius: 8, border: "1px solid rgba(0,229,255,.15)", fontSize: 13, color: "var(--ac)", marginBottom: 14 }}>
-                    💡 Hint: {q.hint}
-                  </div>
-                )}
-
-                {/* Answer section with voice + text */}
-                <div style={{ marginBottom: 16 }}>
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
-                    <span style={{ fontSize: 13, color: "var(--tx2)", fontWeight: 700, letterSpacing: 1 }}>YOUR ANSWER</span>
-                    <button className={`btn ${voice.recording ? 'bdn' : 'bs'}`}
-                      style={{ fontSize: 13, padding: "6px 14px", display: "flex", alignItems: "center", gap: 6 }}
-                      onClick={toggleDictation}>
-                      {voice.recording
-                        ? <><span style={{ width: 8, height: 8, borderRadius: "50%", background: "#ff5252", animation: "pulse 1s infinite" }} /> Stop Recording</>
-                        : <>🎤 Speak Answer</>}
-                    </button>
-                  </div>
-                  <textarea className="input" placeholder={voice.recording ? "🎤 Listening... speak your answer" : "Type your answer here, or click 🎤 to speak..."}
-                    value={ans}
-                    onChange={e => setCandidateAnswers(p => ({ ...p, [candidateQIndex]: e.target.value }))}
-                    style={{ minHeight: 140, fontSize: 13, borderColor: voice.recording ? "#ff5252" : undefined }} />
-                  {voice.recording && (
-                    <div style={{ marginTop: 8, padding: "8px 12px", background: "rgba(255,82,82,.08)", border: "1px solid rgba(255,82,82,.25)", borderRadius: 8 }}>
-                      <div style={{ fontSize: 12, color: "var(--dn)", marginBottom: 4, display: "flex", alignItems: "center", gap: 6 }}>
-                        <span style={{ width: 6, height: 6, borderRadius: "50%", background: "#ff5252", animation: "pulse 1s infinite" }} />
-                        Recording — click "Stop Recording" to add to answer
-                      </div>
-                      {voice.transcript && (
-                        <div style={{ fontSize: 12, color: "var(--tx2)", fontStyle: "italic" }}>{voice.transcript}</div>
-                      )}
-                    </div>
-                  )}
-                </div>
-
-                <button className="btn bp" style={{ width: "100%", padding: 14, fontSize: 15 }}
-                  disabled={!ans.trim() || candidateSubmitting}
-                  onClick={async () => {
-                    // Stop any voice
-                    if (voice.recording) voice.stop();
-                    window.speechSynthesis.cancel();
-                    setIsSpeaking(false);
-
-                    if (candidateQIndex < total - 1) {
-                      setCandidateQIndex(p => p + 1);
-                    } else {
-                      setCandidateSubmitting(true);
-                      setCandidateAssessState("submitting");
-                      try {
-                        const answers = candidateAssessData.questions.map((q, i) => ({
-                          question: q.question,
-                          answer: candidateAnswers[i] || "",
-                          category: q.category || "Security"
-                        }));
-                        const res = await fetch("https://threatready-db.onrender.com/api/candidate/submit", {
-                          method: "POST",
-                          headers: { "Content-Type": "application/json" },
-                          body: JSON.stringify({ token: candidateToken, answers, role_id: candidateAssessData.candidate.role_id, difficulty: candidateAssessData.candidate.difficulty })
-                        });
-                        const data = await res.json();
-                        if (data.success) {
-                          setCandidateResult(data);
-                          setCandidateAssessState("done");
-                        } else {
-                          setCandidateAssessState("error");
-                          setCandidateAssessError(data.error || "Submission failed. Please try again.");
-                        }
-                      } catch (e) {
-                        setCandidateAssessState("error");
-                        setCandidateAssessError("Network error: " + e.message);
-                      }
-                      setCandidateSubmitting(false);
-                    }
-                  }}>
-                  {candidateQIndex < total - 1 ? `Next Question (${candidateQIndex + 2}/${total}) →` : "Submit Assessment →"}
-                </button>
-              </div>
-            );
-          })()}
-
-          {candidateAssessState === "submitting" && (
-            <div className="card fadeUp" style={{ padding: 56, textAlign: "center" }}>
-              <div className="loader" style={{ width: 44, height: 44, margin: "0 auto 24px" }} />
-              <div style={{ fontSize: 18, fontWeight: 700, marginBottom: 10 }}>Evaluating your answers...</div>
-              <div style={{ fontSize: 12, color: "var(--tx2)", lineHeight: 1.7 }}>
-                AI is scoring your responses. This takes about 15–20 seconds.<br />Please keep this page open.
-              </div>
-            </div>
-          )}
-
-          {candidateAssessState === "done" && candidateResult && (
-            <div className="card fadeUp" style={{ padding: 40, textAlign: "center" }}>
-              <div style={{ fontSize: 64, marginBottom: 12 }}>🎉</div>
-              <div style={{ fontSize: 13, color: "var(--ok)", fontWeight: 700, letterSpacing: 2, marginBottom: 8 }}>ASSESSMENT COMPLETE</div>
-              <h2 style={{ fontSize: 24, fontWeight: 800, marginBottom: 6 }}>Well done!</h2>
-              <p style={{ fontSize: 13, color: "var(--tx2)", marginBottom: 24, lineHeight: 1.7 }}>
-                Thank you for completing the assessment. Your results have been recorded.
-              </p>
-              <div style={{ background: "var(--s2)", borderRadius: 16, padding: 28, marginBottom: 20 }}>
-                <div style={{ fontSize: 12, color: "var(--tx2)", marginBottom: 8 }}>Your Score</div>
-                <div className="mono" style={{ fontSize: 64, fontWeight: 900, color: candidateResult.score >= 7 ? "var(--ok)" : candidateResult.score >= 5 ? "var(--wn)" : "var(--dn)" }}>
-                  {candidateResult.score}
-                </div>
-                <div style={{ fontSize: 12, color: "var(--tx2)", marginBottom: 14 }}>out of 10</div>
-                <div style={{ display: "inline-block", border: `2px solid ${candidateResult.score >= 8 ? "#e2e8f0" : candidateResult.score >= 7 ? "#f59e0b" : candidateResult.score >= 6 ? "#94a3b8" : candidateResult.score >= 4 ? "#cd7f32" : "#ff5252"}`, color: candidateResult.score >= 8 ? "#e2e8f0" : candidateResult.score >= 7 ? "#f59e0b" : candidateResult.score >= 6 ? "#94a3b8" : candidateResult.score >= 4 ? "#cd7f32" : "#ff5252", padding: "6px 24px", borderRadius: 24, fontSize: 13, fontWeight: 800, letterSpacing: 2 }}>
-                  {(candidateResult.badge || "").toUpperCase()}
-                </div>
-              </div>
-              <div style={{ padding: 16, background: "rgba(0,229,255,.05)", borderRadius: 12, border: "1px solid rgba(0,229,255,.15)", fontSize: 12, color: "var(--tx2)", lineHeight: 1.8 }}>
-                📧 A detailed report with your scores, strengths, weaknesses and model answers has been sent to your email address.
-              </div>
-            </div>
-          )}
-
-        </div>
-      </div>
-    </div>
+    <CandidateAssessView
+      candidateAssessState={candidateAssessState}
+      candidateAssessData={candidateAssessData}
+      candidateAssessError={candidateAssessError}
+      candidateQIndex={candidateQIndex}
+      candidateAnswers={candidateAnswers}
+      candidateResult={candidateResult}
+      candidateSubmitting={candidateSubmitting}
+      candidateToken={candidateToken}
+      isMuted={isMuted}
+      isSpeaking={isSpeaking}
+      voice={voice}
+      setCandidateAssessState={setCandidateAssessState}
+      setCandidateQIndex={setCandidateQIndex}
+      setCandidateAnswers={setCandidateAnswers}
+      setCandidateResult={setCandidateResult}
+      setCandidateAssessError={setCandidateAssessError}
+      setCandidateSubmitting={setCandidateSubmitting}
+      setIsMuted={setIsMuted}
+      setIsSpeaking={setIsSpeaking}
+    />
   );
 
   // ═══ LOADING FALLBACK ═══
