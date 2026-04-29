@@ -106,7 +106,7 @@ export default function CandidateAssessView({
                   const utt = new SpeechSynthesisUtterance(q.question);
                   const voices = window.speechSynthesis.getVoices();
                   const useFemale = candidateQIndex % 2 === 0;
-                  const femaleVoice = voices.find(v => /samantha|victoria|karen|moira|tessa|zira|susan|fiona|ava|allison/i.test(v.name) && !/male/i.test(v.name.replace(/female/i,'')) && v.lang.startsWith('en'))
+                  const femaleVoice = voices.find(v => /samantha|victoria|karen|moira|tessa|zira|susan|fiona|ava|allison/i.test(v.name) && !/male/i.test(v.name.replace(/female/i, '')) && v.lang.startsWith('en'))
                     || voices.find(v => /female/i.test(v.name) && v.lang.startsWith('en'));
                   const maleVoice = voices.find(v => /daniel|alex|fred|david|james|tom|oliver|aaron|arthur/i.test(v.name) && !/female/i.test(v.name) && v.lang.startsWith('en'))
                     || voices.find(v => /\bmale\b/i.test(v.name) && !/female/i.test(v.name) && v.lang.startsWith('en'));
@@ -128,7 +128,7 @@ export default function CandidateAssessView({
               const utt = new SpeechSynthesisUtterance(q.question);
               const voices = window.speechSynthesis.getVoices();
               const useFemale = candidateQIndex % 2 === 0;
-              const femaleVoice = voices.find(v => /samantha|victoria|karen|moira|tessa|zira|susan|fiona|ava|allison/i.test(v.name) && !/male/i.test(v.name.replace(/female/i,'')) && v.lang.startsWith('en'))
+              const femaleVoice = voices.find(v => /samantha|victoria|karen|moira|tessa|zira|susan|fiona|ava|allison/i.test(v.name) && !/male/i.test(v.name.replace(/female/i, '')) && v.lang.startsWith('en'))
                 || voices.find(v => /female/i.test(v.name) && v.lang.startsWith('en'));
               const maleVoice = voices.find(v => /daniel|alex|fred|david|james|tom|oliver|aaron|arthur/i.test(v.name) && !/female/i.test(v.name) && v.lang.startsWith('en'))
                 || voices.find(v => /\bmale\b/i.test(v.name) && !/female/i.test(v.name) && v.lang.startsWith('en'));
@@ -146,17 +146,21 @@ export default function CandidateAssessView({
               const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
               if (!SR) { showToast('Voice input not supported. Use Chrome/Edge.', 'error'); return; }
               if (voice.recording) {
+                // Just stop recording — don't append, since the voice hook
+                // already updates the textarea live via interim results.
+                // (This was causing text to appear twice on mobile.)
                 voice.stop();
-                if (voice.transcript?.trim()) {
-                  setCandidateAnswers(p => ({
-                    ...p,
-                    [candidateQIndex]: (p[candidateQIndex] ? p[candidateQIndex] + ' ' : '') + voice.transcript.trim()
-                  }));
-                  voice.reset();
-                }
+                voice.reset();
               } else {
+                // Save current textarea content before starting new dictation,
+                // so the live transcript appends to it instead of replacing it
+                const currentAnswer = candidateAnswers[candidateQIndex] || '';
                 voice.reset();
                 voice.start();
+                // If the hook supports a "starting text" / base, keep current answer
+                if (currentAnswer && voice.setBase) {
+                  voice.setBase(currentAnswer + ' ');
+                }
               }
             };
 

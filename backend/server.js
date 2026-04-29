@@ -231,7 +231,7 @@ app.post('/api/payment/create-order', auth, async (req, res) => {
       if (!amount_override || amount_override <= 0) {
         return res.status(400).json({ error: 'Invalid HR subscription amount' });
       }
-     const hrAmount = 1 * 100; // 🧪 TEMP TEST — revert to: amount_override * 100
+      const hrAmount = 1 * 100; // 🧪 TEMP TEST — revert to: amount_override * 100
 
       const order = await razorpay.orders.create({
         amount: hrAmount,
@@ -331,12 +331,12 @@ app.post('/api/payment/verify', auth, async (req, res) => {
       }
 
       // Ensure HR subscription columns exist on users table
-      await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS hr_subscription_active BOOLEAN DEFAULT false`).catch(()=>{});
-      await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS hr_company_name TEXT`).catch(()=>{});
-      await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS hr_team_size VARCHAR(20)`).catch(()=>{});
-      await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS hr_billing_period VARCHAR(20)`).catch(()=>{});
-      await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS hr_subscribed_at TIMESTAMP`).catch(()=>{});
-      await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS hr_subscription_end TIMESTAMP`).catch(()=>{});
+      await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS hr_subscription_active BOOLEAN DEFAULT false`).catch(() => { });
+      await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS hr_company_name TEXT`).catch(() => { });
+      await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS hr_team_size VARCHAR(20)`).catch(() => { });
+      await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS hr_billing_period VARCHAR(20)`).catch(() => { });
+      await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS hr_subscribed_at TIMESTAMP`).catch(() => { });
+      await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS hr_subscription_end TIMESTAMP`).catch(() => { });
 
       // Compute end date based on billing period
       const endDate = new Date();
@@ -460,7 +460,7 @@ app.post('/api/payment/verify', auth, async (req, res) => {
         let existingRoles = [];
         if (Array.isArray(raw)) existingRoles = raw;
         else if (typeof raw === 'string') {
-          try { const v = JSON.parse(raw); existingRoles = Array.isArray(v) ? v : []; } catch (e) {}
+          try { const v = JSON.parse(raw); existingRoles = Array.isArray(v) ? v : []; } catch (e) { }
         }
         // Merge: combine existing + new, dedupe
         mergedRoles = [...new Set([...existingRoles, ...roles])];
@@ -696,7 +696,7 @@ app.post('/api/session/complete', auth, async (req, res) => {
           score NUMERIC(5,2),
           completed_at TIMESTAMP DEFAULT NOW()
         )
-      `).catch(() => {});
+      `).catch(() => { });
 
       // DELETE-then-INSERT pattern (works without UNIQUE constraint)
       await pool.query(
@@ -1479,7 +1479,7 @@ app.post('/api/evaluate', async (req, res) => {
 
     // Rule 4: Random characters / keyboard mashing (asdf, qwerty, aaaaa)
     const isRandomChars = /^([a-z])\1{2,}$/.test(cleanedAnswer) || // aaaa, bbbb
-                          /^(asdf|qwerty|test|abcd|1234|xyz|hello|hi|haha|lol)+$/i.test(cleanedAnswer);
+      /^(asdf|qwerty|test|abcd|1234|xyz|hello|hi|haha|lol)+$/i.test(cleanedAnswer);
 
     if (isTooShort || isJunk || isIDK || isRandomChars) {
       console.log('GARBAGE ANSWER DETECTED — auto-scoring 0, generating model answer');
@@ -2003,7 +2003,7 @@ app.post('/api/b2b/assessments', auth, async (req, res) => {
       [req.user.id, name, role_id, difficulty, assessment_type || 'standard', jd_text || '', question_count]
     ).catch(async () => {
       // question_count column may not exist yet — add it and retry
-      await pool.query(`ALTER TABLE b2b_assessments ADD COLUMN IF NOT EXISTS question_count INTEGER DEFAULT 5`).catch(()=>{});
+      await pool.query(`ALTER TABLE b2b_assessments ADD COLUMN IF NOT EXISTS question_count INTEGER DEFAULT 5`).catch(() => { });
       return pool.query(
         `INSERT INTO b2b_assessments (company_user_id, name, role_id, difficulty, assessment_type, jd_text, created_at) VALUES ($1,$2,$3,$4,$5,$6,NOW()) RETURNING *`,
         [req.user.id, name, role_id, difficulty, assessment_type || 'standard', jd_text || '']
@@ -2028,7 +2028,7 @@ app.post('/api/b2b/assessments', auth, async (req, res) => {
 ${jd_text ? `Job Description context:\n${jd_text.substring(0, 800)}` : ''}
 Rules: practical scenario-based questions, each testing a different skill area, difficulty: ${difficulty}.
 Respond ONLY valid JSON no markdown:
-{"questions":[${Array.from({length: qCount}, (_, i) => `{"id":${i+1},"question":"...","category":"skill area","hint":"short hint"}`).join(',')}]}`;
+{"questions":[${Array.from({ length: qCount }, (_, i) => `{"id":${i + 1},"question":"...","category":"skill area","hint":"short hint"}`).join(',')}]}`;
 
       const msg = await anthropic.messages.create({
         model: MODEL_QUESTIONS,
@@ -2038,7 +2038,7 @@ Respond ONLY valid JSON no markdown:
       const raw = msg.content[0].text.replace(/```json|```/g, '').trim();
       const parsed = JSON.parse(raw);
 
-      await pool.query(`ALTER TABLE b2b_assessments ADD COLUMN IF NOT EXISTS questions JSONB`).catch(()=>{});
+      await pool.query(`ALTER TABLE b2b_assessments ADD COLUMN IF NOT EXISTS questions JSONB`).catch(() => { });
       await pool.query(`UPDATE b2b_assessments SET questions = $1 WHERE id = $2`, [JSON.stringify(parsed.questions), assessment.id]);
       assessment.questions = parsed.questions;
       console.log(`Generated ${parsed.questions.length} questions for: ${name}`);
@@ -2182,7 +2182,7 @@ app.get('/api/candidate/assessment', async (req, res) => {
         model: MODEL_QUESTIONS, max_tokens: Math.max(1500, qCount * 300),
         messages: [{ role: 'user', content: `Generate exactly ${qCount} ${ca.rows[0].difficulty} level ${roleName} interview questions. Respond ONLY valid JSON: {"questions":[{"id":1,"question":"...","category":"...","hint":"..."}]}. Provide all ${qCount} questions in the questions array.` }]
       });
-      questions = JSON.parse(msg.content[0].text.replace(/```json|```/g,'').trim()).questions;
+      questions = JSON.parse(msg.content[0].text.replace(/```json|```/g, '').trim()).questions;
     }
 
     res.json({
@@ -2243,17 +2243,33 @@ app.post('/api/candidate/submit', async (req, res) => {
       try {
         const msg = await anthropic.messages.create({
           model: MODEL_EVALUATION, max_tokens: 800,
-          messages: [{ role: 'user', content: `You are an expert cybersecurity evaluator. Score this ${diff} level ${roleName} answer strictly.\nQuestion: ${ans.question}\nAnswer: ${ans.answer}\nRespond ONLY valid JSON: {"score":7,"strengths":"what was good in 1 sentence","weaknesses":"what was missing in 1 sentence","improved_answer":"ideal answer in 2-3 sentences"}` }]
+          messages: [{
+            role: 'user', content: `You are a strict cybersecurity evaluator. Score this ${diff} level ${roleName} answer from 0 to 10.
+
+SCORING RULES (follow strictly):
+- 0 = Empty answer, completely wrong, gibberish, off-topic, or "I don't know"
+- 1-2 = Vague/incorrect with no real cybersecurity content
+- 3-4 = Some relevant keywords but mostly wrong or shallow
+- 5-6 = Partially correct but missing key concepts
+- 7-8 = Correct and well-explained
+- 9-10 = Expert-level with depth and examples
+
+Question: ${ans.question}
+Answer: ${ans.answer}
+
+If the answer is empty, "test", "abc", "no", or completely unrelated to the question, you MUST score 0.
+
+Respond ONLY valid JSON: {"score":0,"strengths":"specific strength or 'None'","weaknesses":"specific gap","improved_answer":"ideal answer in 2-3 sentences"}` }]
         });
-        const rawText = msg.content[0].text.replace(/```json|```/g,'').trim();
+        const rawText = msg.content[0].text.replace(/```json|```/g, '').trim();
         const ev = JSON.parse(rawText);
         // Ensure score is a valid number between 0-10
         const rawScore = parseFloat(ev.score);
         ev.score = (!isNaN(rawScore) && rawScore >= 0 && rawScore <= 10) ? rawScore : 0;
-        console.log(`Q${i+1} evaluated: score=${ev.score}`);
+        console.log(`Q${i + 1} evaluated: score=${ev.score}`);
         evaluations.push({ question: ans.question, answer: ans.answer, category: ans.category || 'General', ...ev });
       } catch (e) {
-        console.error(`Q${i+1} eval failed:`, e.message);
+        console.error(`Q${i + 1} eval failed:`, e.message);
         evaluations.push({ question: ans.question, answer: ans.answer, category: ans.category || 'General', score: 0, strengths: 'Answer received', weaknesses: 'Evaluation unavailable', improved_answer: '-' });
       }
     }
@@ -2264,11 +2280,11 @@ app.post('/api/candidate/submit', async (req, res) => {
     console.log('Final score:', finalScore, '| Badge:', badge, '| Evaluations count:', evaluations.length);
 
     // Ensure required columns exist before UPDATE
-    await pool.query(`ALTER TABLE candidate_assessments ADD COLUMN IF NOT EXISTS overall_score NUMERIC(4,2)`).catch(()=>{});
-    await pool.query(`ALTER TABLE candidate_assessments ADD COLUMN IF NOT EXISTS completed_at TIMESTAMP`).catch(()=>{});
-    await pool.query(`ALTER TABLE candidate_assessments ADD COLUMN IF NOT EXISTS status VARCHAR(20) DEFAULT 'not_started'`).catch(()=>{});
-    await pool.query(`ALTER TABLE candidate_assessments ADD COLUMN IF NOT EXISTS evaluations JSONB`).catch(()=>{});
-    await pool.query(`ALTER TABLE candidate_assessments ADD COLUMN IF NOT EXISTS badge VARCHAR(20)`).catch(()=>{});
+    await pool.query(`ALTER TABLE candidate_assessments ADD COLUMN IF NOT EXISTS overall_score NUMERIC(4,2)`).catch(() => { });
+    await pool.query(`ALTER TABLE candidate_assessments ADD COLUMN IF NOT EXISTS completed_at TIMESTAMP`).catch(() => { });
+    await pool.query(`ALTER TABLE candidate_assessments ADD COLUMN IF NOT EXISTS status VARCHAR(20) DEFAULT 'not_started'`).catch(() => { });
+    await pool.query(`ALTER TABLE candidate_assessments ADD COLUMN IF NOT EXISTS evaluations JSONB`).catch(() => { });
+    await pool.query(`ALTER TABLE candidate_assessments ADD COLUMN IF NOT EXISTS badge VARCHAR(20)`).catch(() => { });
 
     // Update candidate_assessments with full report data
     const updateResult = await pool.query(
@@ -2312,7 +2328,7 @@ app.post('/api/candidate/submit', async (req, res) => {
       const evalRows = evaluations.map((e, i) => `
         <div style="background:#1a1f2e;border-radius:10px;padding:16px;margin-bottom:12px;border-left:3px solid ${e.score >= 7 ? '#00e096' : e.score >= 5 ? '#ffab40' : '#ff5252'}">
           <div style="display:flex;justify-content:space-between;margin-bottom:8px">
-            <span style="font-size:11px;color:#8890b0">Q${i+1} · ${e.category}</span>
+            <span style="font-size:11px;color:#8890b0">Q${i + 1} · ${e.category}</span>
             <span style="font-size:16px;font-weight:800;color:${e.score >= 7 ? '#00e096' : e.score >= 5 ? '#ffab40' : '#ff5252'}">${e.score}/10</span>
           </div>
           <div style="font-size:11px;color:#e8eaf6;margin-bottom:4px">✓ ${e.strengths}</div>
@@ -2327,8 +2343,8 @@ app.post('/api/candidate/submit', async (req, res) => {
       const nextSteps = finalScore >= 7
         ? ['Apply to senior security roles', 'Consider OSCP or CISSP certification', 'Contribute to open source security projects', 'Build a portfolio of CTF writeups', 'Explore bug bounty programs']
         : finalScore >= 5
-        ? ['Practice on ThreatReady at harder difficulty', 'Complete TryHackMe or HackTheBox labs', 'Study OWASP Top 10 and MITRE ATT&CK', 'Get CompTIA Security+ or CEH certification', 'Work on real-world security projects']
-        : ['Start with CompTIA Security+ fundamentals', 'Complete beginner labs on TryHackMe', 'Study networking and OS security basics', 'Read NIST Cybersecurity Framework', 'Retry this assessment in 30 days'];
+          ? ['Practice on ThreatReady at harder difficulty', 'Complete TryHackMe or HackTheBox labs', 'Study OWASP Top 10 and MITRE ATT&CK', 'Get CompTIA Security+ or CEH certification', 'Work on real-world security projects']
+          : ['Start with CompTIA Security+ fundamentals', 'Complete beginner labs on TryHackMe', 'Study networking and OS security basics', 'Read NIST Cybersecurity Framework', 'Retry this assessment in 30 days'];
 
       await resendClient.emails.send({
         from: 'ThreatReady <noreply@threatready.io>',
@@ -2360,21 +2376,21 @@ app.post('/api/candidate/submit', async (req, res) => {
             <!-- 2. Top Strength -->
             <div style="background:#1a1f2e;border-radius:12px;padding:18px;margin-bottom:16px;border-left:4px solid #00e096">
               <div style="font-size:11px;color:#00e5ff;font-weight:700;letter-spacing:1px;margin-bottom:6px">2. YOUR TOP STRENGTH</div>
-              <div style="font-size:12px;color:#8890b0;margin-bottom:4px">${topStrength.category} — Q${evaluations.indexOf(topStrength)+1} (${topStrength.score}/10)</div>
+              <div style="font-size:12px;color:#8890b0;margin-bottom:4px">${topStrength.category} — Q${evaluations.indexOf(topStrength) + 1} (${topStrength.score}/10)</div>
               <div style="font-size:13px;color:#e8eaf6">${topStrength.strengths}</div>
             </div>
 
             <!-- 3. Key Weakness -->
             <div style="background:#1a1f2e;border-radius:12px;padding:18px;margin-bottom:16px;border-left:4px solid #ff5252">
               <div style="font-size:11px;color:#00e5ff;font-weight:700;letter-spacing:1px;margin-bottom:6px">3. KEY AREA TO IMPROVE</div>
-              <div style="font-size:12px;color:#8890b0;margin-bottom:4px">${topWeakness.category} — Q${evaluations.indexOf(topWeakness)+1} (${topWeakness.score}/10)</div>
+              <div style="font-size:12px;color:#8890b0;margin-bottom:4px">${topWeakness.category} — Q${evaluations.indexOf(topWeakness) + 1} (${topWeakness.score}/10)</div>
               <div style="font-size:13px;color:#e8eaf6">${topWeakness.weaknesses}</div>
             </div>
 
             <!-- 4. Next Steps -->
             <div style="background:#1a1f2e;border-radius:12px;padding:18px;margin-bottom:16px;border-left:4px solid #ffab40">
               <div style="font-size:11px;color:#00e5ff;font-weight:700;letter-spacing:1px;margin-bottom:10px">4. RECOMMENDED NEXT STEPS</div>
-              ${nextSteps.map((s, i) => `<div style="display:flex;gap:10px;margin-bottom:8px"><span style="color:#00e5ff;font-weight:700;min-width:18px">${i+1}.</span><span style="font-size:13px;color:#e8eaf6">${s}</span></div>`).join('')}
+              ${nextSteps.map((s, i) => `<div style="display:flex;gap:10px;margin-bottom:8px"><span style="color:#00e5ff;font-weight:700;min-width:18px">${i + 1}.</span><span style="font-size:13px;color:#e8eaf6">${s}</span></div>`).join('')}
             </div>
 
             <!-- 5. Question Breakdown -->
@@ -2396,6 +2412,81 @@ app.post('/api/candidate/submit', async (req, res) => {
       console.error('Email report failed:', emailErr.message);
     }
 
+    // ═══════════════════════════════════════════════════════════════
+    // Send HR a copy of the candidate report
+    // ═══════════════════════════════════════════════════════════════
+    try {
+      const companyUserId = ca.rows[0].company_user_id;
+      if (companyUserId) {
+        const hrRow = await pool.query('SELECT email, name FROM users WHERE id = $1', [companyUserId]);
+        const hrEmail = hrRow.rows[0]?.email;
+        const hrName = hrRow.rows[0]?.name || 'HR Manager';
+
+        if (hrEmail) {
+          const { Resend } = require('resend');
+          const resendClient = new Resend(process.env.RESEND_API_KEY);
+          const badgeColorHr = finalScore >= 8 ? '#e2e8f0' : finalScore >= 7 ? '#f59e0b' : finalScore >= 6 ? '#94a3b8' : finalScore >= 4 ? '#cd7f32' : '#ff5252';
+          const verdictHr = finalScore >= 7 ? '✅ Strong candidate — recommended for next round' : finalScore >= 5 ? '⚡ Average — consider further screening' : '❌ Below threshold — not recommended';
+
+          const evalRowsHr = evaluations.map((e, i) => `
+            <div style="background:#1a1f2e;border-radius:10px;padding:14px;margin-bottom:10px;border-left:3px solid ${e.score >= 7 ? '#00e096' : e.score >= 5 ? '#ffab40' : '#ff5252'}">
+              <div style="display:flex;justify-content:space-between;margin-bottom:6px">
+                <span style="font-size:11px;color:#8890b0">Q${i+1} · ${e.category}</span>
+                <span style="font-size:14px;font-weight:800;color:${e.score >= 7 ? '#00e096' : e.score >= 5 ? '#ffab40' : '#ff5252'}">${e.score}/10</span>
+              </div>
+              <div style="font-size:11px;color:#e8eaf6;margin-bottom:4px">✓ ${e.strengths}</div>
+              <div style="font-size:11px;color:#8890b0">✗ ${e.weaknesses}</div>
+            </div>`).join('');
+
+          await resendClient.emails.send({
+            from: 'ThreatReady <noreply@threatready.io>',
+            to: hrEmail,
+            subject: `[HR Report] ${candName} completed ${roleName} Assessment — Score: ${finalScore}/10`,
+            html: `
+              <div style="font-family:sans-serif;max-width:600px;margin:0 auto;background:#0a0e1a;color:#e8eaf6;padding:36px;border-radius:14px">
+                <div style="text-align:center;margin-bottom:28px">
+                  <div style="font-size:28px;font-weight:900;color:#00e5ff;letter-spacing:2px">⚡ THREATREADY</div>
+                  <div style="font-size:12px;color:#8890b0;margin-top:4px">HR Candidate Report</div>
+                </div>
+
+                <div style="background:#111827;border-radius:14px;padding:24px;margin-bottom:20px">
+                  <div style="font-size:13px;color:#8890b0;margin-bottom:8px">Hello <strong style="color:#e8eaf6">${hrName}</strong>,</div>
+                  <div style="font-size:14px;color:#e8eaf6;margin-bottom:16px">Your candidate <strong>${candName}</strong> (${candEmail}) just completed their ${roleName} assessment.</div>
+
+                  <div style="text-align:center;padding:16px;background:#0a0e1a;border-radius:10px">
+                    <div style="font-size:48px;font-weight:900;color:${finalScore >= 7 ? '#00e096' : finalScore >= 5 ? '#ffab40' : '#ff5252'};line-height:1">${finalScore}</div>
+                    <div style="font-size:12px;color:#8890b0;margin:6px 0 12px">out of 10 · ${diff} difficulty</div>
+                    <div style="display:inline-block;border:2px solid ${badgeColorHr};color:${badgeColorHr};padding:5px 18px;border-radius:20px;font-size:11px;font-weight:800;letter-spacing:2px">${badge.toUpperCase()}</div>
+                  </div>
+                </div>
+
+                <div style="background:#1a1f2e;border-radius:12px;padding:18px;margin-bottom:16px;border-left:4px solid ${finalScore >= 7 ? '#00e096' : finalScore >= 5 ? '#ffab40' : '#ff5252'}">
+                  <div style="font-size:11px;color:#00e5ff;font-weight:700;letter-spacing:1px;margin-bottom:6px">HIRING VERDICT</div>
+                  <div style="font-size:14px;font-weight:700;color:#e8eaf6">${verdictHr}</div>
+                </div>
+
+                <div style="background:#1a1f2e;border-radius:12px;padding:18px;margin-bottom:16px">
+                  <div style="font-size:11px;color:#00e5ff;font-weight:700;letter-spacing:1px;margin-bottom:12px">QUESTION-BY-QUESTION BREAKDOWN</div>
+                  ${evalRowsHr}
+                </div>
+
+                <div style="text-align:center;padding:14px;background:#1a1f2e;border-radius:10px;margin-bottom:16px">
+                  <a href="https://threatready.io/dashboard" style="color:#00e5ff;text-decoration:none;font-weight:700;font-size:13px">→ View full report on dashboard</a>
+                </div>
+
+                <div style="text-align:center;padding-top:16px;border-top:1px solid #1e2536;font-size:11px;color:#5a6380">
+                  This is an automated notification. Manage settings in your B2B dashboard.
+                </div>
+              </div>
+            `
+          });
+          console.log('HR report email sent to:', hrEmail);
+        }
+      }
+    } catch (hrEmailErr) {
+      console.error('HR email failed:', hrEmailErr.message);
+    }
+
     res.json({ success: true, score: finalScore, badge, evaluations });
   } catch (e) {
     console.error('Candidate submit error:', e.message);
@@ -2413,7 +2504,7 @@ app.post('/api/b2b/candidate/decision', auth, async (req, res) => {
     if (!candidate_id || !decision) return res.status(400).json({ error: 'candidate_id and decision required' });
 
     // Add column if missing
-    await pool.query(`ALTER TABLE candidate_assessments ADD COLUMN IF NOT EXISTS hiring_decision VARCHAR(20)`).catch(()=>{});
+    await pool.query(`ALTER TABLE candidate_assessments ADD COLUMN IF NOT EXISTS hiring_decision VARCHAR(20)`).catch(() => { });
 
     // Save decision to DB
     await pool.query(
@@ -2531,10 +2622,10 @@ app.get('/api/b2b/candidate-report/:id', auth, async (req, res) => {
     if (c.status !== 'completed') return res.json({ report: null });
 
     const roleNames = {
-      cloud:'Cloud Security',devsecops:'DevSecOps',appsec:'Application Security',
-      netsec:'Network Security',prodsec:'Product Security',secarch:'Security Architect',
-      dfir:'DFIR & Incident Response',grc:'GRC & Compliance',soc:'SOC Analyst',
-      threat:'Threat Hunter',red:'Red Team',blue:'Blue Team'
+      cloud: 'Cloud Security', devsecops: 'DevSecOps', appsec: 'Application Security',
+      netsec: 'Network Security', prodsec: 'Product Security', secarch: 'Security Architect',
+      dfir: 'DFIR & Incident Response', grc: 'GRC & Compliance', soc: 'SOC Analyst',
+      threat: 'Threat Hunter', red: 'Red Team', blue: 'Blue Team'
     };
     const roleName = roleNames[c.role_id] || c.role_id;
     const finalScore = c.overall_score || 0;
@@ -2555,13 +2646,13 @@ app.get('/api/b2b/candidate-report/:id', auth, async (req, res) => {
     const nextSteps = finalScore >= 7
       ? ['Apply to senior security roles', 'Consider OSCP or CISSP certification', 'Contribute to open source security projects', 'Build a portfolio of CTF writeups', 'Explore bug bounty programs']
       : finalScore >= 5
-      ? ['Practice on ThreatReady at harder difficulty', 'Complete TryHackMe or HackTheBox labs', 'Study OWASP Top 10 and MITRE ATT&CK', 'Get CompTIA Security+ or CEH certification', 'Work on real-world security projects']
-      : ['Start with CompTIA Security+ fundamentals', 'Complete beginner labs on TryHackMe', 'Study networking and OS security basics', 'Read NIST Cybersecurity Framework', 'Retry this assessment in 30 days'];
+        ? ['Practice on ThreatReady at harder difficulty', 'Complete TryHackMe or HackTheBox labs', 'Study OWASP Top 10 and MITRE ATT&CK', 'Get CompTIA Security+ or CEH certification', 'Work on real-world security projects']
+        : ['Start with CompTIA Security+ fundamentals', 'Complete beginner labs on TryHackMe', 'Study networking and OS security basics', 'Read NIST Cybersecurity Framework', 'Retry this assessment in 30 days'];
 
     const evalRows = evals.rows.length > 0 ? evals.rows.map((e, i) => `
       <div style="margin-bottom:14px;padding:16px;background:#111827;border-radius:10px;border-left:3px solid ${e.score >= 7 ? '#00e096' : e.score >= 5 ? '#ffab40' : '#ff5252'}">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
-          <span style="font-size:13px;font-weight:700;color:#00e5ff">Q${i+1} · ${e.category || ''}</span>
+          <span style="font-size:13px;font-weight:700;color:#00e5ff">Q${i + 1} · ${e.category || ''}</span>
           <span style="font-size:18px;font-weight:900;color:${e.score >= 7 ? '#00e096' : e.score >= 5 ? '#ffab40' : '#ff5252'}">${e.score}/10</span>
         </div>
         <div style="font-size:12px;color:#22c55e;margin-bottom:4px">✓ ${e.strengths || ''}</div>
@@ -2587,17 +2678,17 @@ app.get('/api/b2b/candidate-report/:id', auth, async (req, res) => {
         </div>
         ${topStrength ? `<div style="background:#1a1f2e;border-radius:12px;padding:18px;margin-bottom:14px;border-left:4px solid #00e096">
           <div style="font-size:11px;color:#00e5ff;font-weight:700;letter-spacing:1px;margin-bottom:6px">2. YOUR TOP STRENGTH</div>
-          <div style="font-size:12px;color:#8890b0;margin-bottom:4px">${topStrength.category} — Q${evals.rows.indexOf(topStrength)+1} (${topStrength.score}/10)</div>
+          <div style="font-size:12px;color:#8890b0;margin-bottom:4px">${topStrength.category} — Q${evals.rows.indexOf(topStrength) + 1} (${topStrength.score}/10)</div>
           <div style="font-size:13px;color:#e8eaf6">${topStrength.strengths}</div>
         </div>` : ''}
         ${topWeakness ? `<div style="background:#1a1f2e;border-radius:12px;padding:18px;margin-bottom:14px;border-left:4px solid #ff5252">
           <div style="font-size:11px;color:#00e5ff;font-weight:700;letter-spacing:1px;margin-bottom:6px">3. KEY AREA TO IMPROVE</div>
-          <div style="font-size:12px;color:#8890b0;margin-bottom:4px">${topWeakness.category} — Q${evals.rows.indexOf(topWeakness)+1} (${topWeakness.score}/10)</div>
+          <div style="font-size:12px;color:#8890b0;margin-bottom:4px">${topWeakness.category} — Q${evals.rows.indexOf(topWeakness) + 1} (${topWeakness.score}/10)</div>
           <div style="font-size:13px;color:#e8eaf6">${topWeakness.weaknesses}</div>
         </div>` : ''}
         <div style="background:#1a1f2e;border-radius:12px;padding:18px;margin-bottom:14px;border-left:4px solid #ffab40">
           <div style="font-size:11px;color:#00e5ff;font-weight:700;letter-spacing:1px;margin-bottom:10px">4. RECOMMENDED NEXT STEPS</div>
-          ${nextSteps.map((s, i) => `<div style="display:flex;gap:10px;margin-bottom:8px"><span style="color:#00e5ff;font-weight:700;min-width:18px">${i+1}.</span><span style="font-size:13px;color:#e8eaf6">${s}</span></div>`).join('')}
+          ${nextSteps.map((s, i) => `<div style="display:flex;gap:10px;margin-bottom:8px"><span style="color:#00e5ff;font-weight:700;min-width:18px">${i + 1}.</span><span style="font-size:13px;color:#e8eaf6">${s}</span></div>`).join('')}
         </div>
         <div style="background:#1a1f2e;border-radius:12px;padding:18px;margin-bottom:14px;border-left:4px solid #8b5cf6">
           <div style="font-size:11px;color:#00e5ff;font-weight:700;letter-spacing:1px;margin-bottom:12px">5. QUESTION-BY-QUESTION BREAKDOWN</div>
@@ -2609,7 +2700,7 @@ app.get('/api/b2b/candidate-report/:id', auth, async (req, res) => {
       </div>`;
 
     res.json({ report });
-  } catch(e) {
+  } catch (e) {
     console.error('Report error:', e.message);
     res.status(500).json({ error: e.message });
   }
@@ -2694,8 +2785,8 @@ app.post('/api/b2b/assessments/:id/duplicate', auth, async (req, res) => {
     const a = orig.rows[0];
 
     // Ensure columns exist
-    await pool.query(`ALTER TABLE b2b_assessments ADD COLUMN IF NOT EXISTS questions JSONB`).catch(()=>{});
-    await pool.query(`ALTER TABLE b2b_assessments ADD COLUMN IF NOT EXISTS question_count INTEGER DEFAULT 5`).catch(()=>{});
+    await pool.query(`ALTER TABLE b2b_assessments ADD COLUMN IF NOT EXISTS questions JSONB`).catch(() => { });
+    await pool.query(`ALTER TABLE b2b_assessments ADD COLUMN IF NOT EXISTS question_count INTEGER DEFAULT 5`).catch(() => { });
 
     // Stringify questions if they're an object (PostgreSQL JSONB parameter)
     const questionsParam = a.questions ? JSON.stringify(a.questions) : null;
@@ -2822,14 +2913,14 @@ app.get('/api/leaderboard', auth, async (req, res) => {
 app.get('/api/daily-challenge', auth, async (req, res) => {
   try {
     // Safe migration — ensure required columns exist
-    await pool.query(`ALTER TABLE daily_challenges ADD COLUMN IF NOT EXISTS question TEXT`).catch(()=>{});
-    await pool.query(`ALTER TABLE daily_challenges ADD COLUMN IF NOT EXISTS role_id VARCHAR(50)`).catch(()=>{});
-    await pool.query(`ALTER TABLE daily_challenges ADD COLUMN IF NOT EXISTS hint TEXT`).catch(()=>{});
-    await pool.query(`ALTER TABLE daily_challenges ADD COLUMN IF NOT EXISTS points INTEGER DEFAULT 50`).catch(()=>{});
-    await pool.query(`ALTER TABLE daily_challenges ADD COLUMN IF NOT EXISTS is_active BOOLEAN DEFAULT true`).catch(()=>{});
-    await pool.query(`ALTER TABLE daily_challenges ADD COLUMN IF NOT EXISTS challenge_date DATE`).catch(()=>{});
+    await pool.query(`ALTER TABLE daily_challenges ADD COLUMN IF NOT EXISTS question TEXT`).catch(() => { });
+    await pool.query(`ALTER TABLE daily_challenges ADD COLUMN IF NOT EXISTS role_id VARCHAR(50)`).catch(() => { });
+    await pool.query(`ALTER TABLE daily_challenges ADD COLUMN IF NOT EXISTS hint TEXT`).catch(() => { });
+    await pool.query(`ALTER TABLE daily_challenges ADD COLUMN IF NOT EXISTS points INTEGER DEFAULT 50`).catch(() => { });
+    await pool.query(`ALTER TABLE daily_challenges ADD COLUMN IF NOT EXISTS is_active BOOLEAN DEFAULT true`).catch(() => { });
+    await pool.query(`ALTER TABLE daily_challenges ADD COLUMN IF NOT EXISTS challenge_date DATE`).catch(() => { });
     // Drop NOT NULL constraint on legacy question_text column (so inserts into "question" don't fail)
-    await pool.query(`ALTER TABLE daily_challenges ALTER COLUMN question_text DROP NOT NULL`).catch(()=>{});
+    await pool.query(`ALTER TABLE daily_challenges ALTER COLUMN question_text DROP NOT NULL`).catch(() => { });
 
     // Get today's challenge
     const today = new Date().toISOString().split('T')[0];
@@ -2911,7 +3002,7 @@ app.post('/api/daily-challenge/submit', auth, async (req, res) => {
     if (!challenge_id || !answer?.trim()) return res.status(400).json({ error: 'Missing fields' });
 
     // Drop CHECK constraint if it's too strict (allow any score 0-100 stored as int)
-    await pool.query(`ALTER TABLE daily_challenge_responses DROP CONSTRAINT IF EXISTS daily_challenge_responses_score_check`).catch(()=>{});
+    await pool.query(`ALTER TABLE daily_challenge_responses DROP CONSTRAINT IF EXISTS daily_challenge_responses_score_check`).catch(() => { });
 
     // Check not already answered
     const existing = await pool.query(
@@ -3030,14 +3121,14 @@ app.get('/api/scenario-history', auth, async (req, res) => {
         completed_at TIMESTAMP DEFAULT NOW(),
         UNIQUE(user_id, scenario_id)
       )
-    `).catch(() => {});
+    `).catch(() => { });
 
     // Add missing columns if they don't exist (idempotent)
-    await pool.query(`ALTER TABLE user_scenario_history ADD COLUMN IF NOT EXISTS id SERIAL PRIMARY KEY`).catch(() => {});
-    await pool.query(`ALTER TABLE user_scenario_history ADD COLUMN IF NOT EXISTS scenario_id VARCHAR(100)`).catch(() => {});
-    await pool.query(`ALTER TABLE user_scenario_history ADD COLUMN IF NOT EXISTS role_id VARCHAR(100)`).catch(() => {});
-    await pool.query(`ALTER TABLE user_scenario_history ADD COLUMN IF NOT EXISTS score NUMERIC(5,2)`).catch(() => {});
-    await pool.query(`ALTER TABLE user_scenario_history ADD COLUMN IF NOT EXISTS completed_at TIMESTAMP DEFAULT NOW()`).catch(() => {});
+    await pool.query(`ALTER TABLE user_scenario_history ADD COLUMN IF NOT EXISTS id SERIAL PRIMARY KEY`).catch(() => { });
+    await pool.query(`ALTER TABLE user_scenario_history ADD COLUMN IF NOT EXISTS scenario_id VARCHAR(100)`).catch(() => { });
+    await pool.query(`ALTER TABLE user_scenario_history ADD COLUMN IF NOT EXISTS role_id VARCHAR(100)`).catch(() => { });
+    await pool.query(`ALTER TABLE user_scenario_history ADD COLUMN IF NOT EXISTS score NUMERIC(5,2)`).catch(() => { });
+    await pool.query(`ALTER TABLE user_scenario_history ADD COLUMN IF NOT EXISTS completed_at TIMESTAMP DEFAULT NOW()`).catch(() => { });
 
     const result = await pool.query(
       `SELECT scenario_id, role_id, score, completed_at FROM user_scenario_history
@@ -3066,7 +3157,7 @@ app.post('/api/scenario-history', auth, async (req, res) => {
         score NUMERIC(5,2),
         completed_at TIMESTAMP DEFAULT NOW()
       )
-    `).catch(() => {});
+    `).catch(() => { });
 
     // DELETE-then-INSERT pattern (works without UNIQUE constraint)
     await pool.query(
@@ -3195,8 +3286,8 @@ app.post('/api/settings/profile', auth, async (req, res) => {
     if (!name?.trim()) return res.status(400).json({ error: 'Name required' });
 
     // Ensure company_name and team_size columns exist (idempotent)
-    await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS company_name VARCHAR(255)`).catch(() => {});
-    await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS team_size VARCHAR(20)`).catch(() => {});
+    await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS company_name VARCHAR(255)`).catch(() => { });
+    await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS team_size VARCHAR(20)`).catch(() => { });
 
     // Build dynamic update query based on provided fields
     const fields = ['name = $1'];
@@ -3454,7 +3545,7 @@ async function runMigrations() {
     // This recovers data for users who completed assessments before this fix
     try {
       // Add role_id column to sessions if missing (for the backfill query)
-      await pool.query(`ALTER TABLE sessions ADD COLUMN IF NOT EXISTS role_id VARCHAR(100)`).catch(() => {});
+      await pool.query(`ALTER TABLE sessions ADD COLUMN IF NOT EXISTS role_id VARCHAR(100)`).catch(() => { });
 
       const backfillResult = await pool.query(`
         INSERT INTO user_scenario_history (user_id, scenario_id, role_id, score, completed_at)
@@ -3482,7 +3573,7 @@ async function runMigrations() {
     }
 
     console.log('✅ DB migrations complete');
-  } catch(e) {
+  } catch (e) {
     console.log('Migration note:', e.message);
   }
 }
