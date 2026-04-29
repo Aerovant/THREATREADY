@@ -2249,16 +2249,16 @@ app.post('/api/candidate/submit', async (req, res) => {
         const ev = JSON.parse(rawText);
         // Ensure score is a valid number between 0-10
         const rawScore = parseFloat(ev.score);
-        ev.score = (!isNaN(rawScore) && rawScore >= 0 && rawScore <= 10) ? rawScore : 5;
+        ev.score = (!isNaN(rawScore) && rawScore >= 0 && rawScore <= 10) ? rawScore : 0;
         console.log(`Q${i+1} evaluated: score=${ev.score}`);
         evaluations.push({ question: ans.question, answer: ans.answer, category: ans.category || 'General', ...ev });
       } catch (e) {
         console.error(`Q${i+1} eval failed:`, e.message);
-        evaluations.push({ question: ans.question, answer: ans.answer, category: ans.category || 'General', score: 5, strengths: 'Answer received', weaknesses: 'Evaluation unavailable', improved_answer: '-' });
+        evaluations.push({ question: ans.question, answer: ans.answer, category: ans.category || 'General', score: 0, strengths: 'Answer received', weaknesses: 'Evaluation unavailable', improved_answer: '-' });
       }
     }
 
-    const avgScore = evaluations.reduce((s, e) => s + (parseFloat(e.score) || 5), 0) / evaluations.length;
+    const avgScore = evaluations.reduce((s, e) => s + (parseFloat(e.score) || 0), 0) / evaluations.length;
     const finalScore = Math.max(0, Math.min(10, Math.round(avgScore * 10) / 10));
     const badge = finalScore >= 8 ? 'Platinum' : finalScore >= 7 ? 'Gold' : finalScore >= 6 ? 'Silver' : finalScore >= 4 ? 'Bronze' : 'Not Ready';
     console.log('Final score:', finalScore, '| Badge:', badge, '| Evaluations count:', evaluations.length);
