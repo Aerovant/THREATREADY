@@ -3566,10 +3566,10 @@ app.get('/api/linkedin/callback', async (req, res) => {
     );
     
     // Redirect back to frontend with success
-    res.redirect(`${process.env.LINKEDIN_FRONTEND_URL}?linkedin_connected=true`);
+res.send(`<!DOCTYPE html><html><body style="background:#0a0e1a;color:#00e5ff;font-family:sans-serif;text-align:center;padding:40px;"><h2>✅ LinkedIn Connected!</h2><p>You can close this window.</p><script>setTimeout(()=>window.close(), 1000);</script></body></html>`);
   } catch (e) {
     console.error('LinkedIn callback error:', e);
-    res.redirect(`${process.env.LINKEDIN_FRONTEND_URL}?linkedin_error=callback_failed`);
+res.send(`<!DOCTYPE html><html><body style="background:#0a0e1a;color:#ff5252;font-family:sans-serif;text-align:center;padding:40px;"><h2>❌ LinkedIn Connection Failed</h2><p>Please try again.</p><script>setTimeout(()=>window.close(), 2000);</script></body></html>`);
   }
 });
 
