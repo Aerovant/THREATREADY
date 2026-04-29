@@ -36,6 +36,130 @@ export default function B2BCandidatesTab({
   filterBySearch,
   showConfirm,
 }) {
+  // ═══════════════════════════════════════════════════════════════
+  // RICH REPORT HTML GENERATOR (matches the candidate email report)
+  // Used by: View button, Download button, Bulk Download button
+  // ═══════════════════════════════════════════════════════════════
+  const generateReportHTML = (cand, autoPrint) => {
+    const score = parseFloat(cand.overall_score) || 0;
+    const scoreColor = score >= 7 ? '#00e096' : score >= 5 ? '#f59e0b' : '#ff5252';
+    const badgeColor = score >= 8 ? '#e2e8f0' : score >= 7 ? '#f59e0b' : score >= 6 ? '#94a3b8' : score >= 4 ? '#cd7f32' : '#ff5252';
+    const verdict = score >= 7 ? 'Strong performer — ready for industry roles'
+      : score >= 5 ? 'Developing — needs more hands-on practice'
+      : 'Needs significant improvement — focus on fundamentals';
+    const nextSteps = score >= 7
+      ? ['Apply to senior security roles', 'Consider OSCP or CISSP certification', 'Contribute to open source security projects', 'Build a portfolio of CTF writeups', 'Explore bug bounty programs']
+      : score >= 5
+      ? ['Practice on ThreatReady at harder difficulty', 'Complete TryHackMe or HackTheBox labs', 'Study OWASP Top 10 and MITRE ATT&CK', 'Get CompTIA Security+ or CEH certification', 'Work on real-world security projects']
+      : ['Start with CompTIA Security+ fundamentals', 'Complete beginner labs on TryHackMe', 'Study networking and OS security basics', 'Read NIST Cybersecurity Framework', 'Retry this assessment in 30 days'];
+    const evals = cand.evaluations || [];
+    const topStrength = evals.length > 0 ? evals.reduce((best, e) => e.score > best.score ? e : best, evals[0]) : null;
+    const topWeakness = evals.length > 0 ? evals.reduce((worst, e) => e.score < worst.score ? e : worst, evals[0]) : null;
+    const roleName = ROLES.find(r => r.id === cand.role_id)?.name || cand.role_id;
+    const escape = s => (s || '').toString().replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\n/g, '<br/>');
+
+    const evalRows = evals.map((e, i) => {
+      const cls = e.score >= 7 ? 'good' : e.score >= 5 ? 'avg' : 'bad';
+      const col = e.score >= 7 ? '#00a878' : e.score >= 5 ? '#d97706' : '#d32f2f';
+      return '<div class="q-block ' + cls + '">' +
+        '<div class="q-header">' +
+          '<span class="q-num">QUESTION ' + (i + 1) + ' &middot; ' + escape(e.category || 'General') + '</span>' +
+          '<span class="q-score" style="color:' + col + '">' + e.score + '/10</span>' +
+        '</div>' +
+        '<div class="q-question">&#10067; ' + escape(e.question) + '</div>' +
+        '<div class="q-tag">CANDIDATE\'S ANSWER</div>' +
+        '<div class="q-answer">' + escape(e.answer || '(No answer provided)') + '</div>' +
+        (e.strengths ? '<div class="q-str"><strong>&#10003; Strengths:</strong> ' + escape(e.strengths) + '</div>' : '') +
+        (e.weaknesses ? '<div class="q-wk"><strong>&#10007; Weaknesses:</strong> ' + escape(e.weaknesses) + '</div>' : '') +
+        (e.improved_answer && e.improved_answer !== '-' ? '<div class="q-ideal"><strong>&#128161; Ideal Answer:</strong> ' + escape(e.improved_answer) + '</div>' : '') +
+      '</div>';
+    }).join('');
+
+    const stepsHtml = nextSteps.map((s, i) =>
+      '<div class="step"><span class="step-num">' + (i + 1) + '.</span><span class="step-txt">' + escape(s) + '</span></div>'
+    ).join('');
+
+    const html = '<!DOCTYPE html><html><head><meta charset="utf-8"><title>Report &mdash; ' + escape(cand.name) + '</title>' +
+'<style>' +
+'@page { size: A4; margin: 18mm; }' +
+'body { font-family: -apple-system, "Segoe UI", Arial, sans-serif; color: #e8eaf6; line-height: 1.5; margin: 0; padding: 28px; background: #0a0e1a; }' +
+'.header { text-align: center; margin-bottom: 28px; }' +
+'.brand { color: #00e5ff; font-size: 28px; font-weight: 900; letter-spacing: 2px; }' +
+'.subtitle { color: #8890b0; font-size: 12px; margin-top: 4px; }' +
+'.score-card { text-align: center; background: #111827; border-radius: 14px; padding: 28px; margin-bottom: 20px; }' +
+'.greeting { font-size: 13px; color: #8890b0; margin-bottom: 8px; }' +
+'.greeting strong { color: #e8eaf6; }' +
+'.score-value { font-size: 64px; font-weight: 900; color: ' + scoreColor + '; line-height: 1; }' +
+'.score-meta { font-size: 13px; color: #8890b0; margin: 8px 0 14px; }' +
+'.badge { display: inline-block; border: 2px solid ' + badgeColor + '; color: ' + badgeColor + '; padding: 6px 20px; border-radius: 20px; font-size: 12px; font-weight: 800; letter-spacing: 2px; }' +
+'.section { background: #1a1f2e; border-radius: 12px; padding: 18px; margin-bottom: 16px; border-left: 4px solid; page-break-inside: avoid; }' +
+'.section.s1 { border-left-color: ' + scoreColor + '; }' +
+'.section.s2 { border-left-color: #00e096; }' +
+'.section.s3 { border-left-color: #ff5252; }' +
+'.section.s4 { border-left-color: #ffab40; }' +
+'.section.s5 { border-left-color: #8b5cf6; }' +
+'.sec-title { font-size: 11px; color: #00e5ff; font-weight: 700; letter-spacing: 1px; margin-bottom: 6px; text-transform: uppercase; }' +
+'.sec-body { font-size: 14px; font-weight: 700; color: #e8eaf6; }' +
+'.sec-meta { font-size: 12px; color: #8890b0; margin-bottom: 4px; }' +
+'.sec-text { font-size: 13px; color: #e8eaf6; }' +
+'.step { display: flex; gap: 10px; margin-bottom: 8px; }' +
+'.step-num { color: #00e5ff; font-weight: 700; min-width: 18px; }' +
+'.step-txt { font-size: 13px; color: #e8eaf6; }' +
+'.q-block { margin-bottom: 12px; padding: 14px; background: #1a1f2e; border-radius: 10px; border-left: 3px solid; page-break-inside: avoid; }' +
+'.q-block.good { border-left-color: #00c48a; }' +
+'.q-block.avg { border-left-color: #f59e0b; }' +
+'.q-block.bad { border-left-color: #ff5252; }' +
+'.q-header { display: flex; justify-content: space-between; margin-bottom: 8px; padding-bottom: 6px; border-bottom: 1px solid #2a3142; }' +
+'.q-num { font-size: 11px; color: #8890b0; font-weight: 700; letter-spacing: 1px; }' +
+'.q-score { font-size: 14px; font-weight: 900; }' +
+'.q-question { font-size: 13px; font-weight: 700; color: #e8eaf6; margin-bottom: 8px; }' +
+'.q-tag { font-size: 9px; font-weight: 700; letter-spacing: 1px; color: #8890b0; margin: 6px 0 4px; }' +
+'.q-answer { background: #111827; padding: 10px; border-radius: 6px; border-left: 3px solid #5a6380; font-size: 11px; color: #e8eaf6; margin-bottom: 6px; }' +
+'.q-str { background: rgba(0,224,150,0.08); padding: 8px; border-radius: 6px; border-left: 3px solid #00c48a; font-size: 11px; color: #e8eaf6; margin-bottom: 4px; }' +
+'.q-wk { background: rgba(255,82,82,0.08); padding: 8px; border-radius: 6px; border-left: 3px solid #ff5252; font-size: 11px; color: #e8eaf6; margin-bottom: 4px; }' +
+'.q-ideal { background: rgba(0,184,212,0.08); padding: 8px; border-radius: 6px; border-left: 3px solid #00e5ff; font-size: 11px; color: #e8eaf6; }' +
+'.footer { text-align: center; padding-top: 16px; border-top: 1px solid #1e2536; font-size: 11px; color: #5a6380; margin-top: 20px; }' +
+'</style></head>' +
+'<body>' +
+'<div class="header">' +
+  '<div class="brand">&#9889; THREATREADY</div>' +
+  '<div class="subtitle">Cybersecurity Assessment Report</div>' +
+'</div>' +
+'<div class="score-card">' +
+  '<div class="greeting">Hello <strong>' + escape(cand.name) + '</strong>,</div>' +
+  '<div class="score-value">' + score.toFixed(0) + '</div>' +
+  '<div class="score-meta">out of 10 &middot; ' + escape(roleName) + ' &middot; ' + escape(cand.difficulty || '') + '</div>' +
+  '<div class="badge">' + escape((cand.badge || '').toUpperCase()) + '</div>' +
+'</div>' +
+'<div class="section s1">' +
+  '<div class="sec-title">1. Overall Verdict</div>' +
+  '<div class="sec-body">' + escape(verdict) + '</div>' +
+'</div>' +
+(topStrength ? '<div class="section s2">' +
+  '<div class="sec-title">2. Your Top Strength</div>' +
+  '<div class="sec-meta">' + escape(topStrength.category || 'General') + ' &mdash; Q' + (evals.indexOf(topStrength) + 1) + ' (' + topStrength.score + '/10)</div>' +
+  '<div class="sec-text">' + escape(topStrength.strengths || 'None') + '</div>' +
+'</div>' : '') +
+(topWeakness ? '<div class="section s3">' +
+  '<div class="sec-title">3. Key Area to Improve</div>' +
+  '<div class="sec-meta">' + escape(topWeakness.category || 'General') + ' &mdash; Q' + (evals.indexOf(topWeakness) + 1) + ' (' + topWeakness.score + '/10)</div>' +
+  '<div class="sec-text">' + escape(topWeakness.weaknesses || 'None') + '</div>' +
+'</div>' : '') +
+'<div class="section s4">' +
+  '<div class="sec-title">4. Recommended Next Steps</div>' +
+  stepsHtml +
+'</div>' +
+'<div class="section s5">' +
+  '<div class="sec-title">5. Question-by-Question Breakdown</div>' +
+  evalRows +
+'</div>' +
+'<div class="footer">Assessment completed on ' + ((cand.completed_at && cand.completed_at.substring(0, 10)) || new Date().toLocaleDateString()) + ' &middot; ThreatReady Cybersecurity Platform</div>' +
+(autoPrint ? '<script>window.onload = function() { setTimeout(function() { window.print(); }, 500); };</script>' : '') +
+'</body></html>';
+
+    return html;
+  };
+
   return (
     <>
       {/* ── INVITE CANDIDATE FORM ── */}
@@ -246,103 +370,7 @@ export default function B2BCandidatesTab({
                       });
                       const data = await res.json();
                       if (!data.candidate) continue;
-                      const cand = data.candidate;
-                      const score = parseFloat(cand.overall_score) || 0;
-                      const scoreColor = score >= 7 ? '#00e096' : score >= 5 ? '#f59e0b' : '#ff5252';
-                      const badgeColor = score >= 8 ? '#e2e8f0' : score >= 7 ? '#f59e0b' : score >= 6 ? '#94a3b8' : score >= 4 ? '#cd7f32' : '#ff5252';
-                      const verdict = score >= 8 ? "Excellent candidate — strongly recommended for interview" :
-                        score >= 7 ? "Strong candidate — recommended for next round" :
-                          score >= 6 ? "Good candidate — consider for interview" :
-                            score >= 5 ? "Average — more assessment needed" :
-                              score >= 4 ? "Below expectations — not recommended" :
-                                "Not ready — significant skill gaps";
-                      const evals = cand.evaluations || [];
-                      const strongCount = evals.filter(e => e.score >= 7).length;
-                      const weakCount = evals.filter(e => e.score < 5).length;
-                      const roleName = ROLES.find(r => r.id === cand.role_id)?.name || cand.role_id;
-                      const escape = s => (s || '').toString().replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\n/g, '<br/>');
-                      const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Report - ${escape(cand.name)}</title>
-<style>
-@page { size: A4; margin: 20mm; }
-body { font-family: -apple-system, 'Segoe UI', Arial, sans-serif; color: #1a1a1a; line-height: 1.5; margin: 0; padding: 0; background: #fff; }
-.header { border-bottom: 3px solid #00b8d4; padding-bottom: 16px; margin-bottom: 24px; }
-.brand { color: #00b8d4; font-size: 22px; font-weight: 900; letter-spacing: 2px; margin-bottom: 4px; }
-.subtitle { color: #666; font-size: 11px; margin-bottom: 12px; }
-h1 { font-size: 20px; margin: 0 0 6px 0; }
-.meta { color: #666; font-size: 12px; }
-.score-card { background: linear-gradient(135deg, #0a0e1a 0%, #1a1f2e 100%); color: #fff; padding: 30px; border-radius: 12px; text-align: center; margin: 24px 0; }
-.score-label { font-size: 11px; color: #8890b0; letter-spacing: 2px; font-weight: 700; margin-bottom: 12px; }
-.score-value { font-size: 56px; font-weight: 900; color: ${scoreColor}; line-height: 1; margin-bottom: 8px; }
-.score-max { font-size: 22px; color: #8890b0; }
-.badge { display: inline-block; border: 2px solid ${badgeColor}; color: ${badgeColor}; padding: 6px 20px; border-radius: 20px; font-size: 12px; font-weight: 800; letter-spacing: 2px; margin: 12px 0; }
-.verdict { font-size: 13px; color: ${scoreColor}; font-weight: 600; margin-top: 8px; }
-.stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin: 20px 0; }
-.stat { background: #f5f7fa; padding: 12px; border-radius: 8px; text-align: center; }
-.stat-label { font-size: 9px; color: #666; letter-spacing: 1px; margin-bottom: 4px; font-weight: 700; }
-.stat-val { font-size: 13px; font-weight: 700; }
-.summary { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin: 20px 0; }
-.sum-box { padding: 14px; border-radius: 10px; border: 1px solid; }
-.sum-strong { background: #e6faf1; border-color: #00c48a; }
-.sum-weak { background: #fff0f0; border-color: #ff5252; }
-.sum-count { font-size: 26px; font-weight: 900; }
-.sum-label { font-size: 11px; font-weight: 700; letter-spacing: 1px; margin-bottom: 4px; }
-.sum-desc { font-size: 10px; color: #666; margin-top: 2px; }
-.section-title { font-size: 13px; color: #00b8d4; font-weight: 700; letter-spacing: 2px; margin: 28px 0 14px; text-transform: uppercase; border-bottom: 2px solid #00b8d4; padding-bottom: 6px; }
-.q-block { margin-bottom: 16px; padding: 14px; background: #f9fafb; border-radius: 10px; border-left: 4px solid #ccc; page-break-inside: avoid; }
-.q-block.good { border-left-color: #00c48a; }
-.q-block.avg { border-left-color: #f59e0b; }
-.q-block.bad { border-left-color: #ff5252; }
-.q-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; padding-bottom: 8px; border-bottom: 1px solid #e5e7eb; }
-.q-num { font-size: 10px; color: #666; font-weight: 700; letter-spacing: 1px; }
-.q-score { font-size: 14px; font-weight: 900; }
-.q-question { font-size: 13px; font-weight: 700; margin-bottom: 10px; }
-.q-answer { background: #fff; padding: 10px; border-radius: 6px; border-left: 3px solid #999; font-size: 11px; margin-bottom: 10px; color: #333; }
-.q-tag { font-size: 9px; font-weight: 700; letter-spacing: 1px; color: #666; margin-bottom: 4px; }
-.q-str { background: #e6faf1; padding: 8px; border-radius: 6px; border-left: 3px solid #00c48a; font-size: 11px; margin-bottom: 6px; color: #1a5f3f; }
-.q-wk { background: #fff0f0; padding: 8px; border-radius: 6px; border-left: 3px solid #ff5252; font-size: 11px; margin-bottom: 6px; color: #8b1a1a; }
-.q-ideal { background: #e7f5ff; padding: 8px; border-radius: 6px; border-left: 3px solid #00b8d4; font-size: 11px; color: #0a4d68; }
-.footer { margin-top: 30px; padding-top: 14px; border-top: 1px solid #ccc; font-size: 10px; color: #999; text-align: center; }
-</style></head>
-<body>
-<div class="header">
-<div class="brand">⚡ THREATREADY</div>
-<div class="subtitle">Cybersecurity Assessment Platform · Candidate Report</div>
-<h1>${escape(cand.name)}</h1>
-<div class="meta">${escape(cand.email)} · ${escape(cand.assessment_name || roleName + ' Assessment')}</div>
-</div>
-<div class="score-card">
-<div class="score-label">OVERALL SCORE</div>
-<div class="score-value">${score.toFixed(1)}<span class="score-max">/10</span></div>
-<div class="badge">${escape((cand.badge || '').toUpperCase())}</div>
-<div class="verdict">${escape(verdict)}</div>
-</div>
-<div class="stats">
-<div class="stat"><div class="stat-label">ROLE</div><div class="stat-val">${escape(roleName)}</div></div>
-<div class="stat"><div class="stat-label">DIFFICULTY</div><div class="stat-val" style="text-transform:capitalize">${escape(cand.difficulty)}</div></div>
-<div class="stat"><div class="stat-label">QUESTIONS</div><div class="stat-val">${evals.length} answered</div></div>
-<div class="stat"><div class="stat-label">COMPLETED</div><div class="stat-val">${escape(cand.completed_at?.substring(0, 10) || '—')}</div></div>
-</div>
-<div class="summary">
-<div class="sum-box sum-strong"><div class="sum-label" style="color:#00a878">✓ STRONG ANSWERS</div><div class="sum-count" style="color:#00a878">${strongCount}</div><div class="sum-desc">Questions scored 7+ / 10</div></div>
-<div class="sum-box sum-weak"><div class="sum-label" style="color:#d32f2f">✗ WEAK AREAS</div><div class="sum-count" style="color:#d32f2f">${weakCount}</div><div class="sum-desc">Questions scored below 5 / 10</div></div>
-</div>
-<div class="section-title">📝 Detailed Question Breakdown</div>
-${evals.map((ev, i) => {
-                        const cls = ev.score >= 7 ? 'good' : ev.score >= 5 ? 'avg' : 'bad';
-                        const col = ev.score >= 7 ? '#00a878' : ev.score >= 5 ? '#d97706' : '#d32f2f';
-                        return `<div class="q-block ${cls}">
-    <div class="q-header"><span class="q-num">QUESTION ${i + 1} · ${escape(ev.category || 'General')}</span><span class="q-score" style="color:${col}">${ev.score}/10</span></div>
-    <div class="q-question">❓ ${escape(ev.question)}</div>
-    <div class="q-tag">CANDIDATE'S ANSWER</div>
-    <div class="q-answer">${escape(ev.answer || '(No answer provided)')}</div>
-    ${ev.strengths ? `<div class="q-str"><strong>✓ Strengths:</strong> ${escape(ev.strengths)}</div>` : ''}
-    ${ev.weaknesses ? `<div class="q-wk"><strong>✗ Weaknesses:</strong> ${escape(ev.weaknesses)}</div>` : ''}
-    ${ev.improved_answer && ev.improved_answer !== '-' ? `<div class="q-ideal"><strong>💡 Ideal Answer:</strong> ${escape(ev.improved_answer)}</div>` : ''}
-  </div>`;
-                      }).join('')}
-<div class="footer">Generated by ThreatReady · ${new Date().toLocaleString()}</div>
-<script>window.onload = function() { setTimeout(function() { window.print(); }, 500); };</script>
-</body></html>`;
+                      const html = generateReportHTML(data.candidate, true);
                       const w = window.open('', '_blank');
                       if (!w) { showToast('Please allow popups for bulk download', 'error'); return; }
                       w.document.write(html);
@@ -435,8 +463,12 @@ ${evals.map((ev, i) => {
                           headers: { 'Authorization': `Bearer ${token}` }
                         });
                         const data = await res.json();
-                        if (data.candidate) setReportModal(data.candidate);
-                        else showToast('Report not available', 'error');
+                        if (!data.candidate) { showToast('Report not available', 'error'); return; }
+                        const html = generateReportHTML(data.candidate, false);
+                        const w = window.open('', '_blank');
+                        if (!w) { showToast('Please allow popups to view report', 'error'); return; }
+                        w.document.write(html);
+                        w.document.close();
                       } catch (e) { showToast('Error loading report', 'error'); }
                     }}>👁 View</button>
                   <button style={{ background: "rgba(0,224,150,.1)", border: "1px solid var(--ok)", cursor: "pointer", fontSize: 12, color: "var(--ok)", padding: "3px 8px", borderRadius: 4 }}
@@ -449,125 +481,7 @@ ${evals.map((ev, i) => {
                         });
                         const data = await res.json();
                         if (!data.candidate) { showToast('Report not available', 'error'); return; }
-                        const cand = data.candidate;
-                        const score = parseFloat(cand.overall_score) || 0;
-                        const scoreColor = score >= 7 ? '#00e096' : score >= 5 ? '#f59e0b' : '#ff5252';
-                        const badgeColor = score >= 8 ? '#e2e8f0' : score >= 7 ? '#f59e0b' : score >= 6 ? '#94a3b8' : score >= 4 ? '#cd7f32' : '#ff5252';
-                        const verdict = score >= 8 ? "Excellent candidate — strongly recommended for interview" :
-                          score >= 7 ? "Strong candidate — recommended for next round" :
-                            score >= 6 ? "Good candidate — consider for interview" :
-                              score >= 5 ? "Average — more assessment needed" :
-                                score >= 4 ? "Below expectations — not recommended" :
-                                  "Not ready — significant skill gaps";
-                        const evals = cand.evaluations || [];
-                        const strongCount = evals.filter(e => e.score >= 7).length;
-                        const weakCount = evals.filter(e => e.score < 5).length;
-                        const roleName = ROLES.find(r => r.id === cand.role_id)?.name || cand.role_id;
-                        const escape = s => (s || '').toString().replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\n/g, '<br/>');
-
-                        const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Assessment Report - ${escape(cand.name)}</title>
-<style>
-  @page { size: A4; margin: 20mm; }
-  body { font-family: -apple-system, 'Segoe UI', Arial, sans-serif; color: #1a1a1a; line-height: 1.5; margin: 0; padding: 0; background: #fff; }
-  .header { border-bottom: 3px solid #00b8d4; padding-bottom: 16px; margin-bottom: 24px; }
-  .brand { color: #00b8d4; font-size: 22px; font-weight: 900; letter-spacing: 2px; margin-bottom: 4px; }
-  .subtitle { color: #666; font-size: 11px; margin-bottom: 12px; }
-  h1 { font-size: 20px; margin: 0 0 6px 0; color: #1a1a1a; }
-  .meta { color: #666; font-size: 12px; }
-  .score-card { background: linear-gradient(135deg, #0a0e1a 0%, #1a1f2e 100%); color: #fff; padding: 30px; border-radius: 12px; text-align: center; margin: 24px 0; }
-  .score-label { font-size: 11px; color: #8890b0; letter-spacing: 2px; font-weight: 700; margin-bottom: 12px; }
-  .score-value { font-size: 56px; font-weight: 900; color: ${scoreColor}; line-height: 1; margin-bottom: 8px; }
-  .score-max { font-size: 22px; color: #8890b0; }
-  .badge { display: inline-block; border: 2px solid ${badgeColor}; color: ${badgeColor}; padding: 6px 20px; border-radius: 20px; font-size: 12px; font-weight: 800; letter-spacing: 2px; margin: 12px 0; }
-  .verdict { font-size: 13px; color: ${scoreColor}; font-weight: 600; margin-top: 8px; }
-  .stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin: 20px 0; }
-  .stat { background: #f5f7fa; padding: 12px; border-radius: 8px; text-align: center; }
-  .stat-label { font-size: 9px; color: #666; letter-spacing: 1px; margin-bottom: 4px; font-weight: 700; }
-  .stat-val { font-size: 13px; font-weight: 700; color: #1a1a1a; }
-  .summary { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin: 20px 0; }
-  .sum-box { padding: 14px; border-radius: 10px; border: 1px solid; }
-  .sum-strong { background: #e6faf1; border-color: #00c48a; }
-  .sum-weak { background: #fff0f0; border-color: #ff5252; }
-  .sum-count { font-size: 26px; font-weight: 900; }
-  .sum-label { font-size: 11px; font-weight: 700; letter-spacing: 1px; margin-bottom: 4px; }
-  .sum-desc { font-size: 10px; color: #666; margin-top: 2px; }
-  .section-title { font-size: 13px; color: #00b8d4; font-weight: 700; letter-spacing: 2px; margin: 28px 0 14px; text-transform: uppercase; border-bottom: 2px solid #00b8d4; padding-bottom: 6px; }
-  .q-block { margin-bottom: 16px; padding: 14px; background: #f9fafb; border-radius: 10px; border-left: 4px solid #ccc; page-break-inside: avoid; }
-  .q-block.good { border-left-color: #00c48a; }
-  .q-block.avg { border-left-color: #f59e0b; }
-  .q-block.bad { border-left-color: #ff5252; }
-  .q-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; padding-bottom: 8px; border-bottom: 1px solid #e5e7eb; }
-  .q-num { font-size: 10px; color: #666; font-weight: 700; letter-spacing: 1px; }
-  .q-score { font-size: 14px; font-weight: 900; }
-  .q-question { font-size: 13px; font-weight: 700; color: #1a1a1a; margin-bottom: 10px; }
-  .q-answer { background: #fff; padding: 10px; border-radius: 6px; border-left: 3px solid #999; font-size: 11px; margin-bottom: 10px; color: #333; }
-  .q-tag { font-size: 9px; font-weight: 700; letter-spacing: 1px; color: #666; margin-bottom: 4px; }
-  .q-str { background: #e6faf1; padding: 8px; border-radius: 6px; border-left: 3px solid #00c48a; font-size: 11px; margin-bottom: 6px; color: #1a5f3f; }
-  .q-wk { background: #fff0f0; padding: 8px; border-radius: 6px; border-left: 3px solid #ff5252; font-size: 11px; margin-bottom: 6px; color: #8b1a1a; }
-  .q-ideal { background: #e7f5ff; padding: 8px; border-radius: 6px; border-left: 3px solid #00b8d4; font-size: 11px; color: #0a4d68; }
-  .footer { margin-top: 30px; padding-top: 14px; border-top: 1px solid #ccc; font-size: 10px; color: #999; text-align: center; }
-</style></head>
-<body>
-  <div class="header">
-    <div class="brand">⚡ THREATREADY</div>
-    <div class="subtitle">Cybersecurity Assessment Platform · Candidate Report</div>
-    <h1>${escape(cand.name)}</h1>
-    <div class="meta">${escape(cand.email)} · ${escape(cand.assessment_name || roleName + ' Assessment')}</div>
-  </div>
-
-  <div class="score-card">
-    <div class="score-label">OVERALL SCORE</div>
-    <div class="score-value">${score.toFixed(1)}<span class="score-max">/10</span></div>
-    <div class="badge">${escape((cand.badge || '').toUpperCase())}</div>
-    <div class="verdict">${escape(verdict)}</div>
-  </div>
-
-  <div class="stats">
-    <div class="stat"><div class="stat-label">ROLE</div><div class="stat-val">${escape(roleName)}</div></div>
-    <div class="stat"><div class="stat-label">DIFFICULTY</div><div class="stat-val" style="text-transform:capitalize">${escape(cand.difficulty)}</div></div>
-    <div class="stat"><div class="stat-label">QUESTIONS</div><div class="stat-val">${evals.length} answered</div></div>
-    <div class="stat"><div class="stat-label">COMPLETED</div><div class="stat-val">${escape(cand.completed_at?.substring(0, 10) || '—')}</div></div>
-  </div>
-
-  <div class="summary">
-    <div class="sum-box sum-strong">
-      <div class="sum-label" style="color:#00a878">✓ STRONG ANSWERS</div>
-      <div class="sum-count" style="color:#00a878">${strongCount}</div>
-      <div class="sum-desc">Questions scored 7+ / 10</div>
-    </div>
-    <div class="sum-box sum-weak">
-      <div class="sum-label" style="color:#d32f2f">✗ WEAK AREAS</div>
-      <div class="sum-count" style="color:#d32f2f">${weakCount}</div>
-      <div class="sum-desc">Questions scored below 5 / 10</div>
-    </div>
-  </div>
-
-  <div class="section-title">📝 Detailed Question Breakdown</div>
-  ${evals.map((ev, i) => {
-                          const cls = ev.score >= 7 ? 'good' : ev.score >= 5 ? 'avg' : 'bad';
-                          const col = ev.score >= 7 ? '#00a878' : ev.score >= 5 ? '#d97706' : '#d32f2f';
-                          return `<div class="q-block ${cls}">
-      <div class="q-header">
-        <span class="q-num">QUESTION ${i + 1} · ${escape(ev.category || 'General')}</span>
-        <span class="q-score" style="color:${col}">${ev.score}/10</span>
-      </div>
-      <div class="q-question">❓ ${escape(ev.question)}</div>
-      <div class="q-tag">CANDIDATE'S ANSWER</div>
-      <div class="q-answer">${escape(ev.answer || '(No answer provided)')}</div>
-      ${ev.strengths ? `<div class="q-str"><strong>✓ Strengths:</strong> ${escape(ev.strengths)}</div>` : ''}
-      ${ev.weaknesses ? `<div class="q-wk"><strong>✗ Weaknesses:</strong> ${escape(ev.weaknesses)}</div>` : ''}
-      ${ev.improved_answer && ev.improved_answer !== '-' ? `<div class="q-ideal"><strong>💡 Ideal Answer:</strong> ${escape(ev.improved_answer)}</div>` : ''}
-    </div>`;
-                        }).join('')}
-
-  <div class="footer">Generated by ThreatReady · ${new Date().toLocaleString()}</div>
-  <script>
-    window.onload = function() {
-      setTimeout(function() { window.print(); }, 500);
-    };
-  </script>
-</body></html>`;
-
+                        const html = generateReportHTML(data.candidate, true);
                         const w = window.open('', '_blank');
                         if (!w) { showToast('Please allow popups for PDF download', 'error'); return; }
                         w.document.write(html);
