@@ -172,20 +172,136 @@ export default function ResultsView({
           </button>
 
           <button className="btn bs" style={{ borderColor: "var(--ok)", color: "var(--ok)" }}
-            onClick={() => {
-              const role = ROLES.find(r => r.id === activeRole)?.name || activeRole;
-              const text = `🎯 Just scored ${results.overall_score}/10 on a ${role} cybersecurity assessment on ThreatReady!\n\n` +
-                `🏅 Badge: ${results.badge}\n` +
-                `📊 Top ${100 - results.percentile}% of all candidates\n\n` +
-                `Practice your cybersecurity skills at ThreatReady. #Cybersecurity #ThreatReady #InfoSec`;
-              const url = `https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent('https://threatready.io/')}&summary=${encodeURIComponent(text)}`;
-              window.open(url, '_blank', 'width=600,height=600');
+            onClick={async () => {
+              try {
+                const token = localStorage.getItem('token');
+                if (!token) { showToast('Please sign in first', 'error'); return; }
+                
+                showToast('Checking LinkedIn connection...', 'info');
+                
+                // Step 1: Check if LinkedIn connected
+                const statusRes = await fetch('https://threatready-db.onrender.com/api/linkedin/status', {
+                  headers: { 'Authorization': `Bearer ${token}` }
+                });
+                const statusData = await statusRes.json();
+                
+                // Step 2: If NOT connected, open LinkedIn OAuth
+                if (!statusData.connected) {
+                  const authRes = await fetch('https://threatready-db.onrender.com/api/linkedin/auth', {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                  });
+                  const authData = await authRes.json();
+                  
+                  if (!authData.auth_url) { showToast('Failed to start LinkedIn connection', 'error'); return; }
+                  
+                  // Open OAuth popup
+                  const popup = window.open(authData.auth_url, 'linkedin-oauth', 'width=600,height=700');
+                  
+                  // Wait for popup to close (user authorizes)
+                  showToast('Waiting for LinkedIn authorization...', 'info');
+                  await new Promise((resolve) => {
+                    const interval = setInterval(() => {
+                      if (popup.closed) { clearInterval(interval); resolve(); }
+                    }, 500);
+                  });
+                  
+                  // Re-check status
+                  const recheckRes = await fetch('https://threatready-db.onrender.com/api/linkedin/status', {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                  });
+                  const recheckData = await recheckRes.json();
+                  if (!recheckData.connected) { showToast('LinkedIn connection cancelled', 'error'); return; }
+                  showToast('✅ LinkedIn connected! Generating post...', 'success');
+                }
+                
+                // Step 3: Generate score image
+                const role = ROLES.find(r => r.id === activeRole)?.name || activeRole;
+                const score = results.overall_score;
+                const badge = results.badge;
+                const percentile = 100 - results.percentile;
+                
+                const canvas = document.createElement('canvas');
+                canvas.width = 1200;
+                canvas.height = 630;
+                const ctx = canvas.getContext('2d');
+                
+                const gradient = ctx.createLinearGradient(0, 0, 1200, 630);
+                gradient.addColorStop(0, '#0a0e1a');
+                gradient.addColorStop(1, '#1a1f2e');
+                ctx.fillStyle = gradient;
+                ctx.fillRect(0, 0, 1200, 630);
+                
+                ctx.strokeStyle = '#00e5ff';
+                ctx.lineWidth = 4;
+                ctx.strokeRect(20, 20, 1160, 590);
+                
+                ctx.fillStyle = '#00e5ff';
+                ctx.font = 'bold 38px Arial';
+                ctx.textAlign = 'center';
+                ctx.fillText('⚡ THREATREADY', 600, 100);
+                
+                ctx.fillStyle = '#8890b0';
+                ctx.font = '16px Arial';
+                ctx.fillText('CYBERSECURITY ASSESSMENT', 600, 130);
+                
+                const scoreColor = score >= 7 ? '#00e096' : score >= 5 ? '#ffab40' : '#ff5252';
+                ctx.fillStyle = scoreColor;
+                ctx.font = 'bold 200px Arial';
+                ctx.fillText(`${score}`, 600, 340);
+                
+                ctx.fillStyle = '#8890b0';
+                ctx.font = '32px Arial';
+                ctx.fillText('/ 10', 600, 380);
+                
+                const badgeColor = badge === 'Platinum' ? '#e2e8f0' : badge === 'Gold' ? '#f59e0b' : badge === 'Silver' ? '#94a3b8' : '#cd7f32';
+                ctx.fillStyle = badgeColor;
+                ctx.font = 'bold 36px Arial';
+                ctx.fillText(`🏅 ${badge.toUpperCase()} BADGE`, 600, 440);
+                
+                ctx.fillStyle = '#e8eaf6';
+                ctx.font = '24px Arial';
+                ctx.fillText(role, 600, 490);
+                
+                ctx.fillStyle = '#00e5ff';
+                ctx.font = 'bold 22px Arial';
+                ctx.fillText(`Top ${percentile}% of all candidates`, 600, 530);
+                
+                ctx.fillStyle = '#5a6380';
+                ctx.font = '16px Arial';
+                ctx.fillText('threatready.io', 600, 590);
+                
+                const imageBase64 = canvas.toDataURL('image/png');
+                
+                // Step 4: Post to LinkedIn via backend
+                showToast('Posting to LinkedIn...', 'info');
+                const text = `🎯 Just scored ${score}/10 on a ${role} cybersecurity assessment on ThreatReady!\n\n` +
+                  `🏅 Badge: ${badge}\n` +
+                  `📊 Top ${percentile}% of all candidates\n\n` +
+                  `Practice your cybersecurity skills at https://threatready.io/\n\n` +
+                  `#Cybersecurity #ThreatReady #InfoSec`;
+                
+                const shareRes = await fetch('https://threatready-db.onrender.com/api/linkedin/share', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                  body: JSON.stringify({ text, image_base64: imageBase64 })
+                });
+                const shareData = await shareRes.json();
+                
+                if (shareData.success) {
+                  showToast('🎉 Posted to LinkedIn successfully!', 'success');
+                } else {
+                  showToast('❌ ' + (shareData.error || 'Share failed'), 'error');
+                }
+              } catch (e) {
+                console.error('LinkedIn share error:', e);
+                showToast('❌ ' + e.message, 'error');
+              }
             }}>
             📤 Share Score on LinkedIn
           </button>
 
         </div>
-        
+
         {!isPaid && isTrialExhausted() && (
           <button className="btn bp" style={{ width: "100%", marginTop: 12, padding: 14, fontSize: 14 }} onClick={() => setView("trial-complete")}>
             🔓 View Subscription Options →
