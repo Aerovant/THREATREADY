@@ -231,8 +231,7 @@ app.post('/api/payment/create-order', auth, async (req, res) => {
       if (!amount_override || amount_override <= 0) {
         return res.status(400).json({ error: 'Invalid HR subscription amount' });
       }
-      const hrAmount = 1 * 100; // 🧪 TEMP TEST — revert to: amount_override * 100
-
+     const hrAmount = amount_override * 100; // Razorpay uses paise
       const order = await razorpay.orders.create({
         amount: hrAmount,
         currency: 'INR',
