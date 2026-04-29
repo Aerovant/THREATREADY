@@ -26,9 +26,9 @@ export function useVoice() {
   const [recording, setRec] = useState(false);
   const [transcript, setTr] = useState("");
   const recRef = useRef(null);
-  const finalTranscriptRef = useRef("");
+  const committedRef = useRef("");      // text committed from prior SR sessions
+  const sessionFinalRef = useRef("");   // current SR session's final text
   const manuallyStopped = useRef(false);
-  const processedFinalsRef = useRef(new Set());
 
   const startRecognition = useCallback(() => {
     if (manuallyStopped.current) return;
@@ -42,30 +42,34 @@ export function useVoice() {
     r.lang = 'en-US';
     r.maxAlternatives = 1;
 
+    // Fresh session — reset the per-session final ref
+    sessionFinalRef.current = "";
+
     r.onresult = (e) => {
+      // Rebuild this session's transcript from scratch each call.
+      // Mobile browsers emit progressively-longer "final" results for the
+      // same utterance; rebuilding (instead of appending) avoids duplicates.
+      let sessionFinal = "";
       let interim = "";
-      for (let i = e.resultIndex; i < e.results.length; i++) {
+      for (let i = 0; i < e.results.length; i++) {
         const text = e.results[i][0].transcript;
-        const trimmed = text.trim();
         if (e.results[i].isFinal) {
-          if (!trimmed) continue;
-          const key = trimmed.toLowerCase();
-          if (processedFinalsRef.current.has(key)) continue;
-          processedFinalsRef.current.add(key);
-          if (processedFinalsRef.current.size > 50) {
-            const arr = Array.from(processedFinalsRef.current);
-            processedFinalsRef.current = new Set(arr.slice(-30));
-          }
-          finalTranscriptRef.current += trimmed + ' ';
+          sessionFinal += text.trim() + ' ';
         } else {
           interim += text;
         }
       }
-      setTr(finalTranscriptRef.current + interim);
+      sessionFinalRef.current = sessionFinal;
+      setTr(committedRef.current + sessionFinal + interim);
     };
 
     r.onend = () => {
+      // Commit the session's final text to the global committed text
+      committedRef.current += sessionFinalRef.current;
+      sessionFinalRef.current = "";
+
       if (!manuallyStopped.current) {
+        // Auto-restart for continuous recognition
         setTimeout(() => {
           if (!manuallyStopped.current) {
             startRecognition();
@@ -74,6 +78,7 @@ export function useVoice() {
       } else {
         setRec(false);
         recRef.current = null;
+        setTr(committedRef.current.trim());
       }
     };
 
@@ -96,7 +101,9 @@ export function useVoice() {
 
   const start = useCallback(() => {
     manuallyStopped.current = false;
-    processedFinalsRef.current = new Set();
+    committedRef.current = "";
+    sessionFinalRef.current = "";
+    setTr("");
     setRec(true);
     startRecognition();
   }, [startRecognition]);
@@ -112,8 +119,8 @@ export function useVoice() {
 
   const reset = useCallback(() => {
     manuallyStopped.current = true;
-    finalTranscriptRef.current = "";
-    processedFinalsRef.current = new Set();
+    committedRef.current = "";
+    sessionFinalRef.current = "";
     setTr("");
     setRec(false);
     if (recRef.current) {
@@ -123,7 +130,8 @@ export function useVoice() {
   }, []);
 
   const setTranscript = useCallback((text) => {
-    finalTranscriptRef.current = text + ' ';
+    committedRef.current = text + ' ';
+    sessionFinalRef.current = "";
     setTr(text);
   }, []);
 
