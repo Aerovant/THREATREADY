@@ -1940,7 +1940,9 @@ export default function ThreatReady() {
       { id: "scores", label: "📊 Scores", icon: "📊" },
       { id: "badges", label: "🏆 Badges", icon: "🏆" },
       { id: "profile", label: "👤 Profile", icon: "👤" },
-      { id: "interview", label: "💎 Interview", icon: "💎" },
+
+      // { id: "interview", label: "💎 Interview", icon: "💎" },
+
       { id: "billing", label: "💳 Billing", icon: "💳" },
       { id: "settings", label: "⚙️ Settings", icon: "⚙️" },
       { id: "help", label: "❓ Help", icon: "❓" }
