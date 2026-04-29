@@ -231,6 +231,7 @@ app.post('/api/payment/create-order', auth, async (req, res) => {
       if (!amount_override || amount_override <= 0) {
         return res.status(400).json({ error: 'Invalid HR subscription amount' });
       }
+
      const hrAmount = amount_override * 100; // Razorpay uses paise
       const order = await razorpay.orders.create({
         amount: hrAmount,
@@ -3576,6 +3577,215 @@ async function runMigrations() {
     console.log('Migration note:', e.message);
   }
 }
+
+// ═══════════════════════════════════════════════════════════════
+// LINKEDIN OAUTH + SHARE
+// ═══════════════════════════════════════════════════════════════
+
+// In-memory state store (in production, use Redis or DB)
+const linkedinStates = new Map();
+
+// Step 1: Generate LinkedIn OAuth URL
+app.get('/api/linkedin/auth', auth, async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const state = require('crypto').randomBytes(32).toString('hex');
+    
+    // Store state with userId (expires in 10 mins)
+    linkedinStates.set(state, { userId, expires: Date.now() + 600000 });
+    
+    const authUrl = `https://www.linkedin.com/oauth/v2/authorization?` +
+      `response_type=code` +
+      `&client_id=${process.env.LINKEDIN_CLIENT_ID}` +
+      `&redirect_uri=${encodeURIComponent(process.env.LINKEDIN_REDIRECT_URI)}` +
+      `&state=${state}` +
+      `&scope=${encodeURIComponent('openid profile email w_member_social')}`;
+    
+    res.json({ auth_url: authUrl });
+  } catch (e) {
+    console.error('LinkedIn auth error:', e);
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// Step 2: Handle callback from LinkedIn
+app.get('/api/linkedin/callback', async (req, res) => {
+  try {
+    const { code, state, error } = req.query;
+    
+    if (error) {
+      return res.redirect(`${process.env.LINKEDIN_FRONTEND_URL}?linkedin_error=${error}`);
+    }
+    
+    const stateData = linkedinStates.get(state);
+    if (!stateData || stateData.expires < Date.now()) {
+      return res.redirect(`${process.env.LINKEDIN_FRONTEND_URL}?linkedin_error=invalid_state`);
+    }
+    linkedinStates.delete(state);
+    
+    // Exchange code for access token
+    const tokenRes = await fetch('https://www.linkedin.com/oauth/v2/accessToken', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({
+        grant_type: 'authorization_code',
+        code,
+        client_id: process.env.LINKEDIN_CLIENT_ID,
+        client_secret: process.env.LINKEDIN_CLIENT_SECRET,
+        redirect_uri: process.env.LINKEDIN_REDIRECT_URI
+      })
+    });
+    const tokenData = await tokenRes.json();
+    
+    if (!tokenData.access_token) {
+      return res.redirect(`${process.env.LINKEDIN_FRONTEND_URL}?linkedin_error=token_failed`);
+    }
+    
+    // Get user's LinkedIn ID using OpenID userinfo endpoint
+    const userRes = await fetch('https://api.linkedin.com/v2/userinfo', {
+      headers: { 'Authorization': `Bearer ${tokenData.access_token}` }
+    });
+    const linkedinUser = await userRes.json();
+    const userId = stateData.userId;
+    
+    // Save token to user's record (using Supabase)
+    await pool.query(
+      'UPDATE users SET linkedin_token=$1, linkedin_id=$2, linkedin_connected_at=$3 WHERE id=$4',
+      [tokenData.access_token, linkedinUser.sub, new Date().toISOString(), userId]
+    );
+    
+    // Redirect back to frontend with success
+res.send(`<!DOCTYPE html><html><body style="background:#0a0e1a;color:#00e5ff;font-family:sans-serif;text-align:center;padding:40px;"><h2>✅ LinkedIn Connected!</h2><p>You can close this window.</p><script>setTimeout(()=>window.close(), 1000);</script></body></html>`);
+  } catch (e) {
+    console.error('LinkedIn callback error:', e);
+res.send(`<!DOCTYPE html><html><body style="background:#0a0e1a;color:#ff5252;font-family:sans-serif;text-align:center;padding:40px;"><h2>❌ LinkedIn Connection Failed</h2><p>Please try again.</p><script>setTimeout(()=>window.close(), 2000);</script></body></html>`);
+  }
+});
+
+// Step 3: Share score to LinkedIn
+app.post('/api/linkedin/share', auth, async (req, res) => {
+  try {
+    const { text, image_base64 } = req.body;
+    const userId = req.user.id;
+    
+    // Get user's LinkedIn token
+    const userRow = await pool.query(
+      'SELECT linkedin_token, linkedin_id FROM users WHERE id=$1',
+      [userId]
+    );
+    const user = userRow.rows[0];
+    
+    if (!user?.linkedin_token) {
+      return res.status(401).json({ error: 'LinkedIn not connected. Please connect first.' });
+    }
+    
+    const linkedinId = user.linkedin_id;
+    const accessToken = user.linkedin_token;
+    
+    // Step A: Register image upload
+    const registerRes = await fetch('https://api.linkedin.com/v2/assets?action=registerUpload', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${accessToken}`,
+        'Content-Type': 'application/json',
+        'X-Restli-Protocol-Version': '2.0.0'
+      },
+      body: JSON.stringify({
+        registerUploadRequest: {
+          recipes: ['urn:li:digitalmediaRecipe:feedshare-image'],
+          owner: `urn:li:person:${linkedinId}`,
+          serviceRelationships: [{
+            relationshipType: 'OWNER',
+            identifier: 'urn:li:userGeneratedContent'
+          }]
+        }
+      })
+    });
+    const registerData = await registerRes.json();
+    
+    if (!registerData.value) {
+      console.error('Register failed:', registerData);
+      return res.status(500).json({ error: 'Failed to register image upload' });
+    }
+    
+    const uploadUrl = registerData.value.uploadMechanism['com.linkedin.digitalmedia.uploading.MediaUploadHttpRequest'].uploadUrl;
+    const asset = registerData.value.asset;
+    
+    // Step B: Upload image binary
+    const imageBuffer = Buffer.from(image_base64.replace(/^data:image\/\w+;base64,/, ''), 'base64');
+    
+    const uploadRes = await fetch(uploadUrl, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${accessToken}`,
+        'Content-Type': 'image/png'
+      },
+      body: imageBuffer
+    });
+    
+    if (!uploadRes.ok) {
+      return res.status(500).json({ error: 'Image upload failed' });
+    }
+    
+    // Step C: Create the post
+    const postRes = await fetch('https://api.linkedin.com/v2/ugcPosts', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${accessToken}`,
+        'Content-Type': 'application/json',
+        'X-Restli-Protocol-Version': '2.0.0'
+      },
+      body: JSON.stringify({
+        author: `urn:li:person:${linkedinId}`,
+        lifecycleState: 'PUBLISHED',
+        specificContent: {
+          'com.linkedin.ugc.ShareContent': {
+            shareCommentary: { text: text },
+            shareMediaCategory: 'IMAGE',
+            media: [{
+              status: 'READY',
+              media: asset,
+              title: { text: 'ThreatReady Score' },
+              description: { text: 'Cybersecurity Assessment Score' }
+            }]
+          }
+        },
+        visibility: { 'com.linkedin.ugc.MemberNetworkVisibility': 'PUBLIC' }
+      })
+    });
+    
+    const postData = await postRes.json();
+    
+    if (postRes.status !== 201) {
+      console.error('Post failed:', postData);
+      return res.status(500).json({ error: postData.message || 'Post failed' });
+    }
+    
+    res.json({ success: true, post_id: postData.id });
+  } catch (e) {
+    console.error('LinkedIn share error:', e);
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// Check if user has connected LinkedIn
+app.get('/api/linkedin/status', auth, async (req, res) => {
+  try {
+    const userRow = await pool.query(
+      'SELECT linkedin_id, linkedin_connected_at FROM users WHERE id=$1',
+      [req.user.id]
+    );
+    const user = userRow.rows[0];
+    
+    res.json({
+      connected: !!user?.linkedin_id,
+      connected_at: user?.linkedin_connected_at
+    });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
 
 app.listen(PORT, async () => {
   await runMigrations();
