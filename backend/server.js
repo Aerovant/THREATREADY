@@ -35,6 +35,21 @@ const auth = (req, res, next) => {
   }
 };
 
+// Optional auth — sets req.user if a valid token exists, but allows guests through
+const optionalAuth = (req, res, next) => {
+  const token = req.headers.authorization?.replace('Bearer ', '');
+  if (!token) {
+    req.user = null;
+    return next();
+  }
+  try {
+    req.user = jwt.verify(token, JWT_SECRET);
+  } catch (e) {
+    req.user = null;
+  }
+  next();
+};
+
 // ═══════════════════════════════════════════════════════════════
 // HEALTH CHECK
 // ═══════════════════════════════════════════════════════════════
@@ -546,14 +561,16 @@ app.post('/api/jd/upload', auth, async (req, res) => {
 // ═══════════════════════════════════════════════════════════════
 
 // Start a scenario session
-app.post('/api/session/start', auth, async (req, res) => {
-  console.log('--- SESSION START ---');
+app.post('/api/session/start', optionalAuth, async (req, res) => {
+  console.log('--- SESSION START ---', req.user ? `user=${req.user.id}` : 'guest/trial');
   try {
     const { scenario_id, interview_mode } = req.body;
+    const userId = req.user?.id || null;
     const result = await pool.query(
       'INSERT INTO sessions (user_id, scenario_id, interview_mode, started_at) VALUES ($1, $2, $3, NOW()) RETURNING id',
-      [req.user.id, scenario_id, interview_mode || false]
+      [userId, scenario_id, interview_mode || false]
     );
+
     console.log('Session started:', result.rows[0].id, 'Scenario:', scenario_id);
     res.json({ session_id: result.rows[0].id });
   } catch (e) {
@@ -3546,7 +3563,7 @@ async function runMigrations() {
     try {
       // Add role_id column to sessions if missing (for the backfill query)
       await pool.query(`ALTER TABLE sessions ADD COLUMN IF NOT EXISTS role_id VARCHAR(100)`).catch(() => { });
-
+      await pool.query(`ALTER TABLE sessions ALTER COLUMN user_id DROP NOT NULL`).catch(() => {});
       const backfillResult = await pool.query(`
         INSERT INTO user_scenario_history (user_id, scenario_id, role_id, score, completed_at)
         SELECT s.user_id, s.scenario_id,
