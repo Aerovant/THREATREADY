@@ -3557,6 +3557,7 @@ app.get('/api/linkedin/callback', async (req, res) => {
       headers: { 'Authorization': `Bearer ${tokenData.access_token}` }
     });
     const linkedinUser = await userRes.json();
+    const userId = stateData.userId;
     
     // Save token to user's record (using Supabase)
     await pool.query(
