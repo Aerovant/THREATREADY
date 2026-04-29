@@ -3559,15 +3559,10 @@ app.get('/api/linkedin/callback', async (req, res) => {
     const linkedinUser = await userRes.json();
     
     // Save token to user's record (using Supabase)
-    const userId = stateData.userId;
-    await supabase
-      .from('users')
-      .update({
-        linkedin_token: tokenData.access_token,
-        linkedin_id: linkedinUser.sub,
-        linkedin_connected_at: new Date().toISOString()
-      })
-      .eq('id', userId);
+    await pool.query(
+      'UPDATE users SET linkedin_token=$1, linkedin_id=$2, linkedin_connected_at=$3 WHERE id=$4',
+      [tokenData.access_token, linkedinUser.sub, new Date().toISOString(), userId]
+    );
     
     // Redirect back to frontend with success
     res.redirect(`${process.env.LINKEDIN_FRONTEND_URL}?linkedin_connected=true`);
@@ -3584,11 +3579,11 @@ app.post('/api/linkedin/share', auth, async (req, res) => {
     const userId = req.user.id;
     
     // Get user's LinkedIn token
-    const { data: user } = await supabase
-      .from('users')
-      .select('linkedin_token, linkedin_id')
-      .eq('id', userId)
-      .single();
+    const userRow = await pool.query(
+      'SELECT linkedin_token, linkedin_id FROM users WHERE id=$1',
+      [userId]
+    );
+    const user = userRow.rows[0];
     
     if (!user?.linkedin_token) {
       return res.status(401).json({ error: 'LinkedIn not connected. Please connect first.' });
@@ -3686,11 +3681,11 @@ app.post('/api/linkedin/share', auth, async (req, res) => {
 // Check if user has connected LinkedIn
 app.get('/api/linkedin/status', auth, async (req, res) => {
   try {
-    const { data: user } = await supabase
-      .from('users')
-      .select('linkedin_id, linkedin_connected_at')
-      .eq('id', req.user.id)
-      .single();
+    const userRow = await pool.query(
+      'SELECT linkedin_id, linkedin_connected_at FROM users WHERE id=$1',
+      [req.user.id]
+    );
+    const user = userRow.rows[0];
     
     res.json({
       connected: !!user?.linkedin_id,
