@@ -22,68 +22,19 @@ export default function InterviewView({
   voice,
   isMuted,
   isSpeaking,
-  tabSwitchCount,
-  showTabWarning,
-  showEjectedModal,
+  
   // ── SETTERS ──
   setAnswers,
   setShowHint,
   setInputMode,
   setIsMuted,
-  setShowTabWarning,
+
   // ── HANDLERS ──
   submitAnswer,
   exitScenario,
 }) {
   return (
     <div className="app"><style>{CSS}</style><div className="scanbar" /><div className="gridbg" />
-      {/* Tab Switch Warning Modal (1st, 2nd, 3rd switch) */}
-      {showTabWarning && !showEjectedModal && (
-        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.85)", zIndex: 99999, display: "flex", alignItems: "center", justifyContent: "center", backdropFilter: "blur(8px)" }}>
-          <div style={{ background: "var(--bg)", border: "2px solid var(--dn)", borderRadius: 16, padding: 32, maxWidth: 480, width: "90%", textAlign: "center" }}>
-            <div style={{ fontSize: 56, marginBottom: 12 }}>⚠️</div>
-            <div style={{ fontSize: 18, fontWeight: 800, marginBottom: 8, color: "var(--dn)" }}>Tab Switch Detected!</div>
-            <div style={{ fontSize: 12, color: "var(--tx2)", marginBottom: 16, lineHeight: 1.6 }}>
-              You switched tabs or minimized the window during your attempt.
-              <br />
-              <strong style={{ color: "var(--wn)" }}>Warning {tabSwitchCount}/3</strong>
-            </div>
-            {tabSwitchCount >= 3 ? (
-              <div style={{ fontSize: 12, color: "var(--dn)", marginBottom: 16, padding: 12, background: "rgba(255,82,82,.15)", borderRadius: 8, fontWeight: 700 }}>
-                🚨 FINAL WARNING: One more tab switch and you will be EXITED from this attempt.
-              </div>
-            ) : (
-              <div style={{ fontSize: 13, color: "var(--tx2)", marginBottom: 16 }}>
-                Please stay on this tab. After 3 warnings, the next switch will exit your attempt.
-              </div>
-            )}
-            <button className="btn bp" style={{ width: "100%", padding: 12 }}
-              onClick={() => setShowTabWarning(false)}>
-              I Understand · Continue
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* EJECTED Modal (4th tab switch — auto-exit) */}
-      {showEjectedModal && (
-        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.95)", zIndex: 99999, display: "flex", alignItems: "center", justifyContent: "center", backdropFilter: "blur(12px)" }}>
-          <div style={{ background: "var(--bg)", border: "3px solid var(--dn)", borderRadius: 16, padding: 36, maxWidth: 520, width: "90%", textAlign: "center", boxShadow: "0 0 60px rgba(255,82,82,.4)" }}>
-            <div style={{ fontSize: 72, marginBottom: 16 }}>🚫</div>
-            <div style={{ fontSize: 22, fontWeight: 800, marginBottom: 12, color: "var(--dn)" }}>Attempt Exited</div>
-            <div style={{ fontSize: 13, color: "var(--tx2)", marginBottom: 20, lineHeight: 1.7 }}>
-              You left the attempt window <strong style={{ color: "var(--dn)" }}>{tabSwitchCount} times</strong>.
-              <br /><br />
-              For test integrity, your attempt has been <strong style={{ color: "var(--dn)" }}>automatically ended</strong>.
-              <br /><br />
-              Please complete your attempts in a single focused session without switching tabs.
-            </div>
-            <div style={{ fontSize: 13, color: "var(--tx2)", padding: 10, background: "var(--s2)", borderRadius: 8 }}>
-              Returning to dashboard in a moment...
-            </div>
-          </div>
-        </div>
-      )}
 
       <div className="page"><div className="cnt" style={{ paddingTop: 20 }}>
         {/* Header */}
@@ -92,12 +43,9 @@ export default function InterviewView({
             <div style={{ fontSize: 14, fontWeight: 700 }}>{scenario.ti}</div>
             <div style={{ display: "flex", gap: 6, marginTop: 4 }}>
               <span className={`diff diff-${activeDifficulty}`}>{activeDifficulty}</span>
+              
               <span className="tag">Q{qIndex + 1}/5</span>
-              {tabSwitchCount > 0 && (
-                <span className="tag" style={{ color: "var(--dn)", borderColor: "var(--dn)" }}>
-                  ⚠️ {tabSwitchCount} tab switch{tabSwitchCount > 1 ? 'es' : ''}
-                </span>
-              )}
+
             </div>
           </div>
           <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
@@ -158,12 +106,33 @@ export default function InterviewView({
             onCut={e => e.preventDefault()}
             onContextMenu={e => e.preventDefault()}
           >{currentQ.t}</div>
-          {showHint && currentQ.h && activeDifficulty === "beginner" && (
-            <div style={{ marginTop: 8, padding: 8, background: "rgba(0,229,255,.05)", borderRadius: 6, fontSize: 12, color: "var(--ac)" }}>💡 Hint: {currentQ.h}</div>
-          )}
-          {activeDifficulty === "beginner" && !showHint && currentQ.h && (
-            <button className="btn bs" style={{ marginTop: 8, fontSize: 11, padding: "3px 10px" }} onClick={() => setShowHint(true)}>Show Hint</button>
-          )}
+
+          {/* Difficulty-aware hint system: full → reduced → minimal → none */}
+          {currentQ.h && activeDifficulty !== "expert" && (() => {
+            let hintText = currentQ.h;
+            let hintLabel = "Hint";
+
+            if (activeDifficulty === "intermediate") {
+              // Reduced: first sentence only
+              hintText = currentQ.h.split(/(?<=[.!?])\s+/)[0];
+            } else if (activeDifficulty === "advanced") {
+              // Minimal: first clause, truncated nudge
+              const firstClause = currentQ.h.split(/[,:;.!?]/)[0].trim();
+              hintText = (firstClause.length > 50 ? firstClause.slice(0, 50) : firstClause) + "...";
+              hintLabel = "Nudge";
+            }
+
+            return showHint ? (
+              <div style={{ marginTop: 8, padding: 8, background: "rgba(0,229,255,.05)", borderRadius: 6, fontSize: 12, color: "var(--ac)" }}>
+                💡 {hintLabel}: {hintText}
+              </div>
+            ) : (
+              <button className="btn bs" style={{ marginTop: 8, fontSize: 11, padding: "3px 10px" }} onClick={() => setShowHint(true)}>
+                Show {hintLabel}
+              </button>
+            );
+          })()}
+
         </div>
 
         {/* Answer Input (No Copy-Paste) */}

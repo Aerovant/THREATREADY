@@ -2,6 +2,7 @@
 // RESULTS VIEW (Transparent Scoring + Badges + CTAs)
 // Extracted from App.jsx
 // ═══════════════════════════════════════════════════════════════
+import { useState } from "react";
 import { RadarChart, PolarGrid, PolarAngleAxis, Radar, ResponsiveContainer } from "recharts";
 import { CSS } from "../styles.js";
 import { ROLES, SCENARIOS } from "../constants.js";
@@ -28,6 +29,8 @@ export default function ResultsView({
   startScenario,
   isTrialExhausted,
 }) {
+  const [sharing, setSharing] = useState(false);
+  const [postedSuccess, setPostedSuccess] = useState(false);
   return (
     <div className="app"><style>{CSS}</style><div className="scanbar" /><div className="gridbg" />
       <HomeBtn goHome={goHome} />
@@ -171,8 +174,11 @@ export default function ResultsView({
             🔀 Try Different Role
           </button>
 
-          <button className="btn bs" style={{ borderColor: "var(--ok)", color: "var(--ok)" }}
+          <button className="btn bs" style={{ borderColor: "var(--ok)", color: "var(--ok)", opacity: sharing ? 0.5 : 1 }}
+            disabled={sharing}
             onClick={async () => {
+              if (sharing) return;
+              setSharing(true);
               try {
                 const token = localStorage.getItem('token');
                 if (!token) { showToast('Please sign in first', 'error'); return; }
@@ -288,13 +294,16 @@ export default function ResultsView({
                 const shareData = await shareRes.json();
                 
                 if (shareData.success) {
-                  showToast('🎉 Posted to LinkedIn successfully!', 'success');
+                  setPostedSuccess(true);
                 } else {
                   showToast('❌ ' + (shareData.error || 'Share failed'), 'error');
                 }
+
               } catch (e) {
                 console.error('LinkedIn share error:', e);
                 showToast('❌ ' + e.message, 'error');
+              } finally {
+                setSharing(false);
               }
             }}>
             📤 Share Score on LinkedIn
@@ -307,7 +316,42 @@ export default function ResultsView({
             🔓 View Subscription Options →
           </button>
         )}
+
       </div></div>
+      
+      {/* LinkedIn Post Success Modal */}
+      {postedSuccess && (
+        <div onClick={() => setPostedSuccess(false)} style={{
+          position: "fixed", inset: 0, background: "rgba(0,0,0,0.85)", zIndex: 9999,
+          display: "flex", alignItems: "center", justifyContent: "center",
+          backdropFilter: "blur(8px)", padding: 20
+        }}>
+          <div onClick={e => e.stopPropagation()} style={{
+            background: "#0f1420", border: "2px solid var(--ok)", borderRadius: 16,
+            padding: 32, maxWidth: 420, width: "100%", textAlign: "center",
+            boxShadow: "0 20px 60px rgba(0,0,0,.9), 0 0 60px rgba(0,224,150,0.3)"
+          }}>
+            <div style={{ fontSize: 64, marginBottom: 12 }}>🎉</div>
+            <div style={{ fontSize: 22, fontWeight: 800, marginBottom: 8, color: "var(--ok)" }}>
+              Posted to LinkedIn!
+            </div>
+            <div style={{ fontSize: 14, color: "var(--tx2)", marginBottom: 24, lineHeight: 1.6 }}>
+              Your cybersecurity score has been shared on your LinkedIn feed. 
+              Check your profile to see the post!
+            </div>
+            <div style={{ display: "flex", gap: 10 }}>
+              <button className="btn bs" style={{ flex: 1, padding: "10px" }}
+                onClick={() => setPostedSuccess(false)}>
+                Close
+              </button>
+              <button className="btn bp" style={{ flex: 1, padding: "10px" }}
+                onClick={() => window.open('https://www.linkedin.com/feed/', '_blank')}>
+                View on LinkedIn →
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

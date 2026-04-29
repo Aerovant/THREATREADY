@@ -232,6 +232,7 @@ export default function ThreatReady() {
     if (isPaid || subscribedRoles.length === 0) return false;
     return getTotalUsedAttempts() >= 2;
   };
+
   const [billingPeriod, setBillingPeriod] = useState('monthly'); // 'monthly' | 'yearly'
   const [trialRoles, setTrialRoles] = useState(() => {
     const saved = localStorage.getItem('trialRoles');
@@ -277,10 +278,7 @@ export default function ThreatReady() {
   const [showChain, setShowChain] = useState(false);
   const [inputMode, setInputMode] = useState("text");
   const [elapsed, setElapsed] = useState(0);
-  // Tab switch / focus loss tracking (anti-cheating)
-  const [tabSwitchCount, setTabSwitchCount] = useState(0);
-  const [showTabWarning, setShowTabWarning] = useState(false);
-  const [showEjectedModal, setShowEjectedModal] = useState(false);
+
   const timerRef = useRef(null);
   const voice = useVoice();
 
@@ -881,37 +879,6 @@ export default function ThreatReady() {
   useEffect(() => {
     if (view !== "interview") return;
 
-    const handleVisibilityChange = () => {
-      if (document.hidden) {
-        // User switched tabs or minimized the window
-        setTabSwitchCount(prev => {
-          const newCount = prev + 1;
-          if (newCount >= 4) {
-            // 4th tab switch → eject from attempt
-            setShowEjectedModal(true);
-            // Auto-redirect to dashboard after showing modal
-            setTimeout(() => {
-              setShowEjectedModal(false);
-              setShowTabWarning(false);
-              setView('dashboard');
-              setTabSwitchCount(0);
-            }, 4000);
-          } else {
-            // 1st, 2nd, 3rd tab switch → just warning
-            setShowTabWarning(true);
-            showToast(`⚠️ Tab switch detected! (${newCount}/3) — One more switch will exit your attempt`, "error");
-          }
-          return newCount;
-        });
-      }
-    };
-
-    const handleBlur = () => {
-      // User clicked outside the window (different app)
-      if (!document.hidden) {
-        showToast("⚠️ Window focus lost — keep this window active during your attempt", "warning");
-      }
-    };
 
     // Block right-click context menu (prevents inspect element / save / copy options)
     const handleContextMenu = (e) => { e.preventDefault(); return false; };
@@ -938,26 +905,14 @@ export default function ThreatReady() {
       }
     };
 
-    document.addEventListener('visibilitychange', handleVisibilityChange);
-    window.addEventListener('blur', handleBlur);
     document.addEventListener('contextmenu', handleContextMenu);
     document.addEventListener('keydown', handleKeyDown);
 
     return () => {
-      document.removeEventListener('visibilitychange', handleVisibilityChange);
-      window.removeEventListener('blur', handleBlur);
       document.removeEventListener('contextmenu', handleContextMenu);
       document.removeEventListener('keydown', handleKeyDown);
     };
-  }, [view]);
 
-  // Reset tab switch count when leaving interview
-  useEffect(() => {
-    if (view !== "interview") {
-      setTabSwitchCount(0);
-      setShowTabWarning(false);
-      setShowEjectedModal(false);
-    }
   }, [view]);
 
   // ── DETECT B2C/B2B ──
@@ -1229,23 +1184,28 @@ export default function ThreatReady() {
     }
 
     // Create session in backend FIRST to get session_id
+    // Create session in backend FIRST to get session_id (works for both logged-in and trial users)
     let newSessionId = null;
     try {
       const token = localStorage.getItem('token');
-      if (token) {
-        const res = await fetch('https://threatready-db.onrender.com/api/session/start', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`
-          },
-          body: JSON.stringify({ scenario_id: sc.id, interview_mode: false, role_id: activeRole || 'cloud' })
-        });
-        const data = await res.json();
-        newSessionId = data.session_id;
-        setSessionId(data.session_id);
-        window.__sessionId = data.session_id;
-      }
+      const headers = { 'Content-Type': 'application/json' };
+      if (token) headers['Authorization'] = `Bearer ${token}`;
+
+      const res = await fetch('https://threatready-db.onrender.com/api/session/start', {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({
+          scenario_id: sc.id,
+          interview_mode: false,
+          role_id: activeRole || 'cloud',
+          difficulty: diff || 'beginner',
+          is_trial: !token
+        })
+      });
+      const data = await res.json();
+      newSessionId = data.session_id;
+      setSessionId(data.session_id);
+      window.__sessionId = data.session_id;
     } catch (e) {
       console.log('Session start error:', e);
     }
@@ -1875,14 +1835,10 @@ export default function ThreatReady() {
       voice={voice}
       isMuted={isMuted}
       isSpeaking={isSpeaking}
-      tabSwitchCount={tabSwitchCount}
-      showTabWarning={showTabWarning}
-      showEjectedModal={showEjectedModal}
       setAnswers={setAnswers}
       setShowHint={setShowHint}
       setInputMode={setInputMode}
       setIsMuted={setIsMuted}
-      setShowTabWarning={setShowTabWarning}
       submitAnswer={submitAnswer}
       exitScenario={exitScenario}
     />
