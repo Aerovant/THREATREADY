@@ -170,10 +170,22 @@ export default function ResultsView({
           <button className="btn bs" onClick={() => { setActiveRole(null); setView("dashboard"); }}>
             🔀 Try Different Role
           </button>
-          <button className="btn bs" style={{ borderColor: "var(--ok)", color: "var(--ok)" }}>
+
+          <button className="btn bs" style={{ borderColor: "var(--ok)", color: "var(--ok)" }}
+            onClick={() => {
+              const role = ROLES.find(r => r.id === activeRole)?.name || activeRole;
+              const text = `🎯 Just scored ${results.overall_score}/10 on a ${role} cybersecurity assessment on ThreatReady!\n\n` +
+                `🏅 Badge: ${results.badge}\n` +
+                `📊 Top ${100 - results.percentile}% of all candidates\n\n` +
+                `Practice your cybersecurity skills at ThreatReady. #Cybersecurity #ThreatReady #InfoSec`;
+              const url = `https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent('https://threatready.io/')}&summary=${encodeURIComponent(text)}`;
+              window.open(url, '_blank', 'width=600,height=600');
+            }}>
             📤 Share Score on LinkedIn
           </button>
+
         </div>
+        
         {!isPaid && isTrialExhausted() && (
           <button className="btn bp" style={{ width: "100%", marginTop: 12, padding: 14, fontSize: 14 }} onClick={() => setView("trial-complete")}>
             🔓 View Subscription Options →
