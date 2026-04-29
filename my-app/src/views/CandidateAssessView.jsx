@@ -212,6 +212,10 @@ export default function CandidateAssessView({
                   <textarea className="input" placeholder={voice.recording ? "🎤 Listening... speak your answer" : "Type your answer here, or click 🎤 to speak..."}
                     value={ans}
                     onChange={e => setCandidateAnswers(p => ({ ...p, [candidateQIndex]: e.target.value }))}
+                    onPaste={e => { e.preventDefault(); showToast('Pasting is disabled for this assessment', 'warning'); }}
+                    onCopy={e => e.preventDefault()}
+                    onCut={e => e.preventDefault()}
+                    onContextMenu={e => e.preventDefault()}
                     style={{ minHeight: 140, fontSize: 13, borderColor: voice.recording ? "#ff5252" : undefined }} />
                   {voice.recording && (
                     <div style={{ marginTop: 8, padding: "8px 12px", background: "rgba(255,82,82,.08)", border: "1px solid rgba(255,82,82,.25)", borderRadius: 8 }}>
