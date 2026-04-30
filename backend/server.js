@@ -2911,6 +2911,55 @@ app.get('/api/b2b/candidate-report/:id', auth, async (req, res) => {
   }
 });
 
+
+// ═══════════════════════════════════════════════════════════════
+// Save snapshot URL to candidate's record
+// Called by frontend AFTER uploading image to Supabase Storage
+// Public route — uses invite_token (candidate hasn't logged in)
+// ═══════════════════════════════════════════════════════════════
+app.post('/api/candidate/snapshot', async (req, res) => {
+  try {
+    const { invite_token, snapshot_url, question_index } = req.body;
+
+    if (!invite_token || !snapshot_url) {
+      return res.status(400).json({ error: 'Missing required fields' });
+    }
+
+    // Find the candidate by invite_token
+    const findResult = await pool.query(
+      'SELECT id, snapshot_urls FROM candidate_assessments WHERE invite_token = $1',
+      [invite_token]
+    );
+
+    if (!findResult.rows[0]) {
+      return res.status(404).json({ error: 'Invalid invite token' });
+    }
+
+    const candidateId = findResult.rows[0].id;
+    const existingUrls = findResult.rows[0].snapshot_urls || [];
+
+    // Append new snapshot to the array
+    const newSnapshots = [...existingUrls, {
+      url: snapshot_url,
+      question_index: question_index || existingUrls.length,
+      captured_at: new Date().toISOString()
+    }];
+
+    // Update database
+    await pool.query(
+      'UPDATE candidate_assessments SET snapshot_urls = $1 WHERE id = $2',
+      [JSON.stringify(newSnapshots), candidateId]
+    );
+
+    console.log(`Snapshot saved for candidate ${candidateId}: question ${question_index}`);
+    res.json({ success: true, count: newSnapshots.length });
+
+  } catch (e) {
+    console.error('Snapshot save error:', e.message);
+    res.status(500).json({ error: e.message });
+  }
+});
+
 // B2B Get Candidate Report (full report with all evaluations)
 app.get('/api/b2b/candidates/:id/report', auth, async (req, res) => {
   try {
