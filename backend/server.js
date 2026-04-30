@@ -111,8 +111,9 @@ app.get('/share/:slug', async (req, res) => {
 
     const title = `${owner} scored ${score}/10 on a ${roleName} assessment`;
     const description = `🏅 ${badge} Badge · Real-world cybersecurity scenario assessment on ThreatReady. Practice and prove your security skills at threatready.io`;
-    const imageUrl = `https://threatready-db.onrender.com/share/${encodeURIComponent(slug)}/image.png`;
-    const pageUrl = `https://threatready-db.onrender.com/share/${encodeURIComponent(slug)}`;
+
+    const imageUrl = `https://threatready.io/share/${encodeURIComponent(slug)}/image.png`;
+    const pageUrl = `https://threatready.io/share/${encodeURIComponent(slug)}`;
 
     const html = `<!DOCTYPE html>
 <html lang="en">
@@ -182,25 +183,51 @@ app.get('/share/:slug/image.png', async (req, res) => {
     const scoreColor = parseFloat(score) >= 7 ? '#00e096' : parseFloat(score) >= 5 ? '#ffab40' : '#ff5252';
     const badgeColor = badge === 'Platinum' ? '#e2e8f0' : badge === 'Gold' ? '#f59e0b' : badge === 'Silver' ? '#94a3b8' : badge === 'Bronze' ? '#cd7f32' : '#ff5252';
 
-    const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630">
-  <defs>
-    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0%" stop-color="#0a0e1a"/>
-      <stop offset="100%" stop-color="#1a1f2e"/>
-    </linearGradient>
-  </defs>
-  <rect width="1200" height="630" fill="url(#bg)"/>
-  <rect x="20" y="20" width="1160" height="590" fill="none" stroke="#00e5ff" stroke-width="4"/>
-  <text x="600" y="100" font-family="Arial, sans-serif" font-size="38" font-weight="700" fill="#00e5ff" text-anchor="middle">THREATREADY</text>
-  <text x="600" y="130" font-family="Arial, sans-serif" font-size="16" fill="#8890b0" text-anchor="middle">CYBERSECURITY ASSESSMENT</text>
-  <text x="600" y="340" font-family="Arial, sans-serif" font-size="200" font-weight="700" fill="${scoreColor}" text-anchor="middle">${score}</text>
-  <text x="600" y="380" font-family="Arial, sans-serif" font-size="32" fill="#8890b0" text-anchor="middle">/ 10</text>
-  <text x="600" y="440" font-family="Arial, sans-serif" font-size="36" font-weight="700" fill="${badgeColor}" text-anchor="middle">${badge.toUpperCase()} BADGE</text>
-  <text x="600" y="490" font-family="Arial, sans-serif" font-size="24" fill="#e8eaf6" text-anchor="middle">${escapeHtml(roleName)}</text>
-  <text x="600" y="590" font-family="Arial, sans-serif" font-size="16" fill="#5a6380" text-anchor="middle">threatready.io</text>
-</svg>`;
+    const { createCanvas } = require('@napi-rs/canvas');
+    const canvas = createCanvas(1200, 630);
+    const ctx = canvas.getContext('2d');
 
-    res.type('image/svg+xml').send(svg);
+    const gradient = ctx.createLinearGradient(0, 0, 1200, 630);
+    gradient.addColorStop(0, '#0a0e1a');
+    gradient.addColorStop(1, '#1a1f2e');
+    ctx.fillStyle = gradient;
+    ctx.fillRect(0, 0, 1200, 630);
+
+    ctx.strokeStyle = '#00e5ff';
+    ctx.lineWidth = 4;
+    ctx.strokeRect(20, 20, 1160, 590);
+
+    ctx.fillStyle = '#00e5ff';
+    ctx.font = 'bold 38px Arial, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('THREATREADY', 600, 100);
+
+    ctx.fillStyle = '#8890b0';
+    ctx.font = '16px Arial, sans-serif';
+    ctx.fillText('CYBERSECURITY ASSESSMENT', 600, 130);
+
+    ctx.fillStyle = scoreColor;
+    ctx.font = 'bold 200px Arial, sans-serif';
+    ctx.fillText(score, 600, 340);
+
+    ctx.fillStyle = '#8890b0';
+    ctx.font = '32px Arial, sans-serif';
+    ctx.fillText('/ 10', 600, 380);
+
+    ctx.fillStyle = badgeColor;
+    ctx.font = 'bold 36px Arial, sans-serif';
+    ctx.fillText(`${badge.toUpperCase()} BADGE`, 600, 440);
+
+    ctx.fillStyle = '#e8eaf6';
+    ctx.font = '24px Arial, sans-serif';
+    ctx.fillText(roleName, 600, 490);
+
+    ctx.fillStyle = '#5a6380';
+    ctx.font = '16px Arial, sans-serif';
+    ctx.fillText('threatready.io', 600, 590);
+
+    const pngBuffer = await canvas.encode('png');
+    res.type('image/png').set('Cache-Control', 'public, max-age=86400').send(pngBuffer);
   } catch (e) {
     console.error('Share image error:', e.message);
     res.status(500).send('Error');
