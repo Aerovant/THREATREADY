@@ -3,11 +3,13 @@
 // External candidates take assessment via shared link
 // Extracted from App.jsx
 // ═══════════════════════════════════════════════════════════════
+import { useRef, useEffect } from "react";
 import { CSS } from "../styles.js";
 import { ROLES } from "../constants.js";
 import { showToast } from "../components/helpers.js";
 import ToastContainer from "../components/ToastContainer.jsx";
 import AIAvatar from "../components/AIAvatar.jsx";
+import { supabase } from "../supabaseClient.js";
 
 export default function CandidateAssessView({
   // ── STATE ──
@@ -32,6 +34,96 @@ export default function CandidateAssessView({
   setIsMuted,
   setIsSpeaking,
 }) {
+  // ═══════════════════════════════════════════════════════════════
+  // WEBCAM SNAPSHOT CAPTURE
+  // Captures one photo per question and uploads to Supabase
+  // The HR will see these photos in the candidate's report
+  // ═══════════════════════════════════════════════════════════════
+  const videoRef = useRef(null);
+  const canvasRef = useRef(null);
+  const streamRef = useRef(null);
+
+  // Start webcam when assessment begins (state changes to "question")
+  useEffect(() => {
+    if (candidateAssessState !== "question") return;
+    if (streamRef.current) return; // already started
+
+    (async () => {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({
+          video: { width: 320, height: 240, facingMode: "user" },
+          audio: false
+        });
+        streamRef.current = stream;
+        if (videoRef.current) {
+          videoRef.current.srcObject = stream;
+        }
+      } catch (err) {
+        console.log("Camera permission denied or unavailable:", err.message);
+        showToast("Camera access required for this assessment", "warning");
+      }
+    })();
+
+    // Cleanup: stop camera when leaving question state
+    return () => {
+      if (streamRef.current && candidateAssessState !== "question") {
+        streamRef.current.getTracks().forEach(t => t.stop());
+        streamRef.current = null;
+      }
+    };
+  }, [candidateAssessState]);
+
+  // Capture a snapshot from the video and upload to Supabase
+  const captureSnapshot = async (questionIndex) => {
+    if (!videoRef.current || !canvasRef.current || !streamRef.current) {
+      console.log("Snapshot skipped - camera not ready");
+      return;
+    }
+    try {
+      const video = videoRef.current;
+      const canvas = canvasRef.current;
+      canvas.width = video.videoWidth || 320;
+      canvas.height = video.videoHeight || 240;
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+      // Convert canvas to JPEG blob
+      const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/jpeg', 0.7));
+      if (!blob) return;
+
+      // Upload to Supabase Storage
+      const filename = `${candidateToken}_q${questionIndex}_${Date.now()}.jpg`;
+      const { data, error } = await supabase.storage
+        .from('candidate-snapshots')
+        .upload(filename, blob, { contentType: 'image/jpeg', upsert: false });
+
+      if (error) {
+        console.log("Snapshot upload error:", error.message);
+        return;
+      }
+
+      // Get the public URL
+      const { data: urlData } = supabase.storage
+        .from('candidate-snapshots')
+        .getPublicUrl(filename);
+
+      // Tell backend to save the URL
+      await fetch('https://threatready-db.onrender.com/api/candidate/snapshot', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          invite_token: candidateToken,
+          snapshot_url: urlData.publicUrl,
+          question_index: questionIndex
+        })
+      });
+
+      console.log(`Snapshot ${questionIndex} saved`);
+    } catch (e) {
+      console.log("Snapshot capture failed:", e.message);
+    }
+  };
+
   return (
     <div className="app"><style>{CSS}</style><div className="scanbar" /><div className="gridbg" />
       <ToastContainer />
@@ -96,6 +188,15 @@ export default function CandidateAssessView({
             const q = candidateAssessData.questions[candidateQIndex];
             const total = candidateAssessData.questions.length;
             const ans = candidateAnswers[candidateQIndex] || "";
+
+            // Webcam preview shown in top-right corner during assessment
+            const webcamPreview = (
+              <div style={{ position: "fixed", top: 16, right: 16, zIndex: 100, background: "#000", border: "2px solid var(--ac)", borderRadius: 8, overflow: "hidden", boxShadow: "0 4px 12px rgba(0,0,0,0.4)" }}>
+                <video ref={videoRef} autoPlay playsInline muted style={{ display: "block", width: 120, height: 90, objectFit: "cover" }} />
+                <div style={{ position: "absolute", top: 4, left: 4, background: "rgba(255,82,82,0.9)", color: "#fff", fontSize: 9, fontWeight: 700, padding: "2px 6px", borderRadius: 3, letterSpacing: 1 }}>● REC</div>
+                <canvas ref={canvasRef} style={{ display: "none" }} />
+              </div>
+            );
 
             // Auto-speak question once when index changes (tracked via window global)
             if (q?.question && window.__lastSpokenIdx !== candidateQIndex) {
@@ -166,6 +267,7 @@ export default function CandidateAssessView({
 
             return (
               <div className="card fadeUp" style={{ padding: 28 }}>
+                {webcamPreview}
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
                   <span className="tag">Q{candidateQIndex + 1} of {total} · {q.category || "Security"}</span>
                   <div style={{ display: "flex", gap: 5 }}>
@@ -212,6 +314,10 @@ export default function CandidateAssessView({
                   <textarea className="input" placeholder={voice.recording ? "🎤 Listening... speak your answer" : "Type your answer here, or click 🎤 to speak..."}
                     value={ans}
                     onChange={e => setCandidateAnswers(p => ({ ...p, [candidateQIndex]: e.target.value }))}
+                    onPaste={e => { e.preventDefault(); showToast('Pasting is disabled for this assessment', 'warning'); }}
+                    onCopy={e => e.preventDefault()}
+                    onCut={e => e.preventDefault()}
+                    onContextMenu={e => e.preventDefault()}
                     style={{ minHeight: 140, fontSize: 13, borderColor: voice.recording ? "#ff5252" : undefined }} />
                   {voice.recording && (
                     <div style={{ marginTop: 8, padding: "8px 12px", background: "rgba(255,82,82,.08)", border: "1px solid rgba(255,82,82,.25)", borderRadius: 8 }}>
@@ -232,6 +338,9 @@ export default function CandidateAssessView({
                     if (voice.recording) voice.stop();
                     window.speechSynthesis.cancel();
                     setIsSpeaking(false);
+
+                    // Capture snapshot before moving to next question
+                    captureSnapshot(candidateQIndex);
 
                     if (candidateQIndex < total - 1) {
                       setCandidateQIndex(p => p + 1);
