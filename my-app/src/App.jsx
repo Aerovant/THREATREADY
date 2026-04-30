@@ -1476,9 +1476,10 @@ export default function ThreatReady() {
           body: JSON.stringify({ scenario_id: scenario.id, role_id: activeRole, score })
         }).catch(e => console.log('Scenario history:', e.message));
         const finalSessionId = sessionId || window.__sessionId;
+        
         if (token && finalSessionId) {
           console.log('[SESSION COMPLETE] session_id:', finalSessionId, 'score:', score);
-          await fetch('https://threatready-db.onrender.com/api/session/complete', {
+          const completeRes = await fetch('https://threatready-db.onrender.com/api/session/complete', {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
@@ -1495,7 +1496,15 @@ export default function ThreatReady() {
               earned_xp: earned
             })
           });
+          try {
+            const completeData = await completeRes.json();
+            if (completeData?.share_slug) {
+              setResults(prev => ({ ...prev, share_slug: completeData.share_slug }));
+              console.log('[SHARE SLUG]', completeData.share_slug);
+            }
+          } catch (e) { console.log('Share slug parse failed:', e.message); }
         }
+
       } catch (e) {
         console.log('Session complete error:', e);
       }
