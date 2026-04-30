@@ -50,7 +50,7 @@ export default function ResultsView({
       }
     } catch (e) { console.log('show-name save skipped:', e.message); }
 
-    const shareUrl = `https://threatready-db.onrender.com/share/${slug}`;
+    const shareUrl = `https://threatready.io/share/${slug}`;
     const linkedinUrl = `https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(shareUrl)}`;
     window.open(linkedinUrl, '_blank', 'noopener,noreferrer');
     setShowShareChoice(false);
@@ -198,7 +198,7 @@ export default function ResultsView({
           <button className="btn bs" onClick={() => { setActiveRole(null); setView("dashboard"); }}>
             🔀 Try Different Role
           </button>
-          
+
           {user ? (
             <button className="btn bs" style={{ borderColor: "var(--ok)", color: "var(--ok)" }}
               onClick={() => setShowShareChoice(true)}>
