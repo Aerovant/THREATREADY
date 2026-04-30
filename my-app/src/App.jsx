@@ -101,7 +101,9 @@ export default function ThreatReady() {
     // Only interview/results can't be restored (they need scenario state).
     // This means refresh stays on the same page — landing, auth, trial-role-select,
     // dashboard, b2b-dashboard, etc. — without ever bouncing the user elsewhere.
-    if (savedView && !['interview', 'results'].includes(savedView)) {
+    // Allow 'results' to restore if we have saved results data; 'interview' still excluded
+    const hasSavedResults = !!localStorage.getItem('cyberprep_results');
+    if (savedView && !(savedView === 'interview') && !(savedView === 'results' && !hasSavedResults)) {
       // Check that the view is appropriate for the current auth state
       // (e.g., logged-out users should not land on dashboard)
       if (token && savedUser) {
@@ -127,8 +129,9 @@ export default function ThreatReady() {
   });
 
   const setView = (newView) => {
-    // Don't save interview/results to localStorage - can't restore these
-    if (!['interview', 'results'].includes(newView)) {
+    // Don't save interview to localStorage (mid-test state can't be restored).
+    // Results CAN be saved now since we persist results data separately.
+    if (newView !== 'interview') {
       localStorage.setItem('cyberprep_view', newView);
     }
     // Track navigation history for proper back button behavior
@@ -240,7 +243,10 @@ export default function ThreatReady() {
   });
 
   // ── SCENARIO STATE ──
-  const [activeRole, setActiveRole] = useState(null);
+  const [activeRole, setActiveRole] = useState(() => {
+    return localStorage.getItem('cyberprep_active_role') || null;
+  });
+
   const [interviewPersona, setInterviewPersona] = useState('standard');
   const [leaderboard, setLeaderboard] = useState([]);
   const [myRank, setMyRank] = useState(null);
@@ -265,14 +271,28 @@ export default function ThreatReady() {
   useEffect(() => {
     localStorage.setItem('cyberprep_local_sessions', JSON.stringify(localSessionHistory));
   }, [localSessionHistory]);
-  const [activeDifficulty, setActiveDifficulty] = useState(null);
-  const [scenario, setScenario] = useState(null);
+  const [activeDifficulty, setActiveDifficulty] = useState(() => {
+    return localStorage.getItem('cyberprep_active_difficulty') || null;
+  });
+  const [scenario, setScenario] = useState(() => {
+    try {
+      const saved = localStorage.getItem('cyberprep_scenario');
+      return saved ? JSON.parse(saved) : null;
+    } catch { return null; }
+  });
   const [currentQ, setCurrentQ] = useState(null);
   const [qIndex, setQIndex] = useState(0);
   const [answers, setAnswers] = useState({});
   const [evaluations, setEvaluations] = useState([]);
   const [askedQs, setAskedQs] = useState([]);
-  const [results, setResults] = useState(null);
+
+  const [results, setResults] = useState(() => {
+    try {
+      const saved = localStorage.getItem('cyberprep_results');
+      return saved ? JSON.parse(saved) : null;
+    } catch { return null; }
+  });
+
   const [loading, setLoading] = useState(false);
   const [showHint, setShowHint] = useState(false);
   const [showChain, setShowChain] = useState(false);
@@ -322,8 +342,30 @@ export default function ThreatReady() {
     } catch { return []; }
   });
   // Persist stats to localStorage
-  useEffect(() => { localStorage.setItem('cyberprep_xp', String(xp)); }, [xp]);
-  useEffect(() => { localStorage.setItem('cyberprep_streak', String(streak)); }, [streak]);
+
+  useEffect(() => {
+    if (activeRole) localStorage.setItem('cyberprep_active_role', activeRole);
+    else localStorage.removeItem('cyberprep_active_role');
+  }, [activeRole]);
+
+  useEffect(() => {
+    if (activeDifficulty) localStorage.setItem('cyberprep_active_difficulty', activeDifficulty);
+    else localStorage.removeItem('cyberprep_active_difficulty');
+  }, [activeDifficulty]);
+
+  useEffect(() => {
+    if (scenario) {
+      try { localStorage.setItem('cyberprep_scenario', JSON.stringify(scenario)); } catch {}
+    }
+  }, [scenario]);
+
+  useEffect(() => {
+    if (results) {
+      try { localStorage.setItem('cyberprep_results', JSON.stringify(results)); } catch {}
+    } else {
+      localStorage.removeItem('cyberprep_results');
+    }
+  }, [results]);
   useEffect(() => {
     localStorage.setItem('cyberprep_completed_scenarios', JSON.stringify(completedScenarios));
   }, [completedScenarios]);
@@ -1605,6 +1647,8 @@ export default function ThreatReady() {
     setView(userType === "b2b" ? "b2b-dashboard" : "dashboard");
     setScenario(null);
     setResults(null);
+    localStorage.removeItem('cyberprep_results');
+    localStorage.removeItem('cyberprep_scenario');
   };
 
   const exitScenario = () => {
@@ -1614,6 +1658,8 @@ export default function ThreatReady() {
     setScenario(null);
     setCurrentQ(null);
     setResults(null);
+    localStorage.removeItem('cyberprep_results');
+    localStorage.removeItem('cyberprep_scenario');
     setView("dashboard");
   };
 

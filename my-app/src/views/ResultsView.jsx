@@ -198,10 +198,26 @@ export default function ResultsView({
           <button className="btn bs" onClick={() => { setActiveRole(null); setView("dashboard"); }}>
             🔀 Try Different Role
           </button>
-          <button className="btn bs" style={{ borderColor: "var(--ok)", color: "var(--ok)" }}
-            onClick={() => setShowShareChoice(true)}>
-            📤 Share Score on LinkedIn
-          </button>
+          
+          {user ? (
+            <button className="btn bs" style={{ borderColor: "var(--ok)", color: "var(--ok)" }}
+              onClick={() => setShowShareChoice(true)}>
+              📤 Share Score on LinkedIn
+            </button>
+          ) : (
+            <button className="btn bs"
+              title="Sign up to unlock LinkedIn sharing"
+              style={{
+                borderColor: "var(--tx2)", color: "var(--tx2)",
+                opacity: 0.5, cursor: "not-allowed", position: "relative"
+              }}
+              onClick={() => {
+                showToast('🔒 Sign up to unlock LinkedIn sharing', 'info');
+                setView('auth');
+              }}>
+              🔒 Share Score on LinkedIn
+            </button>
+          )}
         </div>
 
         {!isPaid && isTrialExhausted() && (
