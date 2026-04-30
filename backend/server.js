@@ -58,6 +58,174 @@ app.get('/api/health', (req, res) => {
 });
 
 // ═══════════════════════════════════════════════════════════════
+// PUBLIC SHARE PAGE — serves Open Graph meta tags for LinkedIn
+// ═══════════════════════════════════════════════════════════════
+
+// Role display names (mirrors the frontend ROLES list)
+const ROLE_NAMES = {
+  cloud: 'Cloud Security',
+  devsecops: 'DevSecOps',
+  appsec: 'Application Security',
+  netsec: 'Network Security',
+  prodsec: 'Product Security',
+  archsec: 'Security Architect',
+  dfir: 'DFIR & Incident Response',
+  grc: 'GRC & Compliance',
+  soc: 'SOC Analyst',
+  threathunter: 'Threat Hunter',
+  redteam: 'Red Team',
+  blueteam: 'Blue Team'
+};
+
+const escapeHtml = (s) => String(s || '')
+  .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+  .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+
+app.get('/share/:slug', async (req, res) => {
+  try {
+    const { slug } = req.params;
+    const result = await pool.query(
+      `SELECT s.overall_score, s.badge, s.role_id, s.share_disabled, s.share_show_name,
+              u.name AS user_name
+       FROM sessions s
+       LEFT JOIN users u ON u.id = s.user_id
+       WHERE s.share_slug = $1`,
+      [slug]
+    );
+
+    if (result.rows.length === 0) {
+      res.status(404).type('html').send(`<!DOCTYPE html><html><head><title>Result not found</title></head><body><h1>This share link doesn't exist.</h1><p><a href="https://threatready.io/">Go to ThreatReady</a></p></body></html>`);
+      return;
+    }
+
+    const r = result.rows[0];
+    if (r.share_disabled) {
+      res.status(410).type('html').send(`<!DOCTYPE html><html><head><title>Share disabled</title></head><body><h1>This share link has been disabled by its owner.</h1><p><a href="https://threatready.io/">Go to ThreatReady</a></p></body></html>`);
+      return;
+    }
+
+    const roleName = ROLE_NAMES[r.role_id] || (r.role_id || 'Cybersecurity');
+    const score = parseFloat(r.overall_score || 0).toFixed(1);
+    const badge = r.badge || 'Not Ready';
+    const owner = r.share_show_name && r.user_name ? r.user_name : 'A ThreatReady candidate';
+
+    const title = `${owner} scored ${score}/10 on a ${roleName} assessment`;
+    const description = `🏅 ${badge} Badge · Real-world cybersecurity scenario assessment on ThreatReady. Practice and prove your security skills at threatready.io`;
+    const imageUrl = `https://threatready-db.onrender.com/share/${encodeURIComponent(slug)}/image.png`;
+    const pageUrl = `https://threatready-db.onrender.com/share/${encodeURIComponent(slug)}`;
+
+    const html = `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>${escapeHtml(title)} | ThreatReady</title>
+<meta name="description" content="${escapeHtml(description)}" />
+
+<meta property="og:type" content="website" />
+<meta property="og:site_name" content="ThreatReady" />
+<meta property="og:url" content="${pageUrl}" />
+<meta property="og:title" content="${escapeHtml(title)}" />
+<meta property="og:description" content="${escapeHtml(description)}" />
+<meta property="og:image" content="${imageUrl}" />
+<meta property="og:image:width" content="1200" />
+<meta property="og:image:height" content="630" />
+
+<meta name="twitter:card" content="summary_large_image" />
+<meta name="twitter:title" content="${escapeHtml(title)}" />
+<meta name="twitter:description" content="${escapeHtml(description)}" />
+<meta name="twitter:image" content="${imageUrl}" />
+
+<style>
+  body { margin:0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif; background:#0a0e1a; color:#e8eaf6; min-height:100vh; display:flex; flex-direction:column; align-items:center; justify-content:center; padding:24px; text-align:center; }
+  h1 { font-size:28px; margin:24px 0 8px; color:#00e5ff; }
+  p { font-size:16px; color:#8890b0; margin:8px 0; max-width:560px; line-height:1.5; }
+  img { max-width:100%; width:560px; border-radius:12px; box-shadow:0 20px 60px rgba(0,0,0,.6), 0 0 60px rgba(0,229,255,.2); }
+  a.cta { margin-top:24px; display:inline-block; padding:14px 28px; background:#00e5ff; color:#0a0e1a; text-decoration:none; border-radius:8px; font-weight:700; font-size:15px; }
+  a.cta:hover { background:#00bcd4; }
+  .footer { margin-top:32px; font-size:12px; color:#5a6380; }
+</style>
+</head>
+<body>
+  <img src="${imageUrl}" alt="${escapeHtml(title)}" />
+  <h1>${escapeHtml(title)}</h1>
+  <p>${escapeHtml(description)}</p>
+  <a class="cta" href="https://threatready.io/">Try ThreatReady →</a>
+  <div class="footer">threatready.io · Real cybersecurity scenarios. Real evaluation.</div>
+</body>
+</html>`;
+
+    res.type('html').send(html);
+  } catch (e) {
+    console.error('Share page error:', e.message);
+    res.status(500).type('html').send(`<h1>Error loading share page</h1>`);
+  }
+});
+
+app.get('/share/:slug/image.png', async (req, res) => {
+  try {
+    const { slug } = req.params;
+    const result = await pool.query(
+      `SELECT overall_score, badge, role_id FROM sessions WHERE share_slug = $1 AND share_disabled = FALSE`,
+      [slug]
+    );
+    if (result.rows.length === 0) {
+      const fallback = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=', 'base64');
+      res.type('png').send(fallback);
+      return;
+    }
+
+    const r = result.rows[0];
+    const roleName = ROLE_NAMES[r.role_id] || r.role_id || 'Cybersecurity';
+    const score = parseFloat(r.overall_score || 0).toFixed(1);
+    const badge = r.badge || 'Not Ready';
+    const scoreColor = parseFloat(score) >= 7 ? '#00e096' : parseFloat(score) >= 5 ? '#ffab40' : '#ff5252';
+    const badgeColor = badge === 'Platinum' ? '#e2e8f0' : badge === 'Gold' ? '#f59e0b' : badge === 'Silver' ? '#94a3b8' : badge === 'Bronze' ? '#cd7f32' : '#ff5252';
+
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#0a0e1a"/>
+      <stop offset="100%" stop-color="#1a1f2e"/>
+    </linearGradient>
+  </defs>
+  <rect width="1200" height="630" fill="url(#bg)"/>
+  <rect x="20" y="20" width="1160" height="590" fill="none" stroke="#00e5ff" stroke-width="4"/>
+  <text x="600" y="100" font-family="Arial, sans-serif" font-size="38" font-weight="700" fill="#00e5ff" text-anchor="middle">THREATREADY</text>
+  <text x="600" y="130" font-family="Arial, sans-serif" font-size="16" fill="#8890b0" text-anchor="middle">CYBERSECURITY ASSESSMENT</text>
+  <text x="600" y="340" font-family="Arial, sans-serif" font-size="200" font-weight="700" fill="${scoreColor}" text-anchor="middle">${score}</text>
+  <text x="600" y="380" font-family="Arial, sans-serif" font-size="32" fill="#8890b0" text-anchor="middle">/ 10</text>
+  <text x="600" y="440" font-family="Arial, sans-serif" font-size="36" font-weight="700" fill="${badgeColor}" text-anchor="middle">${badge.toUpperCase()} BADGE</text>
+  <text x="600" y="490" font-family="Arial, sans-serif" font-size="24" fill="#e8eaf6" text-anchor="middle">${escapeHtml(roleName)}</text>
+  <text x="600" y="590" font-family="Arial, sans-serif" font-size="16" fill="#5a6380" text-anchor="middle">threatready.io</text>
+</svg>`;
+
+    res.type('image/svg+xml').send(svg);
+  } catch (e) {
+    console.error('Share image error:', e.message);
+    res.status(500).send('Error');
+  }
+});
+
+// Owner disables their share page
+app.post('/api/share/disable/:slug', auth, async (req, res) => {
+  try {
+    const { slug } = req.params;
+    const result = await pool.query(
+      `UPDATE sessions SET share_disabled = TRUE WHERE share_slug = $1 AND user_id = $2 RETURNING id`,
+      [slug, req.user.id]
+    );
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Share not found or not owned by you' });
+    }
+    res.json({ success: true });
+  } catch (e) {
+    console.error('Disable share error:', e.message);
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// ═══════════════════════════════════════════════════════════════
 // AUTH: SIGNUP
 // ═══════════════════════════════════════════════════════════════
 app.post('/api/auth/signup', async (req, res) => {
@@ -661,10 +829,11 @@ app.post('/api/session/complete', auth, async (req, res) => {
 
     // Update session
     console.log('Step 1: Updating session...');
-    await pool.query(
-      'UPDATE sessions SET completed_at = NOW(), overall_score = $1, skills_score = $2, attack_score = $3, badge = $4, earned_xp = $5 WHERE id = $6',
-      [overall_score, skills_score, attack_score, badge, earned_xp, session_id]
+    const updateResult = await pool.query(
+      'UPDATE sessions SET completed_at = NOW(), overall_score = $1, skills_score = $2, attack_score = $3, badge = $4, earned_xp = $5, share_slug = COALESCE(share_slug, $7) WHERE id = $6 RETURNING share_slug',
+      [overall_score, skills_score, attack_score, badge, earned_xp, session_id, Math.random().toString(36).substring(2, 10)]
     );
+    const shareSlug = updateResult.rows[0]?.share_slug || null;
 
     // Update user stats (XP, streak, completed scenarios)
     console.log('Step 2: Updating user stats...');
@@ -730,8 +899,8 @@ app.post('/api/session/complete', auth, async (req, res) => {
       console.log('History save failed:', histErr.message);
     }
 
-    console.log('SESSION COMPLETE! XP earned:', earned_xp, 'Badge:', badge);
-    res.json({ success: true });
+    console.log('SESSION COMPLETE! XP earned:', earned_xp, 'Badge:', badge, 'Share slug:', shareSlug);
+    res.json({ success: true, share_slug: shareSlug });
   } catch (e) {
     console.error('Session complete error:', e.message);
     res.status(500).json({ error: e.message });
@@ -3562,8 +3731,13 @@ async function runMigrations() {
     // This recovers data for users who completed assessments before this fix
     try {
       // Add role_id column to sessions if missing (for the backfill query)
+
       await pool.query(`ALTER TABLE sessions ADD COLUMN IF NOT EXISTS role_id VARCHAR(100)`).catch(() => { });
       await pool.query(`ALTER TABLE sessions ALTER COLUMN user_id DROP NOT NULL`).catch(() => {});
+      await pool.query(`ALTER TABLE sessions ADD COLUMN IF NOT EXISTS share_slug VARCHAR(20) UNIQUE`).catch(() => {});
+      await pool.query(`ALTER TABLE sessions ADD COLUMN IF NOT EXISTS share_disabled BOOLEAN DEFAULT FALSE`).catch(() => {});
+      await pool.query(`ALTER TABLE sessions ADD COLUMN IF NOT EXISTS share_show_name BOOLEAN DEFAULT FALSE`).catch(() => {});
+
       const backfillResult = await pool.query(`
         INSERT INTO user_scenario_history (user_id, scenario_id, role_id, score, completed_at)
         SELECT s.user_id, s.scenario_id,
