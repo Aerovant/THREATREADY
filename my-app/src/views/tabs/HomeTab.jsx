@@ -230,8 +230,8 @@ export default function HomeTab({
         </div>
       )}
 
-      {!isPaid && <button className="btn bp" style={{ width: "100%", marginTop: 12, padding: 12 }} onClick={() => { setDashTab("billing"); localStorage.setItem('cyberprep_tab', 'billing'); }}>+ Add More Tracks</button>}
-
+      <button className="btn bp" style={{ width: "100%", marginTop: 12, padding: 12 }} onClick={() => { setDashTab("billing"); localStorage.setItem('cyberprep_tab', 'billing'); }}>+ Add More Tracks</button>
+      
       {/* Leaderboard Preview — only for PAID users */}
       {isPaid ? (
         <div className="card fadeUp" style={{ marginTop: 16, padding: 16 }}>

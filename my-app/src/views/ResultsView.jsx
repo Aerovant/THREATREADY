@@ -2,6 +2,7 @@
 // RESULTS VIEW (Transparent Scoring + Badges + CTAs)
 // Extracted from App.jsx
 // ═══════════════════════════════════════════════════════════════
+import { useState } from "react";
 import { RadarChart, PolarGrid, PolarAngleAxis, Radar, ResponsiveContainer } from "recharts";
 import { CSS } from "../styles.js";
 import { ROLES, SCENARIOS } from "../constants.js";
@@ -28,6 +29,33 @@ export default function ResultsView({
   startScenario,
   isTrialExhausted,
 }) {
+  const [showShareChoice, setShowShareChoice] = useState(false);
+
+  // Open LinkedIn composer with the share URL pre-attached as a link card
+  const openLinkedInShare = async (showName) => {
+    const slug = results?.share_slug;
+    if (!slug) {
+      showToast('Share link not available yet — please retry in a moment', 'error');
+      return;
+    }
+    // Save user's "show name" preference (only if logged in)
+    try {
+      const token = localStorage.getItem('token');
+      if (token) {
+        await fetch(`https://threatready-db.onrender.com/api/share/show-name/${slug}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+          body: JSON.stringify({ show_name: !!showName })
+        });
+      }
+    } catch (e) { console.log('show-name save skipped:', e.message); }
+
+    const shareUrl = `https://threatready-db.onrender.com/share/${slug}`;
+    const linkedinUrl = `https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(shareUrl)}`;
+    window.open(linkedinUrl, '_blank', 'noopener,noreferrer');
+    setShowShareChoice(false);
+  };
+
   return (
     <div className="app"><style>{CSS}</style><div className="scanbar" /><div className="gridbg" />
       <HomeBtn goHome={goHome} />
@@ -170,136 +198,26 @@ export default function ResultsView({
           <button className="btn bs" onClick={() => { setActiveRole(null); setView("dashboard"); }}>
             🔀 Try Different Role
           </button>
-
-          <button className="btn bs" style={{ borderColor: "var(--ok)", color: "var(--ok)" }}
-            onClick={async () => {
-              try {
-                const token = localStorage.getItem('token');
-                if (!token) { showToast('Please sign in first', 'error'); return; }
-                
-                showToast('Checking LinkedIn connection...', 'info');
-                
-                // Step 1: Check if LinkedIn connected
-                const statusRes = await fetch('https://threatready-db.onrender.com/api/linkedin/status', {
-                  headers: { 'Authorization': `Bearer ${token}` }
-                });
-                const statusData = await statusRes.json();
-                
-                // Step 2: If NOT connected, open LinkedIn OAuth
-                if (!statusData.connected) {
-                  const authRes = await fetch('https://threatready-db.onrender.com/api/linkedin/auth', {
-                    headers: { 'Authorization': `Bearer ${token}` }
-                  });
-                  const authData = await authRes.json();
-                  
-                  if (!authData.auth_url) { showToast('Failed to start LinkedIn connection', 'error'); return; }
-                  
-                  // Open OAuth popup
-                  const popup = window.open(authData.auth_url, 'linkedin-oauth', 'width=600,height=700');
-                  
-                  // Wait for popup to close (user authorizes)
-                  showToast('Waiting for LinkedIn authorization...', 'info');
-                  await new Promise((resolve) => {
-                    const interval = setInterval(() => {
-                      if (popup.closed) { clearInterval(interval); resolve(); }
-                    }, 500);
-                  });
-                  
-                  // Re-check status
-                  const recheckRes = await fetch('https://threatready-db.onrender.com/api/linkedin/status', {
-                    headers: { 'Authorization': `Bearer ${token}` }
-                  });
-                  const recheckData = await recheckRes.json();
-                  if (!recheckData.connected) { showToast('LinkedIn connection cancelled', 'error'); return; }
-                  showToast('✅ LinkedIn connected! Generating post...', 'success');
-                }
-                
-                // Step 3: Generate score image
-                const role = ROLES.find(r => r.id === activeRole)?.name || activeRole;
-                const score = results.overall_score;
-                const badge = results.badge;
-                const percentile = 100 - results.percentile;
-                
-                const canvas = document.createElement('canvas');
-                canvas.width = 1200;
-                canvas.height = 630;
-                const ctx = canvas.getContext('2d');
-                
-                const gradient = ctx.createLinearGradient(0, 0, 1200, 630);
-                gradient.addColorStop(0, '#0a0e1a');
-                gradient.addColorStop(1, '#1a1f2e');
-                ctx.fillStyle = gradient;
-                ctx.fillRect(0, 0, 1200, 630);
-                
-                ctx.strokeStyle = '#00e5ff';
-                ctx.lineWidth = 4;
-                ctx.strokeRect(20, 20, 1160, 590);
-                
-                ctx.fillStyle = '#00e5ff';
-                ctx.font = 'bold 38px Arial';
-                ctx.textAlign = 'center';
-                ctx.fillText('⚡ THREATREADY', 600, 100);
-                
-                ctx.fillStyle = '#8890b0';
-                ctx.font = '16px Arial';
-                ctx.fillText('CYBERSECURITY ASSESSMENT', 600, 130);
-                
-                const scoreColor = score >= 7 ? '#00e096' : score >= 5 ? '#ffab40' : '#ff5252';
-                ctx.fillStyle = scoreColor;
-                ctx.font = 'bold 200px Arial';
-                ctx.fillText(`${score}`, 600, 340);
-                
-                ctx.fillStyle = '#8890b0';
-                ctx.font = '32px Arial';
-                ctx.fillText('/ 10', 600, 380);
-                
-                const badgeColor = badge === 'Platinum' ? '#e2e8f0' : badge === 'Gold' ? '#f59e0b' : badge === 'Silver' ? '#94a3b8' : '#cd7f32';
-                ctx.fillStyle = badgeColor;
-                ctx.font = 'bold 36px Arial';
-                ctx.fillText(`🏅 ${badge.toUpperCase()} BADGE`, 600, 440);
-                
-                ctx.fillStyle = '#e8eaf6';
-                ctx.font = '24px Arial';
-                ctx.fillText(role, 600, 490);
-                
-                ctx.fillStyle = '#00e5ff';
-                ctx.font = 'bold 22px Arial';
-                ctx.fillText(`Top ${percentile}% of all candidates`, 600, 530);
-                
-                ctx.fillStyle = '#5a6380';
-                ctx.font = '16px Arial';
-                ctx.fillText('threatready.io', 600, 590);
-                
-                const imageBase64 = canvas.toDataURL('image/png');
-                
-                // Step 4: Post to LinkedIn via backend
-                showToast('Posting to LinkedIn...', 'info');
-                const text = `🎯 Just scored ${score}/10 on a ${role} cybersecurity assessment on ThreatReady!\n\n` +
-                  `🏅 Badge: ${badge}\n` +
-                  `📊 Top ${percentile}% of all candidates\n\n` +
-                  `Practice your cybersecurity skills at https://threatready.io/\n\n` +
-                  `#Cybersecurity #ThreatReady #InfoSec`;
-                
-                const shareRes = await fetch('https://threatready-db.onrender.com/api/linkedin/share', {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-                  body: JSON.stringify({ text, image_base64: imageBase64 })
-                });
-                const shareData = await shareRes.json();
-                
-                if (shareData.success) {
-                  showToast('🎉 Posted to LinkedIn successfully!', 'success');
-                } else {
-                  showToast('❌ ' + (shareData.error || 'Share failed'), 'error');
-                }
-              } catch (e) {
-                console.error('LinkedIn share error:', e);
-                showToast('❌ ' + e.message, 'error');
-              }
-            }}>
-            📤 Share Score on LinkedIn
-          </button>
-
+          
+          {user ? (
+            <button className="btn bs" style={{ borderColor: "var(--ok)", color: "var(--ok)" }}
+              onClick={() => setShowShareChoice(true)}>
+              📤 Share Score on LinkedIn
+            </button>
+          ) : (
+            <button className="btn bs"
+              title="Sign up to unlock LinkedIn sharing"
+              style={{
+                borderColor: "var(--tx2)", color: "var(--tx2)",
+                opacity: 0.5, cursor: "not-allowed", position: "relative"
+              }}
+              onClick={() => {
+                showToast('🔒 Sign up to unlock LinkedIn sharing', 'info');
+                setView('auth');
+              }}>
+              🔒 Share Score on LinkedIn
+            </button>
+          )}
         </div>
 
         {!isPaid && isTrialExhausted() && (
@@ -307,7 +225,50 @@ export default function ResultsView({
             🔓 View Subscription Options →
           </button>
         )}
+
       </div></div>
+
+      {/* LinkedIn Share — Identity Choice Modal */}
+      {showShareChoice && (
+        <div onClick={() => setShowShareChoice(false)} style={{
+          position: "fixed", inset: 0, background: "rgba(0,0,0,0.85)", zIndex: 9998,
+          display: "flex", alignItems: "center", justifyContent: "center",
+          backdropFilter: "blur(8px)", padding: 20
+        }}>
+          <div onClick={e => e.stopPropagation()} style={{
+            background: "#0f1420", border: "2px solid var(--ac)", borderRadius: 16,
+            padding: 28, maxWidth: 440, width: "100%", textAlign: "center",
+            boxShadow: "0 20px 60px rgba(0,0,0,.9), 0 0 60px rgba(0,229,255,0.2)"
+          }}>
+            <div style={{ fontSize: 48, marginBottom: 12 }}>🔗</div>
+            <div style={{ fontSize: 18, fontWeight: 800, marginBottom: 8, color: "var(--ac)" }}>
+              Share your score on LinkedIn
+            </div>
+            <div style={{ fontSize: 13, color: "var(--tx2)", marginBottom: 20, lineHeight: 1.5 }}>
+              LinkedIn will open in a new tab with your score preview attached. Write your own caption,
+              then click Post on LinkedIn to share.
+            </div>
+            <div style={{ fontSize: 12, color: "var(--tx2)", marginBottom: 10, fontWeight: 700, letterSpacing: 0.5 }}>
+              SHOW YOUR NAME ON THE SHARE PAGE?
+            </div>
+
+            <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+              <button className="btn bp" style={{ padding: 12 }}
+                onClick={() => openLinkedInShare(true)}>
+                👤 Yes — show my name
+              </button>
+              <button className="btn bs" style={{ padding: 12 }}
+                onClick={() => openLinkedInShare(false)}>
+                🕶️ Anonymous
+              </button>
+              <button className="btn bs" style={{ padding: 10, marginTop: 4, fontSize: 12, opacity: 0.7 }}
+                onClick={() => setShowShareChoice(false)}>
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

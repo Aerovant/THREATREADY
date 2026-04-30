@@ -101,7 +101,9 @@ export default function ThreatReady() {
     // Only interview/results can't be restored (they need scenario state).
     // This means refresh stays on the same page — landing, auth, trial-role-select,
     // dashboard, b2b-dashboard, etc. — without ever bouncing the user elsewhere.
-    if (savedView && !['interview', 'results'].includes(savedView)) {
+    // Allow 'results' to restore if we have saved results data; 'interview' still excluded
+    const hasSavedResults = !!localStorage.getItem('cyberprep_results');
+    if (savedView && !(savedView === 'interview') && !(savedView === 'results' && !hasSavedResults)) {
       // Check that the view is appropriate for the current auth state
       // (e.g., logged-out users should not land on dashboard)
       if (token && savedUser) {
@@ -127,8 +129,9 @@ export default function ThreatReady() {
   });
 
   const setView = (newView) => {
-    // Don't save interview/results to localStorage - can't restore these
-    if (!['interview', 'results'].includes(newView)) {
+    // Don't save interview to localStorage (mid-test state can't be restored).
+    // Results CAN be saved now since we persist results data separately.
+    if (newView !== 'interview') {
       localStorage.setItem('cyberprep_view', newView);
     }
     // Track navigation history for proper back button behavior
@@ -232,6 +235,7 @@ export default function ThreatReady() {
     if (isPaid || subscribedRoles.length === 0) return false;
     return getTotalUsedAttempts() >= 2;
   };
+
   const [billingPeriod, setBillingPeriod] = useState('monthly'); // 'monthly' | 'yearly'
   const [trialRoles, setTrialRoles] = useState(() => {
     const saved = localStorage.getItem('trialRoles');
@@ -239,7 +243,10 @@ export default function ThreatReady() {
   });
 
   // ── SCENARIO STATE ──
-  const [activeRole, setActiveRole] = useState(null);
+  const [activeRole, setActiveRole] = useState(() => {
+    return localStorage.getItem('cyberprep_active_role') || null;
+  });
+
   const [interviewPersona, setInterviewPersona] = useState('standard');
   const [leaderboard, setLeaderboard] = useState([]);
   const [myRank, setMyRank] = useState(null);
@@ -264,23 +271,34 @@ export default function ThreatReady() {
   useEffect(() => {
     localStorage.setItem('cyberprep_local_sessions', JSON.stringify(localSessionHistory));
   }, [localSessionHistory]);
-  const [activeDifficulty, setActiveDifficulty] = useState(null);
-  const [scenario, setScenario] = useState(null);
+  const [activeDifficulty, setActiveDifficulty] = useState(() => {
+    return localStorage.getItem('cyberprep_active_difficulty') || null;
+  });
+  const [scenario, setScenario] = useState(() => {
+    try {
+      const saved = localStorage.getItem('cyberprep_scenario');
+      return saved ? JSON.parse(saved) : null;
+    } catch { return null; }
+  });
   const [currentQ, setCurrentQ] = useState(null);
   const [qIndex, setQIndex] = useState(0);
   const [answers, setAnswers] = useState({});
   const [evaluations, setEvaluations] = useState([]);
   const [askedQs, setAskedQs] = useState([]);
-  const [results, setResults] = useState(null);
+
+  const [results, setResults] = useState(() => {
+    try {
+      const saved = localStorage.getItem('cyberprep_results');
+      return saved ? JSON.parse(saved) : null;
+    } catch { return null; }
+  });
+
   const [loading, setLoading] = useState(false);
   const [showHint, setShowHint] = useState(false);
   const [showChain, setShowChain] = useState(false);
   const [inputMode, setInputMode] = useState("text");
   const [elapsed, setElapsed] = useState(0);
-  // Tab switch / focus loss tracking (anti-cheating)
-  const [tabSwitchCount, setTabSwitchCount] = useState(0);
-  const [showTabWarning, setShowTabWarning] = useState(false);
-  const [showEjectedModal, setShowEjectedModal] = useState(false);
+
   const timerRef = useRef(null);
   const voice = useVoice();
 
@@ -324,8 +342,30 @@ export default function ThreatReady() {
     } catch { return []; }
   });
   // Persist stats to localStorage
-  useEffect(() => { localStorage.setItem('cyberprep_xp', String(xp)); }, [xp]);
-  useEffect(() => { localStorage.setItem('cyberprep_streak', String(streak)); }, [streak]);
+
+  useEffect(() => {
+    if (activeRole) localStorage.setItem('cyberprep_active_role', activeRole);
+    else localStorage.removeItem('cyberprep_active_role');
+  }, [activeRole]);
+
+  useEffect(() => {
+    if (activeDifficulty) localStorage.setItem('cyberprep_active_difficulty', activeDifficulty);
+    else localStorage.removeItem('cyberprep_active_difficulty');
+  }, [activeDifficulty]);
+
+  useEffect(() => {
+    if (scenario) {
+      try { localStorage.setItem('cyberprep_scenario', JSON.stringify(scenario)); } catch {}
+    }
+  }, [scenario]);
+
+  useEffect(() => {
+    if (results) {
+      try { localStorage.setItem('cyberprep_results', JSON.stringify(results)); } catch {}
+    } else {
+      localStorage.removeItem('cyberprep_results');
+    }
+  }, [results]);
   useEffect(() => {
     localStorage.setItem('cyberprep_completed_scenarios', JSON.stringify(completedScenarios));
   }, [completedScenarios]);
@@ -881,37 +921,6 @@ export default function ThreatReady() {
   useEffect(() => {
     if (view !== "interview") return;
 
-    const handleVisibilityChange = () => {
-      if (document.hidden) {
-        // User switched tabs or minimized the window
-        setTabSwitchCount(prev => {
-          const newCount = prev + 1;
-          if (newCount >= 4) {
-            // 4th tab switch → eject from attempt
-            setShowEjectedModal(true);
-            // Auto-redirect to dashboard after showing modal
-            setTimeout(() => {
-              setShowEjectedModal(false);
-              setShowTabWarning(false);
-              setView('dashboard');
-              setTabSwitchCount(0);
-            }, 4000);
-          } else {
-            // 1st, 2nd, 3rd tab switch → just warning
-            setShowTabWarning(true);
-            showToast(`⚠️ Tab switch detected! (${newCount}/3) — One more switch will exit your attempt`, "error");
-          }
-          return newCount;
-        });
-      }
-    };
-
-    const handleBlur = () => {
-      // User clicked outside the window (different app)
-      if (!document.hidden) {
-        showToast("⚠️ Window focus lost — keep this window active during your attempt", "warning");
-      }
-    };
 
     // Block right-click context menu (prevents inspect element / save / copy options)
     const handleContextMenu = (e) => { e.preventDefault(); return false; };
@@ -938,26 +947,14 @@ export default function ThreatReady() {
       }
     };
 
-    document.addEventListener('visibilitychange', handleVisibilityChange);
-    window.addEventListener('blur', handleBlur);
     document.addEventListener('contextmenu', handleContextMenu);
     document.addEventListener('keydown', handleKeyDown);
 
     return () => {
-      document.removeEventListener('visibilitychange', handleVisibilityChange);
-      window.removeEventListener('blur', handleBlur);
       document.removeEventListener('contextmenu', handleContextMenu);
       document.removeEventListener('keydown', handleKeyDown);
     };
-  }, [view]);
 
-  // Reset tab switch count when leaving interview
-  useEffect(() => {
-    if (view !== "interview") {
-      setTabSwitchCount(0);
-      setShowTabWarning(false);
-      setShowEjectedModal(false);
-    }
   }, [view]);
 
   // ── DETECT B2C/B2B ──
@@ -1229,23 +1226,28 @@ export default function ThreatReady() {
     }
 
     // Create session in backend FIRST to get session_id
+    // Create session in backend FIRST to get session_id (works for both logged-in and trial users)
     let newSessionId = null;
     try {
       const token = localStorage.getItem('token');
-      if (token) {
-        const res = await fetch('https://threatready-db.onrender.com/api/session/start', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`
-          },
-          body: JSON.stringify({ scenario_id: sc.id, interview_mode: false, role_id: activeRole || 'cloud' })
-        });
-        const data = await res.json();
-        newSessionId = data.session_id;
-        setSessionId(data.session_id);
-        window.__sessionId = data.session_id;
-      }
+      const headers = { 'Content-Type': 'application/json' };
+      if (token) headers['Authorization'] = `Bearer ${token}`;
+
+      const res = await fetch('https://threatready-db.onrender.com/api/session/start', {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({
+          scenario_id: sc.id,
+          interview_mode: false,
+          role_id: activeRole || 'cloud',
+          difficulty: diff || 'beginner',
+          is_trial: !token
+        })
+      });
+      const data = await res.json();
+      newSessionId = data.session_id;
+      setSessionId(data.session_id);
+      window.__sessionId = data.session_id;
     } catch (e) {
       console.log('Session start error:', e);
     }
@@ -1516,9 +1518,10 @@ export default function ThreatReady() {
           body: JSON.stringify({ scenario_id: scenario.id, role_id: activeRole, score })
         }).catch(e => console.log('Scenario history:', e.message));
         const finalSessionId = sessionId || window.__sessionId;
+        
         if (token && finalSessionId) {
           console.log('[SESSION COMPLETE] session_id:', finalSessionId, 'score:', score);
-          await fetch('https://threatready-db.onrender.com/api/session/complete', {
+          const completeRes = await fetch('https://threatready-db.onrender.com/api/session/complete', {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
@@ -1535,7 +1538,15 @@ export default function ThreatReady() {
               earned_xp: earned
             })
           });
+          try {
+            const completeData = await completeRes.json();
+            if (completeData?.share_slug) {
+              setResults(prev => ({ ...prev, share_slug: completeData.share_slug }));
+              console.log('[SHARE SLUG]', completeData.share_slug);
+            }
+          } catch (e) { console.log('Share slug parse failed:', e.message); }
         }
+
       } catch (e) {
         console.log('Session complete error:', e);
       }
@@ -1636,6 +1647,8 @@ export default function ThreatReady() {
     setView(userType === "b2b" ? "b2b-dashboard" : "dashboard");
     setScenario(null);
     setResults(null);
+    localStorage.removeItem('cyberprep_results');
+    localStorage.removeItem('cyberprep_scenario');
   };
 
   const exitScenario = () => {
@@ -1645,6 +1658,8 @@ export default function ThreatReady() {
     setScenario(null);
     setCurrentQ(null);
     setResults(null);
+    localStorage.removeItem('cyberprep_results');
+    localStorage.removeItem('cyberprep_scenario');
     setView("dashboard");
   };
 
@@ -1875,14 +1890,10 @@ export default function ThreatReady() {
       voice={voice}
       isMuted={isMuted}
       isSpeaking={isSpeaking}
-      tabSwitchCount={tabSwitchCount}
-      showTabWarning={showTabWarning}
-      showEjectedModal={showEjectedModal}
       setAnswers={setAnswers}
       setShowHint={setShowHint}
       setInputMode={setInputMode}
       setIsMuted={setIsMuted}
-      setShowTabWarning={setShowTabWarning}
       submitAnswer={submitAnswer}
       exitScenario={exitScenario}
     />
