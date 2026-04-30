@@ -359,7 +359,13 @@ export default function ThreatReady() {
     }
   }, [scenario]);
 
-  useEffect(() => { localStorage.setItem('cyberprep_streak', String(streak)); }, [streak]);
+  useEffect(() => {
+    if (results) {
+      try { localStorage.setItem('cyberprep_results', JSON.stringify(results)); } catch {}
+    } else {
+      localStorage.removeItem('cyberprep_results');
+    }
+  }, [results]);
   useEffect(() => {
     localStorage.setItem('cyberprep_completed_scenarios', JSON.stringify(completedScenarios));
   }, [completedScenarios]);
