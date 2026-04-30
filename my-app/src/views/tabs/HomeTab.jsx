@@ -209,15 +209,15 @@ export default function HomeTab({
                 </div>
                 <span style={{ color: "var(--ac)", fontSize: 12, fontWeight: 600 }}>Open →</span>
               </div>
-              <div style={{ display: "grid", gridTemplateColumns: isPaid ? "repeat(4,1fr)" : "repeat(1,1fr)", gap: 6, marginTop: 10 }}>
-                {(isPaid ? ["Beginner", "Intermediate", "Advanced", "Expert"] : ["Beginner"]).map((d, i) => (
-                  <div key={i} style={{ background: "var(--s2)", borderRadius: 6, padding: "4px 8px", textAlign: "center" }}>
-                    <div style={{ fontSize: 11, color: "var(--ac)" }}>
-                      {d}
-                    </div>
+
+              {isPaid && (
+                <div style={{ marginTop: 10, padding: "6px 8px", background: "var(--s2)", borderRadius: 6, textAlign: "center" }}>
+                  <div style={{ fontSize: 11, color: "var(--ac)", fontWeight: 600 }}>
+                    All levels unlocked
                   </div>
-                ))}
-              </div>
+                </div>
+              )}
+
             </div>
           );
         })
