@@ -225,6 +225,25 @@ app.post('/api/share/disable/:slug', auth, async (req, res) => {
   }
 });
 
+// User toggles show-name flag on their share page
+app.post('/api/share/show-name/:slug', auth, async (req, res) => {
+  try {
+    const { slug } = req.params;
+    const { show_name } = req.body;
+    const result = await pool.query(
+      `UPDATE sessions SET share_show_name = $1 WHERE share_slug = $2 AND user_id = $3 RETURNING id`,
+      [!!show_name, slug, req.user.id]
+    );
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Share not found or not owned by you' });
+    }
+    res.json({ success: true });
+  } catch (e) {
+    console.error('Show-name update error:', e.message);
+    res.status(500).json({ error: e.message });
+  }
+});
+
 // ═══════════════════════════════════════════════════════════════
 // AUTH: SIGNUP
 // ═══════════════════════════════════════════════════════════════
