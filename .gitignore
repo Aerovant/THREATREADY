@@ -8,3 +8,6 @@ my-app/.env
 *.log
 .vite/
 my-app/.vite/
+.env.local
+backend/.env.local
+my-app/.env.local

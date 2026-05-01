@@ -22,6 +22,7 @@ export default function InterviewView({
   voice,
   isMuted,
   isSpeaking,
+  speakQuestion,
   
   // ── SETTERS ──
   setAnswers,
@@ -73,27 +74,10 @@ export default function InterviewView({
                 if (isMuted) {
                   setIsMuted(false);
                   window.speechSynthesis.cancel();
-                  const utterance = new SpeechSynthesisUtterance(currentQ.t);
-                  const voices = window.speechSynthesis.getVoices();
-                  const femaleVoices = voices.filter(v =>
-                    v.name.includes('Female') || v.name.includes('Zira') ||
-                    v.name.includes('Samantha') || v.name.includes('Google UK English Female')
-                  );
-                  const maleVoices = voices.filter(v =>
-                    v.name.includes('Male') || v.name.includes('Daniel') ||
-                    v.name.includes('Google UK English Male') || v.name.includes('Microsoft David')
-                  );
-                  const useFemale = qIndex % 2 === 0;
-                  const preferred = (useFemale ? femaleVoices[0] : maleVoices[0]) ||
-                    voices.find(v => v.lang === 'en-US');
-                  if (preferred) utterance.voice = preferred;
-                  utterance.rate = 0.9;
-                  utterance.pitch = useFemale ? 1.1 : 0.85;
-                  utterance.volume = 1.0;
-                  window.speechSynthesis.speak(utterance);
                 } else {
                   setIsMuted(true);
                   window.speechSynthesis.cancel();
+                  speakQuestion(currentQ.t, qIndex, true);
                 }
               }}
             >

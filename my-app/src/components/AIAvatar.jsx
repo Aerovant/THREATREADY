@@ -1,6 +1,6 @@
 // ═══════════════════════════════════════════════════════════════
 // AI AVATAR — Static avatar with audio wave visualizer
-// Verbatim from original App.jsx.
+// Visual is driven entirely by isSpeaking. isMuted has no visual effect.
 // ═══════════════════════════════════════════════════════════════
 export default function AIAvatar({ isSpeaking, isMuted, qIndex }) {
   const isFemale = qIndex % 2 === 0;
@@ -12,7 +12,7 @@ export default function AIAvatar({ isSpeaking, isMuted, qIndex }) {
       <div style={{ position: "relative", width: 150, height: 170 }}>
 
         {/* Outer pulse ring when speaking */}
-        {isSpeaking && !isMuted && (
+        {isSpeaking && (
           <>
             <div style={{
               position: "absolute", inset: -10, borderRadius: 16,
@@ -37,7 +37,7 @@ export default function AIAvatar({ isSpeaking, isMuted, qIndex }) {
           transition: "border-color 0.3s, box-shadow 0.3s",
           background: `linear-gradient(135deg, ${isFemale ? "rgba(255,107,157,0.08)" : "rgba(0,229,255,0.08)"}, rgba(10,14,26,0.9))`,
           display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
-          boxShadow: isSpeaking && !isMuted
+          boxShadow: isSpeaking
             ? `0 0 30px ${isFemale ? "rgba(255,107,157,0.4)" : "rgba(0,229,255,0.4)"}`
             : "0 4px 20px rgba(0,0,0,0.5)"
         }}>
@@ -45,8 +45,8 @@ export default function AIAvatar({ isSpeaking, isMuted, qIndex }) {
           {/* Avatar Icon (static) */}
           <div style={{
             fontSize: 50, marginBottom: 6,
-            opacity: isMuted ? 0.3 : 1,
-            filter: isSpeaking && !isMuted ? "none" : "grayscale(0.2)"
+            opacity: 1,
+            filter: isSpeaking ? "none" : "grayscale(0.2)"
           }}>
             {isFemale ? "👩‍💼" : "👨‍💼"}
           </div>
@@ -54,7 +54,7 @@ export default function AIAvatar({ isSpeaking, isMuted, qIndex }) {
           {/* Name */}
           <div style={{
             fontSize: 12, fontWeight: 700, letterSpacing: 1.5,
-            color: isSpeaking && !isMuted ? accentColor : "#8890b0",
+            color: isSpeaking ? accentColor : "#8890b0",
             marginBottom: 8, transition: "color 0.3s"
           }}>
             {name}
@@ -62,7 +62,7 @@ export default function AIAvatar({ isSpeaking, isMuted, qIndex }) {
 
           {/* Status / Audio Wave */}
           <div style={{ height: 24, display: "flex", alignItems: "center", justifyContent: "center", gap: 3 }}>
-            {isSpeaking && !isMuted ? (
+            {isSpeaking ? (
               [1, 2, 3, 4, 5, 6, 7, 8, 9].map(i => (
                 <div key={i} style={{
                   width: 3, borderRadius: 3,
@@ -73,32 +73,12 @@ export default function AIAvatar({ isSpeaking, isMuted, qIndex }) {
               ))
             ) : (
               <div style={{ fontSize: 11, color: "#5a6380", letterSpacing: 1 }}>
-                {isMuted ? "MUTED" : "READY"}
+                READY
               </div>
             )}
           </div>
 
-          {/* Dark overlay when muted */}
-          {isMuted && (
-            <div style={{
-              position: "absolute", inset: 0,
-              background: "rgba(0,0,0,0.45)",
-              display: "flex", alignItems: "center", justifyContent: "center",
-              fontSize: 40, pointerEvents: "none"
-            }}>🔇</div>
-          )}
         </div>
-
-        {/* Muted badge */}
-        {isMuted && (
-          <div style={{
-            position: "absolute", top: -8, right: -8,
-            width: 26, height: 26, borderRadius: "50%",
-            background: "#ff5252", display: "flex",
-            alignItems: "center", justifyContent: "center",
-            fontSize: 12, border: "2px solid #0a0e1a"
-          }}>🔇</div>
-        )}
       </div>
     </div>
   );

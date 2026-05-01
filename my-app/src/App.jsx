@@ -4,6 +4,8 @@
 // Dynamic Hooks · Anti-Gaming · Full Dashboard Suite
 // ═══════════════════════════════════════════════════════════════
 import { useState, useEffect, useRef, useCallback } from "react";
+import { createPortal } from "react-dom";
+
 import { RadarChart, PolarGrid, PolarAngleAxis, Radar, ResponsiveContainer, LineChart, Line, XAxis, YAxis, Tooltip, BarChart, Bar } from "recharts";
 
 // ── Constants & data (extracted to constants.js) ──
@@ -24,6 +26,7 @@ import FileUpload from "./components/FileUpload.jsx";
 import ArchDiagram from "./components/ArchDiagram.jsx";
 import PasswordStrength from "./components/PasswordStrength.jsx";
 import AIAvatar from "./components/AIAvatar.jsx";
+import Breadcrumb from "./components/Breadcrumb.jsx";
 
 import HomeBtn from "./components/HomeBtn.jsx";
 
@@ -1272,8 +1275,8 @@ export default function ThreatReady() {
 
   // ── SPEAK QUESTION ──
 
-  const speakQuestion = (text, forceIndex) => {
-    if (!window.speechSynthesis || isMuted) return;
+  const speakQuestion = (text, forceIndex, force = false) => {
+    if (!window.speechSynthesis || (isMuted && !force)) return;
     window.speechSynthesis.cancel();
 
     // ARIA = female voice (even qIndex: 0,2,4)
@@ -1744,6 +1747,8 @@ export default function ThreatReady() {
 
 
   if (view === "landing") return (
+    <>
+    <Breadcrumb view={view} setView={setView} setDashTab={setDashTab} setB2bTab={setB2bTab} goHome={goHome} dashTab={dashTab} b2bTab={b2bTab} activeRole={activeRole} activeDifficulty={activeDifficulty} scenario={scenario} userType={userType} />
     <LandingView
       hookHeadline={hookHeadline}
       hookSubline={hookSubline}
@@ -1765,6 +1770,7 @@ export default function ThreatReady() {
       setTrialRoles={setTrialRoles}
       runDemo={runDemo}
     />
+    </>
   );
 
   // ═══════════════════════════════════════════════════════════
@@ -1772,6 +1778,7 @@ export default function ThreatReady() {
   // ═══════════════════════════════════════════════════════════
 
   if (view === "trial-role-select") return (
+    <><Breadcrumb view={view} setView={setView} setDashTab={setDashTab} setB2bTab={setB2bTab} goHome={goHome} dashTab={dashTab} b2bTab={b2bTab} activeRole={activeRole} activeDifficulty={activeDifficulty} scenario={scenario} userType={userType} />
     <TrialRoleSelectView
       trialRoles={trialRoles}
       setTrialRoles={setTrialRoles}
@@ -1781,8 +1788,9 @@ export default function ThreatReady() {
       setView={setView}
       setDashTab={setDashTab}
       goBack={goBack}
-    />
-  );
+      />
+    </>
+    );
 
 
   // ═══════════════════════════════════════════════════════════
@@ -1790,6 +1798,7 @@ export default function ThreatReady() {
   // ═══════════════════════════════════════════════════════════
 
   if (view === "trial-complete") return (
+    <><Breadcrumb view={view} setView={setView} setDashTab={setDashTab} setB2bTab={setB2bTab} goHome={goHome} dashTab={dashTab} b2bTab={b2bTab} activeRole={activeRole} activeDifficulty={activeDifficulty} scenario={scenario} userType={userType} />
     <TrialCompleteView
       results={results}
       activeRole={activeRole}
@@ -1798,6 +1807,7 @@ export default function ThreatReady() {
       setDashTab={setDashTab}
       setAuthMode={setAuthMode}
     />
+    </>
   );
 
   // ═══════════════════════════════════════════════════════════
@@ -1805,6 +1815,7 @@ export default function ThreatReady() {
   // ═══════════════════════════════════════════════════════════
 
   if (view === "auth") return (
+    <><Breadcrumb view={view} setView={setView} setDashTab={setDashTab} setB2bTab={setB2bTab} goHome={goHome} dashTab={dashTab} b2bTab={b2bTab} activeRole={activeRole} activeDifficulty={activeDifficulty} scenario={scenario} userType={userType} />
     <AuthView
       authMode={authMode}
       authStep={authStep}
@@ -1853,6 +1864,7 @@ export default function ThreatReady() {
       startScenario={startScenario}
       goBack={goBack}
     />
+    </>
   );
 
   // ═══════════════════════════════════════════════════════════
@@ -1860,6 +1872,7 @@ export default function ThreatReady() {
   // ═══════════════════════════════════════════════════════════
 
   if (view === "difficulty") return (
+    <><Breadcrumb view={view} setView={setView} setDashTab={setDashTab} setB2bTab={setB2bTab} goHome={goHome} dashTab={dashTab} b2bTab={b2bTab} activeRole={activeRole} activeDifficulty={activeDifficulty} scenario={scenario} userType={userType} />
     <DifficultyView
       activeRole={activeRole}
       isPaid={isPaid}
@@ -1871,6 +1884,7 @@ export default function ThreatReady() {
       getRemainingAttempts={getRemainingAttempts}
       startScenario={startScenario}
     />
+    </>
   );
 
   // ═══════════════════════════════════════════════════════════
@@ -1878,6 +1892,7 @@ export default function ThreatReady() {
   // ═══════════════════════════════════════════════════════════
 
   if (view === "interview" && scenario && currentQ) return (
+    <><Breadcrumb view={view} setView={setView} setDashTab={setDashTab} setB2bTab={setB2bTab} goHome={goHome} dashTab={dashTab} b2bTab={b2bTab} activeRole={activeRole} activeDifficulty={activeDifficulty} scenario={scenario} userType={userType} />
     <InterviewView
       scenario={scenario}
       currentQ={currentQ}
@@ -1895,9 +1910,13 @@ export default function ThreatReady() {
       setShowHint={setShowHint}
       setInputMode={setInputMode}
       setIsMuted={setIsMuted}
+
       submitAnswer={submitAnswer}
       exitScenario={exitScenario}
+      exitScenario={exitScenario}
+      speakQuestion={speakQuestion}
     />
+    </>
   );
 
   // ═══════════════════════════════════════════════════════════
@@ -1905,6 +1924,7 @@ export default function ThreatReady() {
   // ═══════════════════════════════════════════════════════════
 
   if (view === "results" && results) return (
+    <><Breadcrumb view={view} setView={setView} setDashTab={setDashTab} setB2bTab={setB2bTab} goHome={goHome} dashTab={dashTab} b2bTab={b2bTab} activeRole={activeRole} activeDifficulty={activeDifficulty} scenario={scenario} userType={userType} />
     <ResultsView
       results={results}
       scenario={scenario}
@@ -1922,6 +1942,7 @@ export default function ThreatReady() {
       startScenario={startScenario}
       isTrialExhausted={isTrialExhausted}
     />
+    </>
   );
 
   // ═══════════════════════════════════════════════════════════
@@ -1929,6 +1950,7 @@ export default function ThreatReady() {
   // ═══════════════════════════════════════════════════════════
 
   if (view === "roles") return (
+    <><Breadcrumb view={view} setView={setView} setDashTab={setDashTab} setB2bTab={setB2bTab} goHome={goHome} dashTab={dashTab} b2bTab={b2bTab} activeRole={activeRole} activeDifficulty={activeDifficulty} scenario={scenario} userType={userType} />
     <RolesView
       isPaid={isPaid}
       selectedRoles={selectedRoles}
@@ -1941,6 +1963,7 @@ export default function ThreatReady() {
       getPrice={getPrice}
       subscribe={subscribe}
     />
+    </>
   );
 
   // ═══════════════════════════════════════════════════════════
@@ -1963,7 +1986,9 @@ export default function ThreatReady() {
     return (
       <div className="app"><style>{CSS}</style><div className="scanbar" /><div className="gridbg" />
         <ToastContainer />
-        <div className="page"><div className="cnt">
+        <div className="page">
+          <Breadcrumb view={view} setView={setView} setDashTab={setDashTab} setB2bTab={setB2bTab} goHome={goHome} dashTab={dashTab} b2bTab={b2bTab} activeRole={activeRole} activeDifficulty={activeDifficulty} scenario={scenario} userType={userType} />
+          <div className="cnt">
           {/* Header */}
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }} className="fadeUp">
             <div>
@@ -1992,25 +2017,29 @@ export default function ThreatReady() {
                   🔔{unreadCount > 0 && <span style={{ background: "var(--dn)", color: "#fff", fontSize: 8, fontWeight: 700, borderRadius: "50%", padding: "1px 4px", marginLeft: 3 }}>{unreadCount}</span>}
                 </button>
 
-                {showNotifs && (
-                  <div style={{ position: "absolute", zIndex: 1000, right: 0, top: 36, width: 280, background: "#111827", border: "1px solid #1e2536", borderRadius: 12, boxShadow: "0 16px 48px rgba(0,0,0,.6)", maxHeight: 300, overflowY: "auto" }}>
-                    <div style={{ padding: "10px 14px", borderBottom: "1px solid #1e2536", fontSize: 13, fontWeight: 700, color: "var(--ac)", display: "flex", justifyContent: "space-between" }}>
-                      <span>NOTIFICATIONS</span>
-                      <span style={{ cursor: "pointer", opacity: 1 }} onClick={() => setShowNotifs(false)}>×</span>
+                {showNotifs && createPortal(
+                  <>
+                    <div style={{ position: "fixed", inset: 0, zIndex: 9998, background: "rgba(0,0,0,0.5)", backdropFilter: "blur(2px)" }} onClick={() => setShowNotifs(false)} />
+                    <div style={{ position: "fixed", zIndex: 9999, right: 24, top: 80, width: 320, maxHeight: "70vh", overflowY: "auto", background: "#0f1420", border: "1px solid var(--ac)", borderRadius: 12, boxShadow: "0 20px 60px rgba(0,0,0,.9), 0 0 30px rgba(0,229,255,0.15)" }}>
+                      <div style={{ padding: "12px 16px", borderBottom: "1px solid #1e2536", fontSize: 13, fontWeight: 700, color: "var(--ac)", letterSpacing: 1, display: "flex", justifyContent: "space-between", alignItems: "center", background: "#0a0e1a", position: "sticky", top: 0 }}>
+                        <span>NOTIFICATIONS</span>
+                        <span style={{ cursor: "pointer", fontSize: 16, color: "var(--tx2)" }} onClick={() => setShowNotifs(false)}>×</span>
+                      </div>
+                      {notifications.length === 0
+                        ? <div style={{ padding: 20, fontSize: 13, color: "var(--tx2)", textAlign: "center" }}>No notifications yet</div>
+                        : notifications.map((n, i) => (
+                          <div key={n.id || i} style={{ padding: "12px 16px", borderBottom: i < notifications.length - 1 ? "1px solid #1e2536" : "none", background: n.is_read ? "transparent" : "rgba(0,229,255,.04)" }}>
+                            <div style={{ fontSize: 12, fontWeight: 600, color: "var(--tx1)", lineHeight: 1.4 }}>{n.title}</div>
+                            <div style={{ fontSize: 12, color: "var(--tx2)", marginTop: 4, lineHeight: 1.4 }}>{n.message}</div>
+                            <div style={{ fontSize: 11, color: "var(--tx2)", marginTop: 5 }}>{new Date(n.created_at).toLocaleDateString()}</div>
+                          </div>
+                        ))
+                      }
                     </div>
-
-                    {notifications.length === 0
-                      ? <div style={{ padding: 16, fontSize: 13, color: "var(--tx2)", textAlign: "center" }}>No notifications yet</div>
-                      : notifications.map((n, i) => (
-                        <div key={n.id || i} style={{ padding: "10px 14px", borderBottom: i < notifications.length - 1 ? "1px solid #1e2536" : "none", background: n.is_read ? "transparent" : "rgba(0,229,255,.04)" }}>
-                          <div style={{ fontSize: 12, fontWeight: 600 }}>{n.title}</div>
-                          <div style={{ fontSize: 12, color: "var(--tx2)", marginTop: 2 }}>{n.message}</div>
-                          <div style={{ fontSize: 11, color: "var(--tx2)", marginTop: 2 }}>{new Date(n.created_at).toLocaleDateString()}</div>
-                        </div>
-                      ))
-                    }
-                  </div>
+                  </>,
+                  document.body
                 )}
+                
               </div>
 
               <button className="btn bs" style={{ padding: "5px 10px", fontSize: 12 }} onClick={logout}>Logout</button>
@@ -2319,7 +2348,9 @@ export default function ThreatReady() {
           );
         })()}
 
-        <div className="page"><div className="cnt">
+        <div className="page">
+          <Breadcrumb view={view} setView={setView} setDashTab={setDashTab} setB2bTab={setB2bTab} goHome={goHome} dashTab={dashTab} b2bTab={b2bTab} activeRole={activeRole} activeDifficulty={activeDifficulty} scenario={scenario} userType={userType} />
+          <div className="cnt">
 
           {/* ── HEADER ── */}
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }} className="fadeUp">
@@ -2812,6 +2843,7 @@ export default function ThreatReady() {
   // ═══════════════════════════════════════════════════════════
 
   if (view === "candidate-assess") return (
+    <><Breadcrumb view={view} setView={setView} setDashTab={setDashTab} setB2bTab={setB2bTab} goHome={goHome} dashTab={dashTab} b2bTab={b2bTab} activeRole={activeRole} activeDifficulty={activeDifficulty} scenario={scenario} userType={userType} />
     <CandidateAssessView
       candidateAssessState={candidateAssessState}
       candidateAssessData={candidateAssessData}
@@ -2833,6 +2865,7 @@ export default function ThreatReady() {
       setIsMuted={setIsMuted}
       setIsSpeaking={setIsSpeaking}
     />
+    </>
   );
 
   // ═══ LOADING FALLBACK ═══
