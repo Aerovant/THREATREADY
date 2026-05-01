@@ -2365,8 +2365,8 @@ export default function ThreatReady() {
                     {/* Backdrop - dim everything else + click outside to close */}
                     <div
                       style={{
-                        position: "absolute", zIndex: 1000,
-                        inset: 0,
+                        position: "fixed", zIndex: 9999,
+                        top: 80,
 
                         background: "rgba(0,0,0,0.7)",
                         backdropFilter: "blur(2px)"
@@ -2375,7 +2375,7 @@ export default function ThreatReady() {
                     />
                     {/* Dropdown panel */}
                     <div style={{
-                      position: "absolute", zIndex: 1000,
+                      position: "fixed", zIndex: 9999,
                       top: 80,
                       right: 24,
                       width: 360,
