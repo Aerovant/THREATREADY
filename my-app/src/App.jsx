@@ -58,6 +58,7 @@ import B2BReportsTab from "./views/tabs/B2BReportsTab.jsx";
 import B2BCreateTab from "./views/tabs/B2BCreateTab.jsx";
 import B2BLibraryTab from "./views/tabs/B2BLibraryTab.jsx";
 import B2BSettingsTab from "./views/tabs/B2BSettingsTab.jsx";
+import B2BBillingTab from "./views/tabs/B2BBillingTab.jsx";
 import B2BHelpTab from "./views/tabs/B2BHelpTab.jsx";
 
 
@@ -2191,6 +2192,7 @@ export default function ThreatReady() {
       { id: "teamskills", label: "🏢 Team Skills" },
 
       { id: "library", label: "📚 Library" },
+      { id: "billing", label: "💳 Billing" },
       { id: "settings", label: "⚙️ Settings" },
       { id: "help", label: "❓ Help" }
     ];
@@ -2543,8 +2545,16 @@ export default function ThreatReady() {
             )}
 
             {/* ── B7: SETTINGS ── */}
+            
+            {b2bTab === "billing" && (
+              <B2BBillingTab
+                b2bLoading={b2bLoading}
+                setB2bTab={setB2bTab}
+              />
+            )}
 
             {b2bTab === "settings" && (
+              
               <B2BSettingsTab
                 companyName={companyName}
                 setCompanyName={setCompanyName}

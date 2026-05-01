@@ -418,9 +418,117 @@ app.get('/api/auth/me', auth, async (req, res) => {
       stats: stats.rows[0] || { total_xp: 0, streak: 0, completed_scenarios: '[]' }
     });
   } catch (e) {
+    console.error('Auth /me error:', e.message);
     res.status(500).json({ error: e.message });
   }
 });
+
+
+// ═══════════════════════════════════════════════════════════════
+// B2B HR BILLING — Get current subscription, usage, invoices
+// ═══════════════════════════════════════════════════════════════
+app.get('/api/b2b/billing', auth, async (req, res) => {
+  try {
+    // Get user with HR subscription fields
+    const userResult = await pool.query(
+      `SELECT id, name, email,
+              hr_subscription_active, hr_company_name, hr_team_size,
+              hr_billing_period, hr_subscribed_at, hr_subscription_end,
+              hr_plan_name, hr_candidate_quota, hr_amount_paid, hr_invoice_url
+       FROM users WHERE id = $1`,
+      [req.user.id]
+    );
+
+    if (userResult.rows.length === 0) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    const u = userResult.rows[0];
+
+    // Auto-expire if end date passed
+    if (u.hr_subscription_active && u.hr_subscription_end) {
+      const endDate = new Date(u.hr_subscription_end);
+      if (endDate < new Date()) {
+        await pool.query(`UPDATE users SET hr_subscription_active = false WHERE id = $1`, [req.user.id]);
+        u.hr_subscription_active = false;
+      }
+    }
+
+    // Compute days remaining
+    let daysRemaining = 0;
+    if (u.hr_subscription_end) {
+      const ms = new Date(u.hr_subscription_end).getTime() - Date.now();
+      daysRemaining = Math.max(0, Math.ceil(ms / (1000 * 60 * 60 * 24)));
+    }
+
+    // Count candidates invited since current subscription started
+    let candidatesUsed = 0;
+    if (u.hr_subscribed_at) {
+      const usageResult = await pool.query(
+        `SELECT COUNT(*) AS used FROM candidate_assessments 
+         WHERE company_user_id = $1 AND invited_at >= $2`,
+        [req.user.id, u.hr_subscribed_at]
+      );
+      candidatesUsed = parseInt(usageResult.rows[0].used, 10) || 0;
+    }
+
+    // Get invoice history from payments table for this user (HR payments only)
+    const invoicesResult = await pool.query(
+      `SELECT id, razorpay_order_id, razorpay_payment_id, amount, currency,
+              status, payment_method, gst_invoice_url, billing_period, created_at, roles
+       FROM payments
+       WHERE user_id = $1
+         AND roles::text LIKE '%hr_subscription_%'
+       ORDER BY created_at DESC
+       LIMIT 50`,
+      [req.user.id]
+    );
+
+    // Determine status label
+    let statusLabel = 'inactive';
+    if (u.hr_subscription_active) {
+      if (daysRemaining <= 7) statusLabel = 'expiring_soon';
+      else statusLabel = 'active';
+    } else if (u.hr_subscription_end && new Date(u.hr_subscription_end) < new Date()) {
+      statusLabel = 'expired';
+    }
+
+    res.json({
+      subscription: {
+        active: u.hr_subscription_active === true,
+        status: statusLabel,
+        plan_name: u.hr_plan_name || 'Standard',
+        company_name: u.hr_company_name,
+        team_size: u.hr_team_size,
+        billing_period: u.hr_billing_period,
+        candidate_quota: u.hr_candidate_quota || 50,
+        candidates_used: candidatesUsed,
+        candidates_remaining: Math.max(0, (u.hr_candidate_quota || 50) - candidatesUsed),
+        amount_paid: u.hr_amount_paid,
+        invoice_url: u.hr_invoice_url,
+        subscribed_at: u.hr_subscribed_at,
+        subscription_end: u.hr_subscription_end,
+        days_remaining: daysRemaining
+      },
+      invoices: invoicesResult.rows.map(p => ({
+        id: p.id,
+        order_id: p.razorpay_order_id,
+        payment_id: p.razorpay_payment_id,
+        amount: p.amount,
+        currency: p.currency,
+        status: p.status,
+        method: p.payment_method,
+        invoice_url: p.gst_invoice_url,
+        billing_period: p.billing_period,
+        created_at: p.created_at
+      }))
+    });
+  } catch (e) {
+    console.error('B2B billing error:', e.message);
+    res.status(500).json({ error: e.message });
+  }
+});
+
 
 // ═══════════════════════════════════════════════════════════════
 // RAZORPAY PAYMENT
