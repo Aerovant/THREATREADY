@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 
-export default function B2BBillingTab({ b2bLoading, setB2bTab }) {
+export default function B2BBillingTab({ b2bLoading, setB2bTab, setShowHrSubscribeModal }) {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -115,7 +115,7 @@ export default function B2BBillingTab({ b2bLoading, setB2bTab }) {
               Renew now to avoid interruption to candidate assessments.
             </div>
           </div>
-          <button className="btn" style={{ fontSize: 12, padding: "6px 14px", background: "#ffab40", color: "#000", fontWeight: 700 }} onClick={() => setB2bTab && setB2bTab("settings")}>
+          <button className="btn" style={{ fontSize: 12, padding: "6px 14px", background: "#ffab40", color: "#000", fontWeight: 700 }} onClick={() => setShowHrSubscribeModal && setShowHrSubscribeModal(true)}>
             Renew Subscription
           </button>
         </div>
@@ -239,7 +239,7 @@ export default function B2BBillingTab({ b2bLoading, setB2bTab }) {
         <button
           className="btn"
           style={{ fontSize: 12, padding: "8px 16px", background: "var(--ac)", color: "#000", fontWeight: 700 }}
-          onClick={() => setB2bTab && setB2bTab("settings")}
+          onClick={() => setShowHrSubscribeModal && setShowHrSubscribeModal(true)}
         >
           {sub.active ? "↑ Upgrade Plan" : "+ Subscribe Now"}
         </button>

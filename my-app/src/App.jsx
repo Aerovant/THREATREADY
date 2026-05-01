@@ -356,13 +356,13 @@ export default function ThreatReady() {
 
   useEffect(() => {
     if (scenario) {
-      try { localStorage.setItem('cyberprep_scenario', JSON.stringify(scenario)); } catch {}
+      try { localStorage.setItem('cyberprep_scenario', JSON.stringify(scenario)); } catch { }
     }
   }, [scenario]);
 
   useEffect(() => {
     if (results) {
-      try { localStorage.setItem('cyberprep_results', JSON.stringify(results)); } catch {}
+      try { localStorage.setItem('cyberprep_results', JSON.stringify(results)); } catch { }
     } else {
       localStorage.removeItem('cyberprep_results');
     }
@@ -1519,7 +1519,7 @@ export default function ThreatReady() {
           body: JSON.stringify({ scenario_id: scenario.id, role_id: activeRole, score })
         }).catch(e => console.log('Scenario history:', e.message));
         const finalSessionId = sessionId || window.__sessionId;
-        
+
         if (token && finalSessionId) {
           console.log('[SESSION COMPLETE] session_id:', finalSessionId, 'score:', score);
           const completeRes = await fetch('https://threatready-db.onrender.com/api/session/complete', {
@@ -2545,16 +2545,17 @@ export default function ThreatReady() {
             )}
 
             {/* ── B7: SETTINGS ── */}
-            
+
             {b2bTab === "billing" && (
               <B2BBillingTab
                 b2bLoading={b2bLoading}
                 setB2bTab={setB2bTab}
+                setShowHrSubscribeModal={setShowHrSubscribeModal}
               />
             )}
 
             {b2bTab === "settings" && (
-              
+
               <B2BSettingsTab
                 companyName={companyName}
                 setCompanyName={setCompanyName}
