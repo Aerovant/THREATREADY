@@ -2376,7 +2376,7 @@ export default function ThreatReady() {
                     {/* Dropdown panel */}
                     <div style={{
                       position: "fixed", zIndex: 9999,
-                      top: 80,
+                      top: 320,
                       right: 24,
                       width: 360,
                       maxHeight: "80vh",
