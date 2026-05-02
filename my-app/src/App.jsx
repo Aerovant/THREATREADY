@@ -4,6 +4,7 @@
 // Dynamic Hooks · Anti-Gaming · Full Dashboard Suite
 // ═══════════════════════════════════════════════════════════════
 import { useState, useEffect, useRef, useCallback } from "react";
+import { useNavigate, useLocation, useParams } from "react-router-dom";
 import { createPortal } from "react-dom";
 
 import { RadarChart, PolarGrid, PolarAngleAxis, Radar, ResponsiveContainer, LineChart, Line, XAxis, YAxis, Tooltip, BarChart, Bar } from "recharts";
@@ -68,6 +69,57 @@ import B2BHelpTab from "./views/tabs/B2BHelpTab.jsx";
 // ═══════════════════════════════════════════════════════════════
 // MAIN COMPONENT
 // ═══════════════════════════════════════════════════════════════
+
+// ═══════════════════════════════════════════════════════════════
+// ROUTE MAP — single source of truth for URL ↔ view mapping
+// ═══════════════════════════════════════════════════════════════
+
+// Convert URL pathname → view name
+function pathToView(pathname) {
+  if (pathname === '/' || pathname === '') return 'landing';
+  if (pathname.startsWith('/auth')) return 'auth';
+  if (pathname === '/trial') return 'trial-role-select';
+  if (pathname === '/trial/complete') return 'trial-complete';
+  if (pathname === '/roles') return 'roles';
+  if (pathname.startsWith('/role/') && pathname.endsWith('/difficulty')) return 'difficulty';
+  if (pathname.startsWith('/interview/')) return 'interview';
+  if (pathname === '/results') return 'results';
+  if (pathname.startsWith('/dashboard')) return 'dashboard';
+  if (pathname.startsWith('/hr')) return 'b2b-dashboard';
+  if (pathname.startsWith('/assess')) return 'candidate-assess';
+  return null; // unknown path
+}
+
+// Convert view name + optional context → URL path
+function viewToPath(view, ctx = {}) {
+  switch (view) {
+    case 'landing':            return '/';
+    case 'auth':               return '/auth';
+    case 'trial-role-select':  return '/trial';
+    case 'trial-complete':     return '/trial/complete';
+    case 'roles':              return '/roles';
+    case 'difficulty':         return ctx.role ? `/role/${ctx.role}/difficulty` : '/roles';
+    case 'interview':          return (ctx.role && ctx.difficulty) ? `/interview/${ctx.role}/${ctx.difficulty}` : '/dashboard';
+    case 'results':            return '/results';
+    case 'dashboard':          return ctx.tab && ctx.tab !== 'home' ? `/dashboard/${ctx.tab}` : '/dashboard';
+    case 'b2b-dashboard':      return ctx.tab && ctx.tab !== 'overview' ? `/hr/${ctx.tab}` : '/hr';
+    case 'candidate-assess':   return '/assess';
+    default:                   return '/';
+  }
+}
+
+// Extract dashboard sub-tab from URL
+function pathToDashTab(pathname) {
+  const m = pathname.match(/^\/dashboard\/([^/]+)/);
+  return m ? m[1] : 'home';
+}
+
+// Extract b2b sub-tab from URL
+function pathToB2bTab(pathname) {
+  const m = pathname.match(/^\/hr\/([^/]+)/);
+  return m ? m[1] : 'overview';
+}
+
 export default function ThreatReady() {
   // ── CORE STATE ──
 
@@ -1704,6 +1756,7 @@ export default function ThreatReady() {
     setAuthMode('login'); setAuthStep('form');
     setView("landing");
   };
+
   const logout = () => showConfirm('Are you sure you want to logout?', doLogout);
 
   // ═══════════════════════════════════════════════════════════════
