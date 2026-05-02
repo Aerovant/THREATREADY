@@ -152,6 +152,27 @@ export default function ThreatReady() {
     const isFreeTrial = localStorage.getItem('cyberprep_freetrial') === 'true';
     const savedView = localStorage.getItem('cyberprep_view');
 
+    // ── NEW: URL-FIRST ROUTING ──
+    // If the URL pathname maps to a known view, use it (with auth filtering).
+    // This makes direct URL visits work: app.threatready.io/dashboard → dashboard view.
+    const urlView = pathToView(path);
+    if (urlView && urlView !== 'landing') {
+      // Auth filtering: only allow this view if the user is permitted to be there
+      if (token && savedUser) {
+        // Logged-in: allow any view
+        return urlView;
+      } else if (isFreeTrial) {
+        // Free trial: allow any view
+        return urlView;
+      } else {
+        // Not logged in, no trial: only allow public-accessible views
+        if (['auth', 'trial-role-select', 'candidate-assess'].includes(urlView)) {
+          return urlView;
+        }
+        // Otherwise fall through to localStorage / default logic below
+      }
+    }
+
     // ── UNIVERSAL REFRESH BEHAVIOR ──
     // If a saved view exists and is restorable, ALWAYS restore it.
     // Only interview/results can't be restored (they need scenario state).
