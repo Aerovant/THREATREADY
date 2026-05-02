@@ -2391,33 +2391,11 @@ export default function ThreatReady() {
                   }}>
                   🔔{unreadCount > 0 && <span style={{ background: "var(--dn)", color: "#fff", fontSize: 8, fontWeight: 700, borderRadius: "50%", padding: "1px 4px", marginLeft: 3 }}>{unreadCount}</span>}
                 </button>
-                {showNotifs && (
+
+                {showNotifs && createPortal(
                   <>
-                    {/* Backdrop - dim everything else + click outside to close */}
-                    <div
-                      style={{
-                        position: "fixed", zIndex: 9999,
-                        top: 80,
-
-                        background: "rgba(0,0,0,0.7)",
-                        backdropFilter: "blur(2px)"
-                      }}
-                      onClick={() => setShowNotifs(false)}
-                    />
-                    {/* Dropdown panel */}
-                    <div style={{
-                      position: "fixed", zIndex: 9999,
-                      top: 320,
-                      right: 24,
-                      width: 360,
-                      maxHeight: "80vh",
-                      overflow: "auto",
-                      background: "#0f1420",
-                      border: "1px solid var(--ac)",
-                      borderRadius: 12,
-                      boxShadow: "0 20px 60px rgba(0,0,0,.9), 0 0 30px rgba(0,229,255,0.15)",
-
-                    }}>
+                    <div style={{ position: "fixed", inset: 0, zIndex: 9998, background: "rgba(0,0,0,0.5)", backdropFilter: "blur(2px)" }} onClick={() => setShowNotifs(false)} />
+                    <div style={{ position: "fixed", zIndex: 9999, right: 24, top: 80, width: 320, maxHeight: "70vh", overflowY: "auto", background: "#0f1420", border: "1px solid var(--ac)", borderRadius: 12, boxShadow: "0 20px 60px rgba(0,0,0,.9), 0 0 30px rgba(0,229,255,0.15)" }}>
                       <div style={{ padding: "12px 16px", borderBottom: "1px solid #1e2536", fontSize: 13, fontWeight: 700, color: "var(--ac)", letterSpacing: 1, display: "flex", justifyContent: "space-between", alignItems: "center", background: "#0a0e1a", position: "sticky", top: 0 }}>
                         <span>NOTIFICATIONS ({notifications.length})</span>
                         <span style={{ cursor: "pointer", fontSize: 16, color: "var(--tx2)" }} onClick={() => setShowNotifs(false)}>×</span>
@@ -2433,7 +2411,8 @@ export default function ThreatReady() {
                         ))
                       }
                     </div>
-                  </>
+                  </>,
+                  document.body
                 )}
               </div>
 
