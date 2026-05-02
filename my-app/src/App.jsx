@@ -155,7 +155,9 @@ export default function ThreatReady() {
     // ── NEW: URL-FIRST ROUTING ──
     // If the URL pathname maps to a known view, use it (with auth filtering).
     // This makes direct URL visits work: app.threatready.io/dashboard → dashboard view.
+
     const urlView = pathToView(path);
+    console.log('[ROUTING DEBUG] path:', path, 'urlView:', urlView, 'savedView:', savedView, 'token:', !!token, 'isFreeTrial:', isFreeTrial);
     if (urlView && urlView !== 'landing') {
       // Auth filtering: only allow this view if the user is permitted to be there
       if (token && savedUser) {
@@ -205,7 +207,11 @@ export default function ThreatReady() {
     return 'landing';
   });
 
-  const setView = (newView) => {
+  // ── React Router hooks ──
+  const navigate = useNavigate();
+  const location = useLocation();
+  
+  const setView = (newView, ctx = {}) => {
     // Don't save interview to localStorage (mid-test state can't be restored).
     // Results CAN be saved now since we persist results data separately.
     if (newView !== 'interview') {
@@ -228,6 +234,17 @@ export default function ThreatReady() {
       }
       return newView;
     });
+    // ── NEW: sync URL ──
+    // Build the URL from the new view + any context (role, difficulty, tab).
+    // ctx may include: { role, difficulty, tab }
+    try {
+      const newPath = viewToPath(newView, ctx);
+      if (newPath && newPath !== location.pathname) {
+        navigate(newPath);
+      }
+    } catch (e) {
+      console.warn('[setView] navigate failed', e);
+    }
   };
 
   // Universal "back" — pops navigation history; falls back to dashboard or landing
