@@ -112,8 +112,8 @@ app.get('/share/:slug', async (req, res) => {
     const title = `${owner} scored ${score}/10 on a ${roleName} assessment`;
     const description = `🏅 ${badge} Badge · Real-world cybersecurity scenario assessment on ThreatReady. Practice and prove your security skills at threatready.io`;
 
-    const imageUrl = `https://threatready.io/share/${encodeURIComponent(slug)}/image.png`;
-    const pageUrl = `https://threatready.io/share/${encodeURIComponent(slug)}`;
+    const imageUrl = `https://app.threatready.io/share/${encodeURIComponent(slug)}/image.png`;
+    const pageUrl = `https://app.threatready.io/share/${encodeURIComponent(slug)}`;
 
     const html = `<!DOCTYPE html>
 <html lang="en">
