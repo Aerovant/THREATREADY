@@ -3135,7 +3135,8 @@ app.get('/api/b2b/candidates/:id/report', auth, async (req, res) => {
         invited_at: c.invited_at,
         completed_at: c.completed_at,
         assessment_name: c.assessment_name,
-        evaluations: c.evaluations || []
+        evaluations: c.evaluations || [],
+        snapshot_urls: c.snapshot_urls || []  
       }
     });
   } catch (e) {
