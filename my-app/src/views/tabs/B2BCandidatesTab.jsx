@@ -178,6 +178,14 @@ export default function B2BCandidatesTab({
 '.audit-row .check { color: #00a878; font-weight: 700; }' +
 '.audit-row .lbl { color: #1a1a1a; font-weight: 600; }' +
 '.audit-row .val { color: #666; font-family: ui-monospace, monospace; font-size: 10px; }' +
+'.snap-empty { padding: 30px 20px; text-align: center; color: #999; font-size: 12px; background: #fafbff; border-radius: 8px; }' +
+'.snap-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 12px; }' +
+'.snap-card { background: #fafbff; border: 1px solid #e8eaf6; border-radius: 8px; overflow: hidden; page-break-inside: avoid; }' +
+'.snap-img { width: 100%; height: 105px; object-fit: cover; display: block; background: #1a1a1a; }' +
+'.snap-cap { padding: 6px 8px; font-size: 10px; }' +
+'.snap-cap-q { color: #7c3aed; font-weight: 700; letter-spacing: 0.5px; }' +
+'.snap-cap-t { color: #999; font-family: ui-monospace, monospace; font-size: 9px; margin-top: 2px; }' +
+'.snap-note { font-size: 10px; color: #666; margin-top: 10px; padding: 8px 10px; background: #fff7ed; border-left: 3px solid #f59e0b; border-radius: 4px; }' +
 '.rec-box { padding: 14px; border-radius: 10px; margin-bottom: 12px; ' +
   (recommendApproved ? 'background:#dcfce7;border-left:4px solid #00a878;color:#166534' : 'background:#fee2e2;border-left:4px solid #ff5252;color:#991b1b') + '; }' +
 '.rec-title { font-weight: 700; font-size: 13px; margin-bottom: 4px; }' +
@@ -230,7 +238,35 @@ export default function B2BCandidatesTab({
   evalBlocks +
 '</div>' +
 '<div class="section">' +
-  '<div class="section-head"><span class="section-num">§6 · Integrity &amp; validation</span><h3>Proof this score is defensible</h3></div>' +
+  '<div class="section-head"><span class="section-num">§6 · Identity verification</span><h3>Webcam timeline</h3></div>' +
+  (() => {
+    const snaps = Array.isArray(cand.snapshot_urls) ? cand.snapshot_urls : [];
+    if (snaps.length === 0) {
+      return '<div class="snap-empty">No webcam snapshots available — candidate did not grant camera permission, or snapshots were not captured.</div>';
+    }
+    const fmtTime = (iso) => {
+      if (!iso) return '—';
+      try { return new Date(iso).toISOString().substring(11, 19); } catch { return '—'; }
+    };
+    const cards = snaps.map((s, i) => {
+      const url = (s && s.url) ? s.url : '';
+      const qIdx = (s && (s.question_index !== undefined && s.question_index !== null)) ? s.question_index : i;
+      const qNum = (typeof qIdx === 'number') ? (qIdx + 1) : (i + 1);
+      const captured = (s && s.captured_at) ? s.captured_at : '';
+      return '<div class="snap-card">' +
+        (url ? '<img class="snap-img" src="' + escape(url) + '" alt="Q' + qNum + ' snapshot" />' : '<div class="snap-img"></div>') +
+        '<div class="snap-cap">' +
+          '<div class="snap-cap-q">QUESTION ' + qNum + '</div>' +
+          '<div class="snap-cap-t">' + escape(fmtTime(captured)) + '</div>' +
+        '</div>' +
+      '</div>';
+    }).join('');
+    return '<div class="snap-grid">' + cards + '</div>' +
+      '<div class="snap-note"><strong>Note:</strong> Snapshots were captured automatically at each question transition during the live assessment. ' + snaps.length + ' image' + (snaps.length === 1 ? '' : 's') + ' recorded.</div>';
+  })() +
+'</div>' +
+'<div class="section">' +
+  '<div class="section-head"><span class="section-num">§7 · Integrity &amp; validation</span><h3>Proof this score is defensible</h3></div>' +
   '<div style="font-size:11px;color:#666;margin-bottom:12px">Every ThreatReady assessment runs under six integrity controls. If a score reaches you, all six passed.</div>' +
   '<div class="audit-row"><div class="check">✓ <span class="lbl">Copy-paste disabled</span></div><div class="val">Blocked at input level</div></div>' +
   '<div class="audit-row"><div class="check">✓ <span class="lbl">Forward-only navigation</span></div><div class="val">No revisions after submit</div></div>' +
@@ -250,7 +286,7 @@ export default function B2BCandidatesTab({
   '</div>' +
 '</div>' +
 '<div class="section">' +
-  '<div class="section-head"><span class="section-num">§7 · Hiring signal</span><h3>Recommendation &amp; summary</h3></div>' +
+  '<div class="section-head"><span class="section-num">§8 · Hiring signal</span><h3>Recommendation &amp; summary</h3></div>' +
   '<div class="rec-box">' +
     '<div class="rec-title">' + (recommendApproved ? '✓ ' : '✗ ') + escape(recommendText) + '</div>' +
     '<div class="rec-detail">' + escape(recommendDetail) + '</div>' +
