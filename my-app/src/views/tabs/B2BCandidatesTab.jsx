@@ -135,7 +135,8 @@ export default function B2BCandidatesTab({
 '.brand-bar strong { font-size: 14px; font-weight: 700; letter-spacing: 1px; }' +
 '.brand-bar .sub { font-size: 9px; opacity: 0.85; margin-top: 2px; letter-spacing: 1.5px; }' +
 '.profile { display: flex; gap: 16px; padding: 18px; background: #fafbff; border: 1px solid #e8eaf6; border-radius: 12px; margin-bottom: 16px; }' +
-'.avatar { width: 56px; height: 56px; border-radius: 50%; background: ' + roleColor + '; color: #fff; display: flex; align-items: center; justify-content: center; font-size: 24px; flex-shrink: 0; }' +
+'.avatar { width: 56px; height: 56px; border-radius: 50%; background: ' + roleColor + '; color: #fff; display: flex; align-items: center; justify-content: center; font-size: 24px; flex-shrink: 0; overflow: hidden; }' +
+'.avatar img { width: 100%; height: 100%; object-fit: cover; display: block; }' +
 '.profile-info h2 { margin: 0; font-size: 18px; font-weight: 700; }' +
 '.profile-info .email { font-size: 12px; color: #666; margin-top: 2px; }' +
 '.profile-info .role-line { font-size: 12px; color: #7c3aed; margin-top: 4px; font-weight: 600; }' +
@@ -205,7 +206,13 @@ export default function B2BCandidatesTab({
 '<body><div class="page">' +
 '<div class="brand-bar"><strong>⚡ ThreatReady.io</strong><div class="sub">BY AEROVANT TECHNOLOGIES</div></div>' +
 '<div class="profile">' +
-  '<div class="avatar">' + (role?.icon || '👤') + '</div>' +
+  '<div class="avatar">' + (() => {
+    const snaps = Array.isArray(cand.snapshot_urls) ? cand.snapshot_urls : [];
+    const firstSnap = snaps.length > 0 && snaps[0] && snaps[0].url ? snaps[0].url : null;
+    return firstSnap
+      ? '<img src="' + escape(firstSnap) + '" alt="Candidate" />'
+      : (role?.icon || '👤');
+  })() + '</div>' +
   '<div class="profile-info">' +
     '<h2>' + escape(cand.name) + ' <span style="font-size:11px;color:#999;font-weight:400">(candidate)</span></h2>' +
     '<div class="email">📧 ' + escape(cand.email || '') + '</div>' +
@@ -234,11 +241,7 @@ export default function B2BCandidatesTab({
   '<div class="meta-item"><div class="meta-lbl">Percentile</div><div class="meta-val">' + percentile + '</div></div>' +
 '</div>' +
 '<div class="section">' +
-  '<div class="section-head"><span class="section-num">§5 · Question-by-question breakdown</span><h3>Detailed Q&amp;A Analysis</h3></div>' +
-  evalBlocks +
-'</div>' +
-'<div class="section">' +
-  '<div class="section-head"><span class="section-num">§6 · Identity verification</span><h3>Webcam timeline</h3></div>' +
+  '<div class="section-head"><span class="section-num">§5 · Identity verification</span><h3>Webcam timeline</h3></div>' +
   (() => {
     const snaps = Array.isArray(cand.snapshot_urls) ? cand.snapshot_urls : [];
     if (snaps.length === 0) {
@@ -264,6 +267,10 @@ export default function B2BCandidatesTab({
     return '<div class="snap-grid">' + cards + '</div>' +
       '<div class="snap-note"><strong>Note:</strong> Snapshots were captured automatically at each question transition during the live assessment. ' + snaps.length + ' image' + (snaps.length === 1 ? '' : 's') + ' recorded.</div>';
   })() +
+'</div>' +
+'<div class="section">' +
+  '<div class="section-head"><span class="section-num">§6 · Question-by-question breakdown</span><h3>Detailed Q&amp;A Analysis</h3></div>' +
+  evalBlocks +
 '</div>' +
 '<div class="section">' +
   '<div class="section-head"><span class="section-num">§7 · Integrity &amp; validation</span><h3>Proof this score is defensible</h3></div>' +
