@@ -3139,6 +3139,7 @@ app.get('/api/b2b/candidates/:id/report', auth, async (req, res) => {
         snapshot_urls: c.snapshot_urls || []  
       }
     });
+    
   } catch (e) {
     console.error('Report error:', e.message);
     res.status(500).json({ error: e.message });
