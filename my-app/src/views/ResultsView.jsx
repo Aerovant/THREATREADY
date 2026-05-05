@@ -50,7 +50,7 @@ export default function ResultsView({
       }
     } catch (e) { console.log('show-name save skipped:', e.message); }
 
-    const shareUrl = `https://app.threatready.io/share/${slug}`;
+    const shareUrl = `https://threatready.io/app/share/${slug}`;
     const linkedinUrl = `https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(shareUrl)}`;
     window.open(linkedinUrl, '_blank', 'noopener,noreferrer');
     setShowShareChoice(false);

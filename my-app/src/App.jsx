@@ -154,7 +154,7 @@ export default function ThreatReady() {
 
     // ── NEW: URL-FIRST ROUTING ──
     // If the URL pathname maps to a known view, use it (with auth filtering).
-    // This makes direct URL visits work: app.threatready.io/dashboard → dashboard view.
+    // This makes direct URL visits work: threatready.io/app/dashboard → dashboard view.
 
     const urlView = pathToView(path);
     console.log('[ROUTING DEBUG] path:', path, 'urlView:', urlView, 'savedView:', savedView, 'token:', !!token, 'isFreeTrial:', isFreeTrial);
