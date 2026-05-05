@@ -1354,7 +1354,7 @@ export default function ThreatReady() {
     setElapsed(0); setShowHint(false); setShowChain(false);
     setCurrentQ(first); setAskedQs([first.id]);
     voice.reset();
-    setView("interview");
+    setView("interview", { role: activeRole, difficulty: diff || "beginner" });
     setTimeout(() => speakQuestion(first.t, 0), 800);
 
     // Decrement per-role attempt (only for trial users)
