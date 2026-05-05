@@ -192,7 +192,7 @@ export default function ResultsView({
           <button className="btn bp" onClick={() => { const scs = SCENARIOS[activeRole]; if (scs?.length) startScenario(scs[Math.floor(Math.random() * scs.length)], activeDifficulty); }}>
             🔄 Retry (New Architecture)
           </button>
-          <button className="btn bs" onClick={() => { setActiveDifficulty(null); setView("difficulty"); }}>
+          <button className="btn bs" onClick={() => { setActiveDifficulty(null); setView("difficulty", { role: activeRole }); }}>
             ⬆️ Try Next Difficulty
           </button>
           <button className="btn bs" onClick={() => { setActiveRole(null); setView("dashboard"); }}>

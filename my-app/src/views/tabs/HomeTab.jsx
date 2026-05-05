@@ -198,7 +198,7 @@ export default function HomeTab({
           const completed = completedScenarios.filter(s => s?.startsWith(rid[0])).length;
           return (
             <div key={rid} className="card card-glow fadeUp" style={{ padding: 16, marginBottom: 10, cursor: "pointer" }}
-              onClick={() => { setActiveRole(rid); setView("difficulty"); }}>
+              onClick={() => { setActiveRole(rid); setView("difficulty", { role: rid }); }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
                   <span style={{ fontSize: 28 }}>{role.icon}</span>

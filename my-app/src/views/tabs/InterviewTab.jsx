@@ -113,7 +113,7 @@ export default function InterviewTab({
             }}
             onClick={() => {
               if (!activeRole) { showToast('Please select a role first', 'warning'); return; }
-              setView("difficulty");
+              setView("difficulty", { role: activeRole });
             }}>
             {!activeRole ? "Select a role to continue" : `Start ${interviewPersona.charAt(0).toUpperCase() + interviewPersona.slice(1)} Interview →`}
           </button>
