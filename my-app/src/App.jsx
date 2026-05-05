@@ -278,6 +278,15 @@ export default function ThreatReady() {
     }
   };
 
+  // ── Sync view state when URL changes from external source (back/forward, manual edit) ──
+  useEffect(() => {
+    const urlView = pathToView(location.pathname);
+    if (urlView && urlView !== view) {
+      // URL changed but view state hasn't caught up — sync it
+      // Don't save to localStorage (the user didn't initiate this; they used browser controls)
+      setViewState(urlView);
+    }
+  }, [location.pathname]);
 
   const [user, setUser] = useState(() => {
     const savedUser = localStorage.getItem('cyberprep_user');
@@ -316,6 +325,7 @@ export default function ThreatReady() {
     const saved = localStorage.getItem('roleAttempts');
     return saved ? JSON.parse(saved) : {};
   });
+
   useEffect(() => {
     localStorage.setItem('roleAttempts', JSON.stringify(roleAttempts));
   }, [roleAttempts]);
@@ -325,6 +335,7 @@ export default function ThreatReady() {
     const totalRemaining = Math.max(0, 2 - totalUsed);
     return totalRemaining;
   };
+
   const isTrialExhausted = () => {
     if (isPaid || subscribedRoles.length === 0) return false;
     return getTotalUsedAttempts() >= 2;
