@@ -217,26 +217,8 @@ export default function ThreatReady() {
     if (newView !== 'interview') {
       localStorage.setItem('cyberprep_view', newView);
     }
-    // Track navigation history for proper back button behavior
-    setViewState(prevView => {
-      if (prevView && prevView !== newView && !['interview', 'results'].includes(prevView)) {
-        try {
-          const histRaw = localStorage.getItem('cyberprep_nav_history');
-          const hist = histRaw ? JSON.parse(histRaw) : [];
-          // Avoid pushing duplicate consecutive entries
-          if (hist[hist.length - 1] !== prevView) {
-            hist.push(prevView);
-            // Cap history to last 20 entries
-            if (hist.length > 20) hist.shift();
-            localStorage.setItem('cyberprep_nav_history', JSON.stringify(hist));
-          }
-        } catch (e) { }
-      }
-      return newView;
-    });
-    // ── NEW: sync URL ──
-    // Build the URL from the new view + any context (role, difficulty, tab).
-    // ctx may include: { role, difficulty, tab }
+    setViewState(newView);
+    // Sync URL — navigation history is now managed by browser
     try {
       const newPath = viewToPath(newView, ctx);
       if (newPath && newPath !== location.pathname) {
@@ -1812,7 +1794,6 @@ export default function ThreatReady() {
     localStorage.removeItem('cyberprep_view');
     localStorage.removeItem('cyberprep_tab');
     localStorage.removeItem('cyberprep_b2btab');
-    localStorage.removeItem('cyberprep_nav_history');  // Clear nav history on logout
     localStorage.removeItem('subscribedRoles');
     localStorage.removeItem('freeAttempts');
     localStorage.removeItem('roleAttempts');
