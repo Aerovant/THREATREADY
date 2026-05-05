@@ -486,8 +486,39 @@ export default function ThreatReady() {
   const [isAuthenticating, setIsAuthenticating] = useState(false);
 
   // ── DASHBOARD TABS ──
-  const [dashTab, setDashTab] = useState(() => localStorage.getItem('cyberprep_tab') || "home");
-  const [b2bTab, setB2bTab] = useState(() => localStorage.getItem('cyberprep_b2btab') || "overview");
+  const [dashTab, setDashTabState] = useState(() => {
+    // URL-first: if path is /dashboard/scores, use "scores"; else fall back to localStorage
+    const fromUrl = pathToDashTab(window.location.pathname);
+    if (fromUrl !== 'home') return fromUrl;
+    return localStorage.getItem('cyberprep_tab') || "home";
+  });
+  const [b2bTab, setB2bTabState] = useState(() => {
+    const fromUrl = pathToB2bTab(window.location.pathname);
+    if (fromUrl !== 'overview') return fromUrl;
+    return localStorage.getItem('cyberprep_b2btab') || "overview";
+  });
+
+  // Wrapper: setDashTab updates state, localStorage, AND URL
+  const setDashTab = (newTab) => {
+    setDashTabState(newTab);
+    localStorage.setItem('cyberprep_tab', newTab);
+    // Sync URL only if we're currently on a dashboard route
+    if (location.pathname.startsWith('/dashboard')) {
+      const newPath = newTab === 'home' ? '/dashboard' : `/dashboard/${newTab}`;
+      if (newPath !== location.pathname) navigate(newPath);
+    }
+  };
+
+  // Wrapper: setB2bTab updates state, localStorage, AND URL
+  const setB2bTab = (newTab) => {
+    setB2bTabState(newTab);
+    localStorage.setItem('cyberprep_b2btab', newTab);
+    if (location.pathname.startsWith('/hr')) {
+      const newPath = newTab === 'overview' ? '/hr' : `/hr/${newTab}`;
+      if (newPath !== location.pathname) navigate(newPath);
+    }
+  };
+  
   const [settingsName, setSettingsName] = useState("");
   const [profilePublic, setProfilePublic] = useState(true);
   const [inLeaderboard, setInLeaderboard] = useState(true);
