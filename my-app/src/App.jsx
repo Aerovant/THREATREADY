@@ -286,6 +286,20 @@ export default function ThreatReady() {
       // Don't save to localStorage (the user didn't initiate this; they used browser controls)
       setViewState(urlView);
     }
+    // Also sync dashboard tab if URL is /dashboard/*
+    if (location.pathname.startsWith('/dashboard')) {
+      const urlDashTab = pathToDashTab(location.pathname);
+      if (urlDashTab !== dashTab) {
+        setDashTabState(urlDashTab);
+      }
+    }
+    // Also sync b2b tab if URL is /hr/*
+    if (location.pathname.startsWith('/hr')) {
+      const urlB2bTab = pathToB2bTab(location.pathname);
+      if (urlB2bTab !== b2bTab) {
+        setB2bTabState(urlB2bTab);
+      }
+    }
   }, [location.pathname]);
 
   const [user, setUser] = useState(() => {
@@ -518,7 +532,7 @@ export default function ThreatReady() {
       if (newPath !== location.pathname) navigate(newPath);
     }
   };
-  
+
   const [settingsName, setSettingsName] = useState("");
   const [profilePublic, setProfilePublic] = useState(true);
   const [inLeaderboard, setInLeaderboard] = useState(true);
