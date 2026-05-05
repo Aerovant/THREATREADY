@@ -247,34 +247,23 @@ export default function ThreatReady() {
     }
   };
 
-  // Universal "back" — pops navigation history; falls back to dashboard or landing
+  // Universal "back" — uses browser native history, with smart fallback
   const goBack = () => {
-    try {
-      const histRaw = localStorage.getItem('cyberprep_nav_history');
-      const hist = histRaw ? JSON.parse(histRaw) : [];
-      if (hist.length > 0) {
-        const prevView = hist.pop();
-        localStorage.setItem('cyberprep_nav_history', JSON.stringify(hist));
-        if (prevView && !['interview', 'results'].includes(prevView)) {
-          localStorage.setItem('cyberprep_view', prevView);
-          setViewState(prevView);
-          return;
-        }
-
-      }
-
-    } catch (e) { }
+    // Try browser back first — if there's history, this is the natural choice
+    if (window.history.length > 1) {
+      navigate(-1);
+      return;
+    }
+    // No browser history (user landed here directly via URL paste, etc.)
     // Fallback: go to dashboard if logged-in/free-trial, else landing
     const token = localStorage.getItem('token');
     const isFreeTrial = localStorage.getItem('cyberprep_freetrial') === 'true';
     const userType = localStorage.getItem('cyberprep_usertype');
     if (token || isFreeTrial) {
-      const fallback = userType === 'b2b' ? 'b2b-dashboard' : 'dashboard';
-      localStorage.setItem('cyberprep_view', fallback);
-      setViewState(fallback);
+      const fallback = userType === 'b2b' ? '/hr' : '/dashboard';
+      navigate(fallback);
     } else {
-      localStorage.setItem('cyberprep_view', 'landing');
-      setViewState('landing');
+      navigate('/');
     }
   };
 
