@@ -2,7 +2,7 @@
 // SHARED HELPERS
 // All code is verbatim from original App.jsx — no logic changes.
 // ═══════════════════════════════════════════════════════════════
-import { useState, useRef, useCallback } from "react";
+import { useState, useRef, useCallback, useEffect } from "react";
 
 // ── TOAST & CONFIRM BRIDGE ──
 export let _showToast = null;
@@ -39,6 +39,7 @@ export function useVoice() {
     const r = new SR();
     r.continuous = true;
     r.interimResults = true;
+
     r.lang = 'en-US';
     r.maxAlternatives = 1;
 
@@ -101,9 +102,9 @@ export function useVoice() {
 
   const start = useCallback(() => {
     manuallyStopped.current = false;
-    committedRef.current = "";
+    // If transcript already has text, this is a RESUME — keep existing text
+    // If empty, this is a FRESH START — clear refs (already empty, but explicit)
     sessionFinalRef.current = "";
-    setTr("");
     setRec(true);
     startRecognition();
   }, [startRecognition]);
@@ -133,6 +134,17 @@ export function useVoice() {
     committedRef.current = text + ' ';
     sessionFinalRef.current = "";
     setTr(text);
+  }, []);
+
+  // Cleanup: stop recognition when component using this hook unmounts
+  useEffect(() => {
+    return () => {
+      manuallyStopped.current = true;
+      if (recRef.current) {
+        try { recRef.current.stop(); } catch (e) {}
+        recRef.current = null;
+      }
+    };
   }, []);
 
   return { recording, transcript, start, stop, reset, setTranscript };

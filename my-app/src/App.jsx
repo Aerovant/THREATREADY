@@ -133,6 +133,8 @@ export default function ThreatReady() {
     const params = new URLSearchParams(window.location.search);
     const path = window.location.pathname;
 
+    
+
     // Check redirect param from GitHub Pages 404 fallback
     const redirect = params.get('redirect');
     if (redirect) {
@@ -251,6 +253,13 @@ export default function ThreatReady() {
 
   // ── Sync view state when URL changes from external source (back/forward, manual edit) ──
   useEffect(() => {
+    
+    // Don't override candidate-assess if assess_token is in URL
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('assess_token') || params.get('token')) {
+      return;
+    }
+    
     const urlView = pathToView(location.pathname);
     if (urlView && urlView !== view) {
       // URL changed but view state hasn't caught up — sync it
