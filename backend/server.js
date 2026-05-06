@@ -1114,8 +1114,21 @@ app.post('/api/demo/evaluate', async (req, res) => {
       max_tokens: 500,
       messages: [{
         role: 'user',
-        content: `Score this cybersecurity answer 1-10. Be strict and honest.\nQuestion: ${question}\nAnswer: ${answer}\nRespond ONLY valid JSON: {"score":7,"feedback":"1 sentence of specific feedback","level":"Beginner or Intermediate or Advanced or Expert"}`
+        content: `You are evaluating a cybersecurity professional's answer. Score 4 dimensions, each 1-10. Be strict and honest.
+
+        Question: ${question}
+        Answer: ${answer}
+
+        Score these dimensions:
+        - tech: Technical depth, accuracy, correct terminology (1-10)
+        - comm: Communication clarity, structure, completeness (1-10)
+        - dec: Decision-making, prioritization, justification (1-10)
+        - score: Overall weighted = tech*0.4 + comm*0.3 + dec*0.3 (1-10)
+
+        Respond ONLY valid JSON: {"score":7.5,"tech":8,"comm":7,"dec":7.5,"feedback":"1 sentence of specific feedback","level":"Beginner|Intermediate|Advanced|Expert"}`
+
       }]
+
     });
 
     const result = JSON.parse(msg.content[0]?.text?.replace(/```json|```/g, '').trim() || '{}');
@@ -4180,6 +4193,106 @@ app.get('/api/linkedin/status', auth, async (req, res) => {
   }
 });
 
+
+
+// ═══════════════════════════════════════════════════════════════
+// INTERVIEW CHAT — AI-powered interview session via Anthropic
+// ═══════════════════════════════════════════════════════════════
+
+app.post('/api/interview/analyze', auth, async (req, res) => {
+  try {
+    const { jdText = '', resumeText = '' } = req.body;
+    if (!jdText.trim() && !resumeText.trim()) {
+      return res.status(400).json({ error: 'Provide JD or resume text' });
+    }
+    const apiKey = process.env.ANTHROPIC_API_KEY;
+    if (!apiKey) return res.status(500).json({ error: 'Anthropic API key not configured' });
+
+    const prompt = `Analyze the following uploaded materials and identify key skills, technologies, and focus areas for an interview prep session. Be concise (under 150 words).
+
+${jdText ? '=== JOB DESCRIPTION ===\n' + jdText.substring(0, 5000) + '\n\n' : ''}${resumeText ? '=== RESUME ===\n' + resumeText.substring(0, 5000) : ''}`;
+
+    const response = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': apiKey,
+        'anthropic-version': '2023-06-01',
+      },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-20250514',
+        max_tokens: 500,
+        messages: [{ role: 'user', content: prompt }],
+      }),
+    });
+    const data = await response.json();
+    if (data.error) return res.status(500).json({ error: data.error.message });
+    res.json({ analysis: data.content?.[0]?.text || 'No analysis generated' });
+  } catch (e) {
+    console.error('Analyze error:', e.message);
+    res.status(500).json({ error: e.message });
+  }
+});
+
+app.post('/api/interview/chat', auth, async (req, res) => {
+  try {
+    const { messages = [], jdText = '', resumeText = '', durationMinutes = 30, level = 'intermediate', timeRemaining } = req.body;
+    if (!Array.isArray(messages) || messages.length === 0) {
+      return res.status(400).json({ error: 'messages array required' });
+    }
+    const apiKey = process.env.ANTHROPIC_API_KEY;
+    if (!apiKey) return res.status(500).json({ error: 'Anthropic API key not configured' });
+
+    const levelGuidance = {
+      beginner: 'Ask BEGINNER questions: foundational concepts, definitions, basic scenarios. Use accessible language.',
+      intermediate: 'Ask INTERMEDIATE questions: multi-step problems, real-world tradeoffs, applied scenarios.',
+      expert: 'Ask EXPERT questions: advanced architecture, edge cases, deep technical depth, adversarial scenarios.',
+      collaborate: 'Mix BEGINNER, INTERMEDIATE, and EXPERT questions. Vary difficulty across the session.',
+    };
+
+    const systemPrompt = `You are a senior cybersecurity interviewer conducting a live interview. Cover topics across these 5 areas as the session progresses, mixing them naturally:
+1. Architect & Defend (zero-trust, segmentation, secure design, HIPAA/PCI/SOC2)
+2. Incident Simulator (detection, containment, lateral movement, IAM compromise)
+3. Threat Brief (board, exec, customer, regulator briefings)
+4. Threat Hunt (log analysis, IoC identification, attack timeline)
+5. Vuln Verdict (CVSS, exploit availability, business impact, prioritization)
+
+DIFFICULTY: ${levelGuidance[level] || levelGuidance.intermediate}
+
+Rules:
+- Ask ONE clear question at a time. Wait for the answer before next question.
+- Don't repeat questions or topics already covered in this conversation.
+- Adapt difficulty based on user's answer quality.
+- For a session of ${durationMinutes} minutes, aim for ~${Math.max(5, Math.floor(durationMinutes / 4))} questions.
+- Keep questions concise (1-3 sentences). Reference real-world scenarios where relevant.
+- After receiving an answer, briefly acknowledge (1 sentence) then ask next question covering a different module.
+- Label your question with the module it covers: "[ARCHITECT & DEFEND]" or "[INCIDENT SIMULATOR]" etc. at the start.
+
+${jdText ? '\nCANDIDATE TARGET JD:\n' + jdText.substring(0, 3000) : ''}
+${resumeText ? '\nCANDIDATE BACKGROUND:\n' + resumeText.substring(0, 3000) : ''}`;
+
+    const response = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': apiKey,
+        'anthropic-version': '2023-06-01',
+      },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-20250514',
+        max_tokens: 600,
+        system: systemPrompt,
+        messages: messages.map(m => ({ role: m.role, content: m.content })),
+      }),
+    });
+    const data = await response.json();
+    if (data.error) return res.status(500).json({ error: data.error.message });
+    res.json({ reply: data.content?.[0]?.text || 'No response generated' });
+  } catch (e) {
+    console.error('Interview chat error:', e.message);
+    res.status(500).json({ error: e.message });
+  }
+});
 
 app.listen(PORT, async () => {
   await runMigrations();
