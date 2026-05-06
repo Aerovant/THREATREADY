@@ -1114,8 +1114,21 @@ app.post('/api/demo/evaluate', async (req, res) => {
       max_tokens: 500,
       messages: [{
         role: 'user',
-        content: `Score this cybersecurity answer 1-10. Be strict and honest.\nQuestion: ${question}\nAnswer: ${answer}\nRespond ONLY valid JSON: {"score":7,"feedback":"1 sentence of specific feedback","level":"Beginner or Intermediate or Advanced or Expert"}`
+        content: `You are evaluating a cybersecurity professional's answer. Score 4 dimensions, each 1-10. Be strict and honest.
+
+        Question: ${question}
+        Answer: ${answer}
+
+        Score these dimensions:
+        - tech: Technical depth, accuracy, correct terminology (1-10)
+        - comm: Communication clarity, structure, completeness (1-10)
+        - dec: Decision-making, prioritization, justification (1-10)
+        - score: Overall weighted = tech*0.4 + comm*0.3 + dec*0.3 (1-10)
+
+        Respond ONLY valid JSON: {"score":7.5,"tech":8,"comm":7,"dec":7.5,"feedback":"1 sentence of specific feedback","level":"Beginner|Intermediate|Advanced|Expert"}`
+
       }]
+
     });
 
     const result = JSON.parse(msg.content[0]?.text?.replace(/```json|```/g, '').trim() || '{}');
