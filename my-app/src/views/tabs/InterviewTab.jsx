@@ -1,9 +1,58 @@
 // ═══════════════════════════════════════════════════════════════
-// INTERVIEW TAB (Dashboard - Interview Simulation Mode Setup)
-// Extracted from App.jsx (B2C Dashboard)
+// INTERVIEW TAB (Dashboard - Interview Simulation Mode + 5 Practice Modules)
 // ═══════════════════════════════════════════════════════════════
+import { useState } from "react";
 import { ROLES } from "../../constants.js";
 import { showToast } from "../../components/helpers.js";
+import ArchitectDefend from "./modules/ArchitectDefend.jsx";
+import IncidentSim from "./modules/IncidentSim.jsx";
+import ThreatBrief from "./modules/ThreatBrief.jsx";
+import ThreatHunt from "./modules/ThreatHunt.jsx";
+import VulnVerdict from "./modules/VulnVerdict.jsx";
+
+// Definitions for the 5 practice modules
+const PRACTICE_MODULES = [
+  {
+    id: "architectdefend",
+    name: "Architect & Defend",
+    desc: "Design a secure architecture for a real-world scenario. Place components, justify decisions.",
+    icon: "🏛️",
+    color: "#3b82f6",
+    component: ArchitectDefend,
+  },
+  {
+    id: "incidentsim",
+    name: "Incident Simulator",
+    desc: "Multi-stage incident response. React under pressure as the on-call commander.",
+    icon: "🚨",
+    color: "#ef4444",
+    component: IncidentSim,
+  },
+  {
+    id: "threatbrief",
+    name: "Threat Brief",
+    desc: "Communicate a security incident to the Board, CEO, Media, or Customers — under time pressure.",
+    icon: "📢",
+    color: "#a855f7",
+    component: ThreatBrief,
+  },
+  {
+    id: "threathunt",
+    name: "Threat Hunt",
+    desc: "Hunt through CloudTrail, VPC Flow, DNS, and WAF logs to find the attack timeline.",
+    icon: "🔍",
+    color: "#22c55e",
+    component: ThreatHunt,
+  },
+  {
+    id: "vulnverdict",
+    name: "Vuln Verdict",
+    desc: "Prioritize 12 real vulnerabilities under a strict 40-point budget. Defend your reasoning.",
+    icon: "⚖️",
+    color: "#f59e0b",
+    component: VulnVerdict,
+  },
+];
 
 export default function InterviewTab({
   subscribedRoles,
@@ -15,15 +64,92 @@ export default function InterviewTab({
   setDashTab,
   setView,
 }) {
+  // Track which module (if any) is currently open
+  const [activeModule, setActiveModule] = useState(null);
+
+  // ── If a module is open, render only that module + a back button ──
+  if (activeModule) {
+    const mod = PRACTICE_MODULES.find(m => m.id === activeModule);
+    if (mod) {
+      const ModuleComponent = mod.component;
+      return (
+        <div className="fadeUp">
+          <button
+            className="btn bs"
+            style={{ marginBottom: 12, fontSize: 12, padding: "6px 14px" }}
+            onClick={() => setActiveModule(null)}
+          >
+            ← Back to Practice Modules
+          </button>
+          <ModuleComponent />
+        </div>
+      );
+    }
+  }
+
   return (
     <div className="fadeUp">
+      {/* ═══════════════════════════════════════════════════════ */}
+      {/* PRACTICE MODULES — Available to everyone, no subscription needed */}
+      {/* ═══════════════════════════════════════════════════════ */}
+      <div className="card" style={{ padding: 20, marginBottom: 16 }}>
+        <div className="lbl" style={{ marginBottom: 4 }}>PRACTICE MODULES</div>
+        <h3 style={{ fontSize: 18, fontWeight: 800, marginBottom: 6 }}>Hands-on Security Practice</h3>
+        <p style={{ fontSize: 12, color: "var(--tx2)", marginBottom: 16, lineHeight: 1.6 }}>
+          Choose a module below to practice real-world security scenarios. Each module simulates a different aspect of working as a security professional.
+        </p>
+
+        <div style={{
+          display: "grid",
+          gridTemplateColumns: "repeat(auto-fill, minmax(240px, 1fr))",
+          gap: 12,
+        }}>
+          {PRACTICE_MODULES.map((mod, i) => (
+            <div
+              key={mod.id}
+              className="card card-glow fadeUp"
+              style={{
+                padding: 16,
+                cursor: "pointer",
+                borderTop: `3px solid ${mod.color}`,
+                transition: "all .2s",
+                animationDelay: `${i * 0.05}s`,
+              }}
+              onClick={() => setActiveModule(mod.id)}
+              onMouseEnter={(e) => { e.currentTarget.style.transform = 'translateY(-2px)'; }}
+              onMouseLeave={(e) => { e.currentTarget.style.transform = 'translateY(0)'; }}
+            >
+              <div style={{ fontSize: 32, marginBottom: 8 }}>{mod.icon}</div>
+              <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 6, color: mod.color }}>
+                {mod.name}
+              </div>
+              <div style={{ fontSize: 12, color: "var(--tx2)", lineHeight: 1.5, marginBottom: 10 }}>
+                {mod.desc}
+              </div>
+              <div style={{
+                fontSize: 11,
+                color: mod.color,
+                fontWeight: 700,
+                letterSpacing: 0.5,
+              }}>
+                START PRACTICE →
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* ═══════════════════════════════════════════════════════ */}
+      {/* ATTACK REASONING LAB (existing Interview Simulation) */}
+      {/* ═══════════════════════════════════════════════════════ */}
+
       {/* NOT SUBSCRIBED — show lock screen */}
       {subscribedRoles.length === 0 && (
         <div className="card" style={{ padding: 40, textAlign: "center" }}>
           <div style={{ fontSize: 56, marginBottom: 16 }}>🔒</div>
-          <h3 style={{ fontSize: 20, fontWeight: 800, marginBottom: 10 }}>Interview Mode is a Premium Feature</h3>
+          <h3 style={{ fontSize: 20, fontWeight: 800, marginBottom: 10 }}>Attack Reasoning Lab is a Premium Feature</h3>
           <p style={{ fontSize: 12, color: "var(--tx2)", marginBottom: 8, lineHeight: 1.8 }}>
-            Subscribe to a role to unlock Interview Simulation Mode.<br />
+            Subscribe to a role to unlock the Attack Reasoning Lab.<br />
             Practice with an AI interviewer, get scored, and receive detailed feedback.
           </p>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(2,1fr)", gap: 8, margin: "20px 0", textAlign: "left" }}>
@@ -50,7 +176,7 @@ export default function InterviewTab({
       {subscribedRoles.length > 0 && (<>
         <div className="card" style={{ padding: 24, textAlign: "center", marginBottom: 16 }}>
           <div style={{ fontSize: 48, marginBottom: 12 }}>💎</div>
-          <h3 style={{ fontSize: 20, fontWeight: 800, marginBottom: 8 }}>Interview Simulation Mode</h3>
+          <h3 style={{ fontSize: 20, fontWeight: 800, marginBottom: 8 }}>Attack Reasoning Lab</h3>
           <p style={{ fontSize: 12, color: "var(--tx2)", marginBottom: 20, lineHeight: 1.7 }}>
             AI acts as your interviewer with adaptive follow-ups, time pressure, and detailed debrief.
           </p>
