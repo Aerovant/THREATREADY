@@ -179,12 +179,12 @@ export default function ThreatReady() {
 
     // ── UNIVERSAL REFRESH BEHAVIOR ──
     // If a saved view exists and is restorable, ALWAYS restore it.
-    // Only InterviewPrep/results can't be restored (they need scenario state).
+    // Only interview/results can't be restored (they need scenario state).
     // This means refresh stays on the same page — landing, auth, trial-role-select,
     // dashboard, b2b-dashboard, etc. — without ever bouncing the user elsewhere.
-    // Allow 'results' to restore if we have saved results data; 'InterviewPrep' still excluded
+    // Allow 'results' to restore if we have saved results data; 'interview' still excluded
     const hasSavedResults = !!localStorage.getItem('cyberprep_results');
-    if (savedView && !(savedView === 'InterviewPrep') && !(savedView === 'results' && !hasSavedResults)) {
+    if (savedView && !(savedView === 'interview') && !(savedView === 'results' && !hasSavedResults)) {
       // Check that the view is appropriate for the current auth state
       // (e.g., logged-out users should not land on dashboard)
       if (token && savedUser) {
@@ -212,7 +212,7 @@ export default function ThreatReady() {
   const setView = (newView) => {
     // Don't save interview to localStorage (mid-test state can't be restored).
     // Results CAN be saved now since we persist results data separately.
-    if (newView !== 'InterviewPrep') {
+    if (newView !== 'interview') {
       localStorage.setItem('cyberprep_view', newView);
     }
     // Track navigation history for proper back button behavior
@@ -358,7 +358,7 @@ export default function ThreatReady() {
     return localStorage.getItem('cyberprep_active_role') || null;
   });
 
-  const [InterviewPrepPersona, setInterviewPersona] = useState('standard');
+  const [interviewPersona, setInterviewPersona] = useState('standard');
   const [leaderboard, setLeaderboard] = useState([]);
   const [myRank, setMyRank] = useState(null);
   const [dailyChallenge, setDailyChallenge] = useState(null); const [dailyAnswered, setDailyAnswered] = useState(false);
@@ -1046,7 +1046,7 @@ export default function ThreatReady() {
 
   // ── TIMER ──
   useEffect(() => {
-    if (view === "InterviewPrep") {
+    if (view === "interview") {
       timerRef.current = setInterval(() => setElapsed(p => p + 1), 1000);
       return () => {
         clearInterval(timerRef.current);
@@ -1061,7 +1061,7 @@ export default function ThreatReady() {
 
   // ── ANTI-CHEAT: Tab Switch / Focus Loss Detection ──
   useEffect(() => {
-    if (view !== "InterviewPrep") return;
+    if (view !== "interview") return;
 
 
     // Block right-click context menu (prevents inspect element / save / copy options)
@@ -1380,7 +1380,7 @@ export default function ThreatReady() {
         headers,
         body: JSON.stringify({
           scenario_id: sc.id,
-          InterviewPrep_mode: false,
+          interview_mode: false,
           role_id: activeRole || 'cloud',
           difficulty: diff || 'beginner',
           is_trial: !token
@@ -1394,7 +1394,7 @@ export default function ThreatReady() {
       console.log('Session start error:', e);
     }
 
-    // Then set all state and show InterviewPrep
+    // Then set all state and show interview
     const first = sc.po[0];
     setScenario(sc);
     setActiveDifficulty(diff || "beginner");
@@ -2029,7 +2029,7 @@ export default function ThreatReady() {
   // PAGE 3: SCENARIO INTERFACE (Adaptive + Anti-Gaming)
   // ═══════════════════════════════════════════════════════════
 
-  if (view === "InterviewPrep" && scenario && currentQ) return (
+  if (view === "interview" && scenario && currentQ) return (
     <><Breadcrumb view={view} setView={setView} setDashTab={setDashTab} setB2bTab={setB2bTab} goHome={goHome} dashTab={dashTab} b2bTab={b2bTab} activeRole={activeRole} activeDifficulty={activeDifficulty} scenario={scenario} userType={userType} />
     <InterviewView
       scenario={scenario}
@@ -2114,7 +2114,7 @@ export default function ThreatReady() {
       { id: "badges", label: "🏆 Badges", icon: "🏆" },
       { id: "profile", label: "👤 Profile", icon: "👤" },
 
-     { id: "InterviewPrep", label: "💎 InterviewPrep", icon: "💎" },
+     { id: "interview", label: "💎 Interview", icon: "💎" },
 
       { id: "billing", label: "💳 Billing", icon: "💳" },
       { id: "settings", label: "⚙️ Settings", icon: "⚙️" },
@@ -2278,12 +2278,12 @@ export default function ThreatReady() {
 
           {/* ── C5: INTERVIEW MODE ── */}
 
-          {dashTab === "InterviewPrep" && (
+          {dashTab === "interview" && (
             <InterviewTab
               subscribedRoles={subscribedRoles}
               activeRole={activeRole}
               setActiveRole={setActiveRole}
-              InterviewPrepPersona={InterviewPrepPersona}
+              interviewPersona={interviewPersona}
               setInterviewPersona={setInterviewPersona}
               isPaid={isPaid}
               setDashTab={setDashTab}
@@ -2374,9 +2374,9 @@ export default function ThreatReady() {
           const score = parseFloat(reportModal.overall_score) || 0;
           const avgStrength = evals.filter(e => e.score >= 7).length;
           const avgWeak = evals.filter(e => e.score < 5).length;
-          const verdict = score >= 8 ? "Excellent candidate — strongly recommended for InterviewPrep" :
+          const verdict = score >= 8 ? "Excellent candidate — strongly recommended for interview" :
             score >= 7 ? "Strong candidate — recommended for next round" :
-              score >= 6 ? "Good candidate — consider for InterviewPrep" :
+              score >= 6 ? "Good candidate — consider for interview" :
                 score >= 5 ? "Average — more assessment needed" :
                   score >= 4 ? "Below expectations — not recommended" :
                     "Not ready — significant skill gaps";
