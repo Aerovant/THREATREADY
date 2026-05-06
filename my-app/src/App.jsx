@@ -263,6 +263,15 @@ export default function ThreatReady() {
     }
   };
 
+
+  // Apply saved theme on mount (light = default, dark = if user toggled)
+  useEffect(() => {
+    const saved = localStorage.getItem('cyberprep_theme');
+    if (saved === 'dark') {
+      document.documentElement.setAttribute('data-theme', 'dark');
+    }
+  }, []);
+
   // ── Sync view state when URL changes from external source (back/forward, manual edit) ──
   useEffect(() => {
     
@@ -2180,7 +2189,14 @@ export default function ThreatReady() {
                 
               </div>
 
+              <button className="btn bs" style={{ padding: "5px 10px", fontSize: 12, marginRight: 8 }} onClick={() => {
+                const cur = document.documentElement.getAttribute('data-theme') === 'dark' ? 'dark' : 'light';
+                const next = cur === 'dark' ? 'light' : 'dark';
+                document.documentElement.setAttribute('data-theme', next);
+                localStorage.setItem('cyberprep_theme', next);
+              }} title="Toggle theme">{document.documentElement.getAttribute('data-theme') === 'dark' ? '☀' : '🌙'}</button>
               <button className="btn bs" style={{ padding: "5px 10px", fontSize: 12 }} onClick={logout}>Logout</button>
+            
             </div>
           </div>
 
@@ -2555,7 +2571,14 @@ export default function ThreatReady() {
               </div>
 
 
+              <button className="btn bs" style={{ padding: "5px 10px", fontSize: 12, marginRight: 8 }} onClick={() => {
+                const cur = document.documentElement.getAttribute('data-theme') === 'dark' ? 'dark' : 'light';
+                const next = cur === 'dark' ? 'light' : 'dark';
+                document.documentElement.setAttribute('data-theme', next);
+                localStorage.setItem('cyberprep_theme', next);
+              }} title="Toggle theme">{document.documentElement.getAttribute('data-theme') === 'dark' ? '☀' : '🌙'}</button>
               <button className="btn bs" style={{ padding: "5px 10px", fontSize: 12 }} onClick={logout}>Logout</button>
+
             </div>
           </div>
 

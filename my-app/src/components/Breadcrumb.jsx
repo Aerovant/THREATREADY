@@ -1,8 +1,3 @@
-// ═══════════════════════════════════════════════════════════════
-// BREADCRUMB — Shows navigation path with clickable segments
-// ═══════════════════════════════════════════════════════════════
-import { ROLES } from "../constants.js";
-
 export default function Breadcrumb({
   view,
   dashTab,
@@ -56,13 +51,11 @@ export default function Breadcrumb({
     segments.push({ label: "Roles", clickable: false });
   } else if (view === "difficulty") {
     segments.push({ label: "Home", onClick: () => goHome() });
-    const role = ROLES.find(r => r.id === activeRole);
-    segments.push({ label: role?.name || activeRole || "Role", clickable: false });
+    segments.push({ label: activeRole || "Role", clickable: false });
     segments.push({ label: "Select Difficulty", clickable: false });
   } else if (view === "interview") {
     segments.push({ label: "Home", onClick: () => goHome() });
-    const role = ROLES.find(r => r.id === activeRole);
-    segments.push({ label: role?.name || activeRole || "Role", onClick: () => setView("difficulty") });
+    segments.push({ label: activeRole || "Role", onClick: () => setView("difficulty") });
     if (activeDifficulty) {
       const diff = activeDifficulty.charAt(0).toUpperCase() + activeDifficulty.slice(1);
       segments.push({ label: diff, clickable: false });
@@ -70,8 +63,7 @@ export default function Breadcrumb({
     segments.push({ label: scenario?.ti || "Assessment", clickable: false });
   } else if (view === "results") {
     segments.push({ label: "Home", onClick: () => goHome() });
-    const role = ROLES.find(r => r.id === activeRole);
-    segments.push({ label: role?.name || activeRole || "Role", onClick: () => setView("difficulty") });
+    segments.push({ label: activeRole || "Role", onClick: () => setView("difficulty") });
     if (activeDifficulty) {
       const diff = activeDifficulty.charAt(0).toUpperCase() + activeDifficulty.slice(1);
       segments.push({ label: diff, clickable: false });
@@ -81,24 +73,25 @@ export default function Breadcrumb({
     segments.push({ label: "Home", onClick: () => setView("landing") });
   }
 
+  // Don't render breadcrumb if only one segment (just "Home" or single label)
+  if (segments.length <= 1) return null;
+
   return (
     <div style={{
-      padding: "10px 16px",
+      padding: "12px 24px",
       fontSize: 13,
       color: "var(--tx2)",
       display: "flex",
       flexWrap: "wrap",
       alignItems: "center",
-      gap: 6,
-      borderBottom: "1px solid #1e2536",
-      background: "rgba(15, 20, 32, 0.6)",
-      backdropFilter: "blur(4px)"
+      gap: 8,
+      background: "transparent"
     }}>
       {segments.map((seg, i) => {
         const isLast = i === segments.length - 1;
         const isClickable = !isLast && (seg.onClick || seg.clickable !== false);
         return (
-          <span key={i} style={{ display: "flex", alignItems: "center", gap: 6 }}>
+          <span key={i} style={{ display: "flex", alignItems: "center", gap: 8 }}>
             {isClickable ? (
               <span
                 onClick={seg.onClick}
