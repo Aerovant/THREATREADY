@@ -246,22 +246,7 @@ export default function IncidentSim() {
             </div>
           </div>
 
-          {/* Follow-up */}
-          {showFollowUp && (
-            <div style={styles.followUpBox}>
-              <p style={styles.followUpLabel}>{stage.followUp}</p>
-              <textarea
-                style={styles.followUpInput}
-                placeholder="Type your response..."
-                value={followUpText}
-                onChange={(e) => setFollowUpText(e.target.value)}
-                rows={4}
-              />
-              <button style={styles.nextBtn} onClick={handleNext}>
-                {currentStage < STAGES.length - 1 ? "PROCEED TO NEXT STAGE →" : "COMPLETE — VIEW DEBRIEF →"}
-              </button>
-            </div>
-          )}
+          {/* Follow-up REMOVED — display-only mode */}
         </div>
 
         {/* Right Panel — Team & Metrics */}

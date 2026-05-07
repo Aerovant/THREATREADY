@@ -2167,15 +2167,17 @@ export default function ThreatReady() {
                 {showNotifs && createPortal(
                   <>
                     <div style={{ position: "fixed", inset: 0, zIndex: 9998, background: "rgba(0,0,0,0.5)", backdropFilter: "blur(2px)" }} onClick={() => setShowNotifs(false)} />
-                    <div style={{ position: "fixed", zIndex: 9999, right: 24, top: 80, width: 320, maxHeight: "70vh", overflowY: "auto", background: "#0f1420", border: "1px solid var(--ac)", borderRadius: 12, boxShadow: "0 20px 60px rgba(0,0,0,.9), 0 0 30px rgba(0,229,255,0.15)" }}>
-                      <div style={{ padding: "12px 16px", borderBottom: "1px solid #1e2536", fontSize: 13, fontWeight: 700, color: "var(--ac)", letterSpacing: 1, display: "flex", justifyContent: "space-between", alignItems: "center", background: "#0a0e1a", position: "sticky", top: 0 }}>
+                    
+                      <div style={{ position: "fixed", zIndex: 9999, right: 24, top: 80, width: 320, maxHeight: "70vh", overflowY: "auto", background: "var(--s1)", border: "1px solid var(--bd)", borderRadius: 12, boxShadow: "var(--shadow-lg)" }}>
+                      <div style={{ padding: "12px 16px", borderBottom: "1px solid var(--bd)", fontSize: 13, fontWeight: 700, color: "var(--ac)", letterSpacing: 1, display: "flex", justifyContent: "space-between", alignItems: "center", background: "var(--s2)", position: "sticky", top: 0 }}>
                         <span>NOTIFICATIONS</span>
                         <span style={{ cursor: "pointer", fontSize: 16, color: "var(--tx2)" }} onClick={() => setShowNotifs(false)}>×</span>
                       </div>
                       {notifications.length === 0
                         ? <div style={{ padding: 20, fontSize: 13, color: "var(--tx2)", textAlign: "center" }}>No notifications yet</div>
                         : notifications.map((n, i) => (
-                          <div key={n.id || i} style={{ padding: "12px 16px", borderBottom: i < notifications.length - 1 ? "1px solid #1e2536" : "none", background: n.is_read ? "transparent" : "rgba(0,229,255,.04)" }}>
+                          <div key={n.id || i} style={{ padding: "12px 16px", borderBottom: i < notifications.length - 1 ? "1px solid var(--bd)" : "none", background: n.is_read ? "transparent" : "rgba(124,58,237,.06)" }}>
+                     
                             <div style={{ fontSize: 12, fontWeight: 600, color: "var(--tx1)", lineHeight: 1.4 }}>{n.title}</div>
                             <div style={{ fontSize: 12, color: "var(--tx2)", marginTop: 4, lineHeight: 1.4 }}>{n.message}</div>
                             <div style={{ fontSize: 11, color: "var(--tx2)", marginTop: 5 }}>{new Date(n.created_at).toLocaleDateString()}</div>
@@ -2403,9 +2405,9 @@ export default function ThreatReady() {
             <div style={{ position: "fixed", inset: 0, zIndex: 9998, background: "rgba(0,0,0,0.85)", backdropFilter: "blur(6px)", display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }}
               onClick={() => setReportModal(null)}>
               <div onClick={e => e.stopPropagation()}
-                style={{ width: "92%", maxWidth: 900, maxHeight: "92vh", overflow: "hidden", background: "#0f1420", border: "1px solid var(--ac)", borderRadius: 16, boxShadow: "0 20px 60px rgba(0,0,0,.9), 0 0 40px rgba(0,229,255,0.25)", display: "flex", flexDirection: "column" }}>
+                style={{ width: "92%", maxWidth: 900, maxHeight: "92vh", overflow: "hidden", background: "var(--s1)", border: "1px solid var(--bd)", borderRadius: 16, boxShadow: "var(--shadow-xl)", display: "flex", flexDirection: "column" }}>
 
-                <div style={{ padding: "20px 28px", borderBottom: "1px solid #1e2536", background: "#0a0e1a", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <div style={{ padding: "20px 28px", borderBottom: "1px solid var(--bd)", background: "var(--s2)", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                   <div>
                     <div style={{ fontSize: 13, color: "var(--ac)", fontWeight: 700, letterSpacing: 2, marginBottom: 4 }}>📊 ASSESSMENT RESULTS</div>
                     <div style={{ fontSize: 18, fontWeight: 800 }}>{reportModal.name}</div>
@@ -2416,7 +2418,7 @@ export default function ThreatReady() {
 
                 <div style={{ overflow: "auto", flex: 1 }}>
 
-                  <div style={{ padding: "32px 28px", textAlign: "center", borderBottom: "1px solid #1e2536", background: "linear-gradient(180deg, rgba(0,229,255,0.04) 0%, transparent 100%)" }}>
+                  <div style={{ padding: "32px 28px", textAlign: "center", borderBottom: "1px solid var(--bd)", background: "linear-gradient(180deg, rgba(124,58,237,0.06) 0%, transparent 100%)" }}>
                     <div style={{ fontSize: 13, color: "var(--tx2)", marginBottom: 8, letterSpacing: 2, fontWeight: 700 }}>OVERALL SCORE</div>
                     <div className="mono" style={{ fontSize: 72, fontWeight: 900, lineHeight: 1, color: verdictColor, marginBottom: 8 }}>
                       {score.toFixed(1)}<span style={{ fontSize: 28, color: "var(--tx2)" }}>/10</span>
@@ -2429,7 +2431,7 @@ export default function ThreatReady() {
                     </div>
                   </div>
 
-                  <div style={{ padding: "20px 28px", borderBottom: "1px solid #1e2536", display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 12 }}>
+                  <div style={{ padding: "20px 28px", borderBottom: "1px solid var(--bd)", display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 12 }}>
                     <div style={{ textAlign: "center", padding: 14, background: "var(--s2)", borderRadius: 10 }}>
                       <div style={{ fontSize: 11, color: "var(--tx2)", marginBottom: 4, letterSpacing: 1 }}>ROLE</div>
                       <div style={{ fontSize: 13, fontWeight: 700 }}>{ROLES.find(r => r.id === reportModal.role_id)?.icon} {ROLES.find(r => r.id === reportModal.role_id)?.name || reportModal.role_id}</div>
@@ -2448,7 +2450,7 @@ export default function ThreatReady() {
                     </div>
                   </div>
 
-                  <div style={{ padding: "20px 28px", borderBottom: "1px solid #1e2536", display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+                  <div style={{ padding: "20px 28px", borderBottom: "1px solid var(--bd)", display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
                     <div style={{ padding: 14, background: "rgba(0,224,150,.05)", border: "1px solid rgba(0,224,150,.25)", borderRadius: 10 }}>
                       <div style={{ fontSize: 12, color: "var(--ok)", fontWeight: 700, marginBottom: 6, letterSpacing: 1 }}>✓ STRONG ANSWERS</div>
                       <div style={{ fontSize: 24, fontWeight: 900, color: "var(--ok)" }}>{avgStrength}</div>
@@ -2549,15 +2551,15 @@ export default function ThreatReady() {
                 {showNotifs && createPortal(
                   <>
                     <div style={{ position: "fixed", inset: 0, zIndex: 9998, background: "rgba(0,0,0,0.5)", backdropFilter: "blur(2px)" }} onClick={() => setShowNotifs(false)} />
-                    <div style={{ position: "fixed", zIndex: 9999, right: 24, top: 80, width: 320, maxHeight: "70vh", overflowY: "auto", background: "#0f1420", border: "1px solid var(--ac)", borderRadius: 12, boxShadow: "0 20px 60px rgba(0,0,0,.9), 0 0 30px rgba(0,229,255,0.15)" }}>
-                      <div style={{ padding: "12px 16px", borderBottom: "1px solid #1e2536", fontSize: 13, fontWeight: 700, color: "var(--ac)", letterSpacing: 1, display: "flex", justifyContent: "space-between", alignItems: "center", background: "#0a0e1a", position: "sticky", top: 0 }}>
+                    <div style={{ position: "fixed", zIndex: 9999, right: 24, top: 80, width: 320, maxHeight: "70vh", overflowY: "auto", background: "var(--s1)", border: "1px solid var(--bd)", borderRadius: 12, boxShadow: "var(--shadow-lg)" }}>
+                      <div style={{ padding: "12px 16px", borderBottom: "1px solid var(--bd)", fontSize: 13, fontWeight: 700, color: "var(--ac)", letterSpacing: 1, display: "flex", justifyContent: "space-between", alignItems: "center", background: "var(--s2)", position: "sticky", top: 0 }}>
                         <span>NOTIFICATIONS ({notifications.length})</span>
                         <span style={{ cursor: "pointer", fontSize: 16, color: "var(--tx2)" }} onClick={() => setShowNotifs(false)}>×</span>
                       </div>
                       {notifications.length === 0
                         ? <div style={{ padding: 20, fontSize: 13, color: "var(--tx2)", textAlign: "center" }}>No notifications yet</div>
                         : notifications.map((n, i) => (
-                          <div key={n.id || i} style={{ padding: "12px 16px", borderBottom: i < notifications.length - 1 ? "1px solid #1e2536" : "none", background: n.is_read ? "transparent" : "rgba(0,229,255,.04)" }}>
+                          <div key={n.id || i} style={{ padding: "12px 16px", borderBottom: i < notifications.length - 1 ? "1px solid var(--bd)" : "none", background: n.is_read ? "transparent" : "rgba(124,58,237,.06)" }}>
                             <div style={{ fontSize: 12, fontWeight: 600, color: "var(--tx1)", lineHeight: 1.4 }}>{n.title || n.type}</div>
                             <div style={{ fontSize: 12, color: "var(--tx2)", marginTop: 4, lineHeight: 1.4 }}>{n.message}</div>
                             <div style={{ fontSize: 11, color: "var(--tx2)", marginTop: 5 }}>{n.created_at?.substring(0, 16).replace('T', ' ')}</div>
@@ -2767,7 +2769,7 @@ export default function ThreatReady() {
               backdropFilter: "blur(6px)", padding: 16
             }} onClick={() => setShowHrSubscribeModal(false)}>
               <div onClick={e => e.stopPropagation()} style={{
-                background: "#0f1420", border: "1px solid var(--ac)", borderRadius: 14,
+                background: "var(--s1)", border: "1px solid var(--bd)", borderRadius: 14,
                 padding: "20px 24px", maxWidth: 480, width: "100%",
                 boxShadow: "0 20px 60px rgba(0,0,0,.9), 0 0 40px rgba(0,229,255,0.2)"
               }}>

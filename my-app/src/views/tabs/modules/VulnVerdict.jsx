@@ -180,29 +180,14 @@ export default function VulnVerdict() {
                   <div style={styles.detailItem}><span style={styles.detailLabel}>Internet</span><span style={{ ...styles.detailValue, color: v.internet ? "#ef4444" : "#22c55e" }}>{v.internet ? "Yes" : "No"}</span></div>
                   <div style={styles.detailItem}><span style={styles.detailLabel}>Category</span><span style={styles.detailValue}>{v.category}</span></div>
                 </div>
-                <textarea
-                  style={styles.justifyInput}
-                  placeholder={priorities[v.id] ? "Why are you allocating time to this? What's the business risk?" : "Why are you NOT fixing this? What risk are you accepting?"}
-                  value={justifications[v.id] || ""}
-                  onChange={(e) => setJustifications({ ...justifications, [v.id]: e.target.value })}
-                  rows={3}
-                />
+                {/* Justification textarea REMOVED — display-only mode */}
               </div>
             )}
           </div>
         ))}
       </div>
 
-      <div style={styles.submitBar}>
-        <div style={styles.submitInfo}>
-          <span style={styles.submitStat}>{Object.keys(priorities).length} addressed</span>
-          <span style={styles.submitStat}>{VULNS.length - Object.keys(priorities).length} accepted risk</span>
-          <span style={{ ...styles.submitStat, color: remaining < 0 ? "#ff2244" : "#22c55e" }}>{remaining}h remaining</span>
-        </div>
-        <button style={styles.submitBtn} onClick={() => setShowResults(true)} disabled={Object.keys(priorities).length === 0}>
-          SUBMIT TRIAGE DECISION →
-        </button>
-      </div>
+      {/* Submit bar REMOVED — display-only mode */}
     </div>
   );
 }

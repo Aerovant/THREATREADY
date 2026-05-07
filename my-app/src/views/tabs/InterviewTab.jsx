@@ -1,56 +1,94 @@
 // ═══════════════════════════════════════════════════════════════
-// INTERVIEW TAB (Dashboard - Interview Simulation Mode + 5 Practice Modules)
+// INTERVIEW TAB — v5: Levels + Detailed Popups + Preset Timing
 // ═══════════════════════════════════════════════════════════════
 import { useState } from "react";
-import { ROLES } from "../../constants.js";
 import { showToast } from "../../components/helpers.js";
+import InterviewSession from "../InterviewSession.jsx";
 import ArchitectDefend from "./modules/ArchitectDefend.jsx";
 import IncidentSim from "./modules/IncidentSim.jsx";
 import ThreatBrief from "./modules/ThreatBrief.jsx";
 import ThreatHunt from "./modules/ThreatHunt.jsx";
 import VulnVerdict from "./modules/VulnVerdict.jsx";
 
-// Definitions for the 5 practice modules
-const PRACTICE_MODULES = [
+const API_BASE = "https://threatready-db.onrender.com";
+
+// Timing presets
+const MINUTE_PRESETS = [15, 30, 45];
+const HOUR_PRESETS = [1, 2, 3];
+
+// Difficulty levels
+const LEVELS = [
+  {
+    id: "beginner",
+    name: "Beginner",
+    icon: "🌱",
+    color: "#22c55e",
+    desc: "Foundational concepts, basic scenarios",
+  },
+  {
+    id: "intermediate",
+    name: "Intermediate",
+    icon: "⚡",
+    color: "#3b82f6",
+    desc: "Multi-step problems, real-world tradeoffs",
+  },
+  {
+    id: "expert",
+    name: "Expert",
+    icon: "🔥",
+    color: "#ef4444",
+    desc: "Advanced architecture, edge cases, depth",
+  },
+  {
+    id: "collaborate",
+    name: "Collaborate",
+    icon: "🤝",
+    color: "#a855f7",
+    desc: "Mixed difficulty across all 6 modules",
+  },
+];
+
+// 5 modules — each renders its full UI inside the popup
+const MODULE_INFO = [
   {
     id: "architectdefend",
     name: "Architect & Defend",
-    desc: "Design a secure architecture for a real-world scenario. Place components, justify decisions.",
     icon: "🏛️",
     color: "#3b82f6",
-    component: ArchitectDefend,
+    topic: "Architecture design",
+    Component: ArchitectDefend,
   },
   {
     id: "incidentsim",
     name: "Incident Simulator",
-    desc: "Multi-stage incident response. React under pressure as the on-call commander.",
     icon: "🚨",
     color: "#ef4444",
-    component: IncidentSim,
+    topic: "Incident response",
+    Component: IncidentSim,
   },
   {
     id: "threatbrief",
     name: "Threat Brief",
-    desc: "Communicate a security incident to the Board, CEO, Media, or Customers — under time pressure.",
     icon: "📢",
     color: "#a855f7",
-    component: ThreatBrief,
+    topic: "Crisis communication",
+    Component: ThreatBrief,
   },
   {
     id: "threathunt",
     name: "Threat Hunt",
-    desc: "Hunt through CloudTrail, VPC Flow, DNS, and WAF logs to find the attack timeline.",
     icon: "🔍",
     color: "#22c55e",
-    component: ThreatHunt,
+    topic: "Log analysis",
+    Component: ThreatHunt,
   },
   {
     id: "vulnverdict",
     name: "Vuln Verdict",
-    desc: "Prioritize 12 real vulnerabilities under a strict 40-point budget. Defend your reasoning.",
     icon: "⚖️",
     color: "#f59e0b",
-    component: VulnVerdict,
+    topic: "Vuln prioritization",
+    Component: VulnVerdict,
   },
 ];
 
@@ -64,207 +102,476 @@ export default function InterviewTab({
   setDashTab,
   setView,
 }) {
-  // Track which module (if any) is currently open
-  const [activeModule, setActiveModule] = useState(null);
+  // Session prep state
+  const [resumeFile, setResumeFile] = useState(null);
+  const [jdFile, setJdFile] = useState(null);
+  const [durationUnit, setDurationUnit] = useState("minutes");
+  const [durationValue, setDurationValue] = useState(30); // default 30 min
+  const [level, setLevel] = useState("intermediate");
+  const [analyzing, setAnalyzing] = useState(false);
+  const [analysisResult, setAnalysisResult] = useState(null);
 
-  // ── If a module is open, render only that module + a back button ──
-  if (activeModule) {
-    const mod = PRACTICE_MODULES.find(m => m.id === activeModule);
-    if (mod) {
-      const ModuleComponent = mod.component;
-      return (
-        <div className="fadeUp">
-          <button
-            className="btn bs"
-            style={{ marginBottom: 12, fontSize: 12, padding: "6px 14px" }}
-            onClick={() => setActiveModule(null)}
-          >
-            ← Back to Practice Modules
-          </button>
-          <ModuleComponent />
-        </div>
-      );
+  // UI state
+  const [popupModule, setPopupModule] = useState(null);
+  const [sessionActive, setSessionActive] = useState(false);
+
+  // When unit changes, reset to first preset
+  const handleUnitChange = (newUnit) => {
+    setDurationUnit(newUnit);
+    setDurationValue(newUnit === "minutes" ? MINUTE_PRESETS[1] : HOUR_PRESETS[0]);
+  };
+
+  const handleFileUpload = (e, setter, label) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 5 * 1024 * 1024) {
+      showToast(`${label} too large (max 5MB)`, "error");
+      return;
     }
+    setter(file);
+    setAnalysisResult(null);
+    showToast(`${label} uploaded`, "success");
+  };
+
+  const handleAnalyze = async () => {
+    if (!jdFile && !resumeFile) {
+      showToast("Upload at least JD or resume to analyze", "warning");
+      return;
+    }
+    setAnalyzing(true);
+    setAnalysisResult(null);
+    try {
+      const readText = (f) => new Promise((res, rej) => {
+        if (!f) return res("");
+        const r = new FileReader();
+        r.onload = (e) => res(e.target.result);
+        r.onerror = rej;
+        r.readAsText(f);
+      });
+
+      const jdText = await readText(jdFile);
+      const resumeText = await readText(resumeFile);
+      const token = localStorage.getItem("token");
+
+      const res = await fetch(`${API_BASE}/api/interview/analyze`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ jdText, resumeText }),
+      });
+
+      if (!res.ok) {
+        const err = await res.text();
+        throw new Error(`Backend error (${res.status}): ${err.substring(0, 200)}`);
+      }
+
+      const data = await res.json();
+      if (data.error) throw new Error(data.error);
+      setAnalysisResult(data.analysis || "Analysis complete");
+      showToast("Analysis complete!", "success");
+    } catch (e) {
+      console.error("Analyze error:", e);
+      showToast("Analysis failed: " + e.message, "error");
+      setAnalysisResult(null);
+    } finally {
+      setAnalyzing(false);
+    }
+  };
+
+  const handleStartSession = () => {
+    const minutes = durationUnit === "hours" ? durationValue * 60 : durationValue;
+    if (!minutes || minutes < 5) {
+      showToast("Please select a valid duration", "error");
+      return;
+    }
+    setSessionActive(true);
+  };
+
+  // ── If session is active, show the chat UI ──
+  if (sessionActive) {
+    const totalMinutes = durationUnit === "hours" ? durationValue * 60 : durationValue;
+    return (
+      <InterviewSession
+        jdFile={jdFile}
+        resumeFile={resumeFile}
+        durationMinutes={totalMinutes}
+        level={level}
+        onEnd={() => setSessionActive(false)}
+      />
+    );
   }
 
   return (
     <div className="fadeUp">
-      {/* ═══════════════════════════════════════════════════════ */}
-      {/* PRACTICE MODULES — Available to everyone, no subscription needed */}
-      {/* ═══════════════════════════════════════════════════════ */}
-      <div className="card" style={{ padding: 20, marginBottom: 16 }}>
-        <div className="lbl" style={{ marginBottom: 4 }}>PRACTICE MODULES</div>
-        <h3 style={{ fontSize: 18, fontWeight: 800, marginBottom: 6 }}>Hands-on Security Practice</h3>
-        <p style={{ fontSize: 12, color: "var(--tx2)", marginBottom: 16, lineHeight: 1.6 }}>
-          Choose a module below to practice real-world security scenarios. Each module simulates a different aspect of working as a security professional.
+      <div className="card" style={{ padding: 28, marginBottom: 16 }}>
+        <div className="lbl" style={{ marginBottom: 4 }}>INTERVIEW PREP SESSION</div>
+        <h3 style={{ fontSize: 18, fontWeight: 800, marginBottom: 6 }}>
+          Personalized AI Interview Practice
+        </h3>
+        <p style={{ fontSize: 12, color: "var(--tx2)", marginBottom: 18, lineHeight: 1.6 }}>
+          Upload your JD or resume for tailored questions — or skip and start with default content.
         </p>
 
+        {/* Upload row with OR divider */}
         <div style={{
           display: "grid",
-          gridTemplateColumns: "repeat(auto-fill, minmax(240px, 1fr))",
+          gridTemplateColumns: "1fr auto 1fr",
           gap: 12,
+          alignItems: "stretch",
+          marginBottom: 28,
         }}>
-          {PRACTICE_MODULES.map((mod, i) => (
-            <div
-              key={mod.id}
-              className="card card-glow fadeUp"
-              style={{
-                padding: 16,
-                cursor: "pointer",
-                borderTop: `3px solid ${mod.color}`,
-                transition: "all .2s",
-                animationDelay: `${i * 0.05}s`,
-              }}
-              onClick={() => setActiveModule(mod.id)}
-              onMouseEnter={(e) => { e.currentTarget.style.transform = 'translateY(-2px)'; }}
-              onMouseLeave={(e) => { e.currentTarget.style.transform = 'translateY(0)'; }}
-            >
-              <div style={{ fontSize: 32, marginBottom: 8 }}>{mod.icon}</div>
-              <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 6, color: mod.color }}>
-                {mod.name}
-              </div>
-              <div style={{ fontSize: 12, color: "var(--tx2)", lineHeight: 1.5, marginBottom: 10 }}>
-                {mod.desc}
-              </div>
-              <div style={{
-                fontSize: 11,
-                color: mod.color,
-                fontWeight: 700,
-                letterSpacing: 0.5,
-              }}>
-                START PRACTICE →
-              </div>
+          {/* JD Upload */}
+          <div className="card card-glow" style={{ padding: 14, borderTop: "3px solid #06b6d4" }}>
+            <div className="lbl" style={{ marginBottom: 6 }}>📄 Job Description</div>
+            <div style={{ fontSize: 11, color: "var(--tx2)", marginBottom: 10 }}>
+              Optional · PDF, DOC, or TXT (max 5MB)
             </div>
-          ))}
+            <label style={{
+              display: "block", padding: 14, textAlign: "center",
+              background: jdFile ? "rgba(6,182,212,0.08)" : "rgba(255,255,255,0.02)",
+              border: jdFile ? "1px dashed #06b6d4" : "1px dashed rgba(255,255,255,0.1)",
+              borderRadius: 8, cursor: "pointer", fontSize: 12,
+            }}>
+              {jdFile ? (
+                <>
+                  <div style={{ color: "var(--ok)", fontWeight: 700, marginBottom: 3 }}>
+                    ✓ {jdFile.name}
+                  </div>
+                  <div style={{ fontSize: 11, color: "var(--tx2)" }}>
+                    {(jdFile.size / 1024).toFixed(1)} KB · Click to replace
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div style={{ marginBottom: 4 }}>📤 Click to upload JD</div>
+                  <div style={{ fontSize: 11, color: "var(--tx2)" }}>Drop the role description</div>
+                </>
+              )}
+              <input type="file" accept=".pdf,.doc,.docx,.txt"
+                onChange={(e) => handleFileUpload(e, setJdFile, "Job description")}
+                style={{ display: "none" }} />
+            </label>
+          </div>
+
+          {/* OR divider */}
+          <div style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            padding: "0 4px",
+          }}>
+            <div style={{
+              width: 36, height: 36, borderRadius: "50%",
+              background: "var(--s2)",
+              border: "1px solid var(--bd)",
+              display: "flex", alignItems: "center", justifyContent: "center",
+              fontSize: 11, fontWeight: 800, color: "var(--tx2)",
+              letterSpacing: 0.5,
+            }}>
+              OR
+            </div>
+          </div>
+
+          {/* Resume Upload */}
+          <div className="card card-glow" style={{ padding: 14, borderTop: "3px solid #22c55e" }}>
+            <div className="lbl" style={{ marginBottom: 6 }}>📋 Your Resume</div>
+            <div style={{ fontSize: 11, color: "var(--tx2)", marginBottom: 10 }}>
+              Optional · PDF, DOC, or TXT (max 5MB)
+            </div>
+            <label style={{
+              display: "block", padding: 14, textAlign: "center",
+              background: resumeFile ? "rgba(34,197,94,0.06)" : "rgba(255,255,255,0.02)",
+              border: resumeFile ? "1px dashed #22c55e" : "1px dashed rgba(255,255,255,0.1)",
+              borderRadius: 8, cursor: "pointer", fontSize: 12,
+            }}>
+              {resumeFile ? (
+                <>
+                  <div style={{ color: "var(--ok)", fontWeight: 700, marginBottom: 3 }}>
+                    ✓ {resumeFile.name}
+                  </div>
+                  <div style={{ fontSize: 11, color: "var(--tx2)" }}>
+                    {(resumeFile.size / 1024).toFixed(1)} KB · Click to replace
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div style={{ marginBottom: 4 }}>📤 Click to upload resume</div>
+                  <div style={{ fontSize: 11, color: "var(--tx2)" }}>Your CV or experience</div>
+                </>
+              )}
+              <input type="file" accept=".pdf,.doc,.docx,.txt"
+                onChange={(e) => handleFileUpload(e, setResumeFile, "Resume")}
+                style={{ display: "none" }} />
+            </label>
+          </div>
+        </div>
+
+        {/* Analyze Button */}
+        <div style={{ display: "flex", justifyContent: "center", marginBottom: 24 }}>
+          <button
+            className="btn bs"
+            onClick={handleAnalyze}
+            disabled={analyzing || (!jdFile && !resumeFile)}
+            style={{
+              padding: "8px 22px",
+              fontSize: 12,
+              fontWeight: 700,
+              opacity: analyzing || (!jdFile && !resumeFile) ? 0.5 : 1,
+              cursor: analyzing || (!jdFile && !resumeFile) ? "not-allowed" : "pointer",
+            }}
+          >
+            {analyzing ? "🤖 Analyzing…" : "🤖 Analyze with AI"}
+          </button>
+        </div>
+
+        {/* Analysis result */}
+        {analysisResult && (
+          <div style={{
+            padding: 12, marginBottom: 28,
+            background: "rgba(0,229,255,0.04)",
+            border: "1px solid rgba(0,229,255,0.2)",
+            borderRadius: 8,
+            fontSize: 12, color: "var(--tx1)",
+            lineHeight: 1.6,
+            whiteSpace: "pre-wrap",
+          }}>
+            <div className="lbl" style={{ marginBottom: 6 }}>🤖 AI ANALYSIS</div>
+            {analysisResult}
+          </div>
+        )}
+
+        {/* ─── Duration: unit toggle + preset dropdown ─── */}
+        <div style={{ marginBottom: 28 }}>
+          <div className="lbl" style={{ marginBottom: 8 }}>⏱️ Session Duration</div>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 8 }}>
+            <button
+              onClick={() => handleUnitChange("minutes")}
+              className="btn"
+              style={{
+                padding: "10px 8px", fontSize: 12, fontWeight: 700,
+                background: durationUnit === "minutes" ? "rgba(0,229,255,0.1)" : "var(--s2)",
+                border: durationUnit === "minutes" ? "1px solid var(--ac)" : "1px solid var(--bd)",
+                color: durationUnit === "minutes" ? "var(--ac)" : "var(--tx1)",
+                cursor: "pointer", transition: "all .2s"
+              }}
+            >
+              Minutes
+            </button>
+            <button
+              onClick={() => handleUnitChange("hours")}
+              className="btn"
+              style={{
+                padding: "10px 8px", fontSize: 12, fontWeight: 700,
+                background: durationUnit === "hours" ? "rgba(0,229,255,0.1)" : "var(--s2)",
+                border: durationUnit === "hours" ? "1px solid var(--ac)" : "1px solid var(--bd)",
+                color: durationUnit === "hours" ? "var(--ac)" : "var(--tx1)",
+                cursor: "pointer", transition: "all .2s"
+              }}
+            >
+              Hours
+            </button>
+          </div>
+
+          {/* Preset value dropdown */}
+          <select
+            value={durationValue}
+            onChange={(e) => setDurationValue(parseInt(e.target.value, 10))}
+            className="input"
+            style={{ width: "100%", fontSize: 14, padding: "10px 12px" }}
+          >
+            {(durationUnit === "minutes" ? MINUTE_PRESETS : HOUR_PRESETS).map((v) => (
+              <option key={v} value={v}>
+                {v} {durationUnit === "minutes" ? "minutes" : (v === 1 ? "hour" : "hours")}
+              </option>
+            ))}
+          </select>
+          <div style={{ fontSize: 11, color: "var(--tx2)", marginTop: 6 }}>
+            Total: {durationUnit === "hours" ? durationValue * 60 : durationValue} minutes
+          </div>
+        </div>
+
+        {/* ─── Difficulty Level Selector ─── */}
+        <div style={{ marginBottom: 28 }}>
+          <div className="lbl" style={{ marginBottom: 8 }}>🎯 Difficulty Level</div>
+          <div style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))",
+            gap: 8,
+          }}>
+            {LEVELS.map((lvl) => (
+              <div
+                key={lvl.id}
+                onClick={() => setLevel(lvl.id)}
+                className="card card-glow"
+                style={{
+                  padding: 12,
+                  cursor: "pointer",
+                  textAlign: "center",
+                  borderColor: level === lvl.id ? lvl.color : "var(--bd)",
+                  background: level === lvl.id ? `${lvl.color}15` : "var(--s2)",
+                  transition: "all .2s",
+                }}
+              >
+                <div style={{ fontSize: 22, marginBottom: 4 }}>{lvl.icon}</div>
+                <div style={{
+                  fontSize: 13,
+                  fontWeight: 700,
+                  color: level === lvl.id ? lvl.color : "var(--tx1)",
+                  marginBottom: 3,
+                }}>
+                  {lvl.name}
+                </div>
+                <div style={{ fontSize: 10, color: "var(--tx2)", lineHeight: 1.4 }}>
+                  {lvl.desc}
+                </div>
+                {level === lvl.id && (
+                  <div style={{
+                    fontSize: 10, color: lvl.color, marginTop: 5, fontWeight: 700,
+                  }}>
+                    ✓ SELECTED
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Modules — clickable for detailed info */}
+        <div style={{ marginBottom: 28 }}>
+          <div className="lbl" style={{ marginBottom: 8 }}>📚 This Session Covers (click any for details)</div>
+          <div style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(auto-fill, minmax(150px, 1fr))",
+            gap: 8,
+          }}>
+            {MODULE_INFO.map((m) => (
+              <div
+                key={m.id}
+                onClick={() => setPopupModule(m)}
+                style={{
+                  padding: 10,
+                  background: "rgba(255,255,255,0.02)",
+                  border: `1px solid ${m.color}33`,
+                  borderLeft: `3px solid ${m.color}`,
+                  borderRadius: 6,
+                  fontSize: 11,
+                  cursor: "pointer",
+                  transition: "all .2s",
+                }}
+                onMouseEnter={(e) => { e.currentTarget.style.background = `${m.color}11`; }}
+                onMouseLeave={(e) => { e.currentTarget.style.background = "rgba(255,255,255,0.02)"; }}
+              >
+                <div style={{ marginBottom: 3 }}>
+                  <span style={{ fontSize: 16, marginRight: 6 }}>{m.icon}</span>
+                  <span style={{ fontWeight: 700, color: m.color }}>{m.name}</span>
+                </div>
+                <div style={{ fontSize: 10, color: "var(--tx2)", paddingLeft: 22 }}>{m.topic}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Start Button */}
+        <button
+          className="btn bp"
+          onClick={handleStartSession}
+          style={{
+            width: "100%",
+            padding: 16,
+            fontSize: 15,
+            fontWeight: 800,
+            letterSpacing: 0.5,
+          }}
+        >
+          🚀 Start Interview Session
+        </button>
+
+        {/* Disclaimer */}
+        <div style={{
+          marginTop: 12,
+          padding: "10px 12px",
+          background: "rgba(245,158,11,0.06)",
+          border: "1px solid rgba(245,158,11,0.2)",
+          borderRadius: 8,
+          fontSize: 11,
+          color: "var(--tx2)",
+          lineHeight: 1.5,
+        }}>
+          <strong style={{ color: "#f59e0b" }}>ℹ️ Note:</strong> The AI may present scenarios based
+          on real-world security incidents for assessment. Educational use only.
         </div>
       </div>
 
-      {/* ═══════════════════════════════════════════════════════ */}
-      {/* ATTACK REASONING LAB (existing Interview Simulation) */}
-      {/* ═══════════════════════════════════════════════════════ */}
-
-      {/* NOT SUBSCRIBED — show lock screen */}
-      {subscribedRoles.length === 0 && (
-        <div className="card" style={{ padding: 40, textAlign: "center" }}>
-          <div style={{ fontSize: 56, marginBottom: 16 }}>🔒</div>
-          <h3 style={{ fontSize: 20, fontWeight: 800, marginBottom: 10 }}>Attack Reasoning Lab is a Premium Feature</h3>
-          <p style={{ fontSize: 12, color: "var(--tx2)", marginBottom: 8, lineHeight: 1.8 }}>
-            Subscribe to a role to unlock the Attack Reasoning Lab.<br />
-            Practice with an AI interviewer, get scored, and receive detailed feedback.
-          </p>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(2,1fr)", gap: 8, margin: "20px 0", textAlign: "left" }}>
-            {[
-              ["🎯", "Role-specific questions"],
-              ["🔄", "Adaptive AI follow-ups"],
-              ["⏱️", "Real interview time pressure"],
-              ["📊", "Detailed score & debrief"]
-            ].map(([icon, text], i) => (
-              <div key={i} style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 12px", background: "var(--s2)", borderRadius: 8 }}>
-                <span style={{ fontSize: 18 }}>{icon}</span>
-                <span style={{ fontSize: 13, fontWeight: 600 }}>{text}</span>
-              </div>
-            ))}
-          </div>
-          <button className="btn bp" style={{ padding: "14px 40px", fontSize: 14, marginTop: 8 }}
-            onClick={() => { setDashTab("billing"); localStorage.setItem('cyberprep_tab', 'billing'); }}>
-            Subscribe to Unlock →
-          </button>
-        </div>
-      )}
-
-      {/* SUBSCRIBED — show full interview mode */}
-      {subscribedRoles.length > 0 && (<>
-        <div className="card" style={{ padding: 24, textAlign: "center", marginBottom: 16 }}>
-          <div style={{ fontSize: 48, marginBottom: 12 }}>💎</div>
-          <h3 style={{ fontSize: 20, fontWeight: 800, marginBottom: 8 }}>Attack Reasoning Lab</h3>
-          <p style={{ fontSize: 12, color: "var(--tx2)", marginBottom: 20, lineHeight: 1.7 }}>
-            AI acts as your interviewer with adaptive follow-ups, time pressure, and detailed debrief.
-          </p>
-
-          {/* Persona Selection */}
-          <div className="lbl" style={{ marginBottom: 10, textAlign: "left" }}>SELECT INTERVIEWER PERSONA</div>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 10, marginBottom: 24 }}>
-            {[["🙂", "Friendly", "Encouraging but thorough", "friendly"],
-            ["⚖️", "Standard", "Balanced and fair", "standard"],
-            ["😤", "Tough", "Challenges everything", "tough"]
-            ].map(([icon, label, desc, val]) => (
-              <div key={val} onClick={() => setInterviewPersona(val)}
-                className="card card-glow"
-                style={{
-                  padding: 16, cursor: "pointer", textAlign: "center",
-                  borderColor: interviewPersona === val ? "var(--ac)" : "var(--bd)",
-                  background: interviewPersona === val ? "rgba(0,229,255,.06)" : undefined,
-                  transition: "all .2s"
-                }}>
-                <div style={{ fontSize: 24, marginBottom: 6 }}>{icon}</div>
-                <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 3 }}>{label}</div>
-                <div style={{ fontSize: 12, color: "var(--tx2)" }}>{desc}</div>
-                {interviewPersona === val && <div style={{ fontSize: 11, color: "var(--ac)", marginTop: 6, fontWeight: 700 }}>✓ SELECTED</div>}
-              </div>
-            ))}
-          </div>
-
-          {/* Subscribed Roles — all difficulties unlocked */}
-          <div className="lbl" style={{ marginBottom: 10, textAlign: "left" }}>SELECT ROLE TO PRACTICE</div>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(2,1fr)", gap: 8, marginBottom: 20 }}>
-            {ROLES.filter(r => subscribedRoles.includes(r.id)).map(role => (
-              <div key={role.id} onClick={() => setActiveRole(role.id)}
-                className="card card-glow"
-                style={{
-                  padding: 14, cursor: "pointer", display: "flex", alignItems: "center", gap: 12,
-                  borderColor: activeRole === role.id ? "var(--ac)" : "var(--bd)",
-                  background: activeRole === role.id ? "rgba(0,229,255,.06)" : undefined
-                }}>
-                <span style={{ fontSize: 26 }}>{role.icon}</span>
-                <div style={{ textAlign: "left" }}>
-                  <div style={{ fontSize: 13, fontWeight: 700 }}>{role.name}</div>
-                  <div style={{ fontSize: 11, color: activeRole === role.id ? "var(--ac)" : (isPaid ? "var(--ok)" : "var(--wn)"), marginTop: 2, fontWeight: 600 }}>
-                    {activeRole === role.id ? "✓ SELECTED" : (isPaid ? "🔓 All levels unlocked" : "🔒 Beginner only · Subscribe to unlock all")}
+      {/* ════════════════════════════════════════════════════ */}
+      {/* MODULE FULL-UI POPUP — renders the actual module     */}
+      {/* ════════════════════════════════════════════════════ */}
+      {popupModule && (() => {
+        const ModuleComponent = popupModule.Component;
+        return (
+          <div
+            style={{
+              position: "fixed", inset: 0, zIndex: 9999,
+              background: "rgba(0,0,0,0.85)",
+              backdropFilter: "blur(4px)",
+              display: "flex", alignItems: "center", justifyContent: "center",
+              padding: 12,
+            }}
+            onClick={() => setPopupModule(null)}
+          >
+            <div
+              onClick={(e) => e.stopPropagation()}
+              style={{
+                background: "#0a0e1a",
+                border: `1px solid ${popupModule.color}`,
+                borderRadius: 12,
+                width: "96vw",
+                height: "94vh",
+                display: "flex",
+                flexDirection: "column",
+                overflow: "hidden",
+                boxShadow: `0 20px 60px rgba(0,0,0,0.9), 0 0 30px ${popupModule.color}33`,
+              }}
+            >
+              {/* Header */}
+              <div style={{
+                padding: "12px 18px",
+                borderBottom: `1px solid ${popupModule.color}33`,
+                background: `${popupModule.color}10`,
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                flexShrink: 0,
+              }}>
+                <div>
+                  <div className="lbl" style={{ marginBottom: 0 }}>
+                    <span style={{ color: popupModule.color, fontWeight: 800, letterSpacing: 1 }}>
+                      {popupModule.icon} {popupModule.name.toUpperCase()}
+                    </span>
+                    <span style={{ color: "var(--tx2)", marginLeft: 8, fontWeight: 400 }}>
+                      · {popupModule.topic}
+                    </span>
                   </div>
                 </div>
+                <button
+                  className="btn bs"
+                  onClick={() => setPopupModule(null)}
+                  style={{ fontSize: 14, padding: "4px 12px", flexShrink: 0 }}
+                >
+                  ✕ Close
+                </button>
               </div>
-            ))}
-          </div>
 
-          <button
-            className="btn bp"
-            disabled={!activeRole}
-            title={!activeRole ? "Please select a role first" : ""}
-            style={{
-              width: "100%",
-              padding: 14,
-              fontSize: 14,
-              cursor: !activeRole ? "not-allowed" : "pointer",
-              opacity: !activeRole ? 0.5 : 1
-            }}
-            onClick={() => {
-              if (!activeRole) { showToast('Please select a role first', 'warning'); return; }
-              setView("difficulty", { role: activeRole });
-            }}>
-            {!activeRole ? "Select a role to continue" : `Start ${interviewPersona.charAt(0).toUpperCase() + interviewPersona.slice(1)} Interview →`}
-          </button>
-        </div>
-
-        {/* What to expect */}
-        <div className="card" style={{ padding: 16 }}>
-          <div className="lbl" style={{ marginBottom: 10 }}>WHAT TO EXPECT</div>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(2,1fr)", gap: 8 }}>
-            {[["🎯", "Role-specific questions", "Tailored to your subscribed role"],
-            ["🔄", "Adaptive follow-ups", "AI digs deeper based on your answers"],
-            ["⏱️", "Time pressure", "Simulates real interview conditions"],
-            ["📊", "Detailed debrief", "Score, strengths, weaknesses, model answers"]
-            ].map(([icon, title, desc], i) => (
-              <div key={i} style={{ display: "flex", gap: 10, padding: "8px 0", borderBottom: i < 2 ? "1px solid var(--bd)" : "none" }}>
-                <span style={{ fontSize: 20 }}>{icon}</span>
-                <div>
-                  <div style={{ fontSize: 13, fontWeight: 700 }}>{title}</div>
-                  <div style={{ fontSize: 12, color: "var(--tx2)" }}>{desc}</div>
-                </div>
+              {/* Module body — renders the actual interactive module */}
+              <div style={{
+                flex: 1,
+                overflow: "auto",
+                padding: 0,
+              }}>
+                <ModuleComponent />
               </div>
-            ))}
+            </div>
           </div>
-        </div>
-      </>)}
+        );
+      })()}
     </div>
   );
 }

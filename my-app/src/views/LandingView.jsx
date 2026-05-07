@@ -28,12 +28,22 @@ export default function LandingView({
   setSubscribedRoles,
   setSelectedRoles,
   setTrialRoles,
+
   // ── HANDLERS ──
   runDemo,
 }) {
   return (
     <div className="app"><style>{CSS}</style><div className="scanbar" /><div className="gridbg" />
       <ToastContainer />
+
+      <button onClick={() => {
+        const cur = document.documentElement.getAttribute('data-theme') === 'dark' ? 'dark' : 'light';
+        const next = cur === 'dark' ? 'light' : 'dark';
+        document.documentElement.setAttribute('data-theme', next);
+        localStorage.setItem('cyberprep_theme', next);
+        location.reload();
+      }} className="theme-toggle" title="Toggle theme">{document.documentElement.getAttribute('data-theme') === 'dark' ? '☀️' : '🌙'}</button>
+
       <div className="orb" style={{ width: 600, height: 600, background: "radial-gradient(circle,rgba(0,229,255,.15),transparent)", top: -200, right: 0 }} />
       <div className="orb" style={{ width: 500, height: 500, background: "radial-gradient(circle,rgba(255,61,113,.1),transparent)", bottom: -100, left: 0 }} />
       <div className="page"><div className="cnt">

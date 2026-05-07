@@ -165,20 +165,7 @@ export default function ThreatBrief() {
             <span style={styles.constraintItem}>🎯 Scored on 6 dimensions</span>
           </div>
 
-          <textarea
-            style={styles.briefInput}
-            placeholder={`Write your crisis communication brief to the ${selectedAudience.label}...\n\nRemember:\n- They need to understand the situation\n- They need to know what's being done\n- They need to know what happens next\n- Keep it under 200 words`}
-            value={briefText}
-            onChange={handleTextChange}
-            rows={12}
-          />
-
-          <div style={styles.writeFooter}>
-            <span style={{ ...styles.wordCounter, color: wordCount > 200 ? "#ff4444" : "#888" }}>{wordCount}/200 words</span>
-            <button style={styles.submitBtn} onClick={() => setShowScoring(true)} disabled={wordCount < 10}>
-              SUBMIT FOR SCORING →
-            </button>
-          </div>
+          {/* Brief input REMOVED — display-only mode */}
         </div>
       )}
     </div>

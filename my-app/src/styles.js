@@ -95,7 +95,7 @@ body{background:var(--bg);color:var(--tx1);font-family:'Inter','Segoe UI',system
 .page{position:relative;z-index:1;min-height:100vh;padding:20px 0;width:100%}
 .cnt{width:100%;padding:0 24px;box-sizing:border-box;max-width:1400px;margin:0 auto}
 .hero{text-align:center;padding:80px 0 40px}
-.hero h1{font-size:clamp(40px,7vw,76px);font-weight:900;line-height:1.05;letter-spacing:-.03em;background:var(--grad-text);-webkit-background-clip:text;-webkit-text-fill-color:transparent;margin-bottom:18px}
+.hero h1{font-size:clamp(40px,7vw,76px);font-weight:900;line-height:1.05;letter-spacing:-.03em;color:var(--ac);margin-bottom:18px}
 .hero p{font-size:18px;color:var(--tx2);max-width:760px;margin:0 auto;line-height:1.7}
 
 .card{background:var(--s1);border:1px solid var(--bd);border-radius:16px;padding:24px;position:relative;transition:all .25s cubic-bezier(.4,0,.2,1);box-shadow:var(--shadow-sm)}

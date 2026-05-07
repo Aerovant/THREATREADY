@@ -143,32 +143,7 @@ export default function ThreatHunt() {
           </div>
         </div>
 
-        {/* Right - Hunt Questions */}
-        <div style={styles.rightPanel}>
-          <h3 style={styles.rightTitle}>INVESTIGATION REPORT</h3>
-          {HUNT_QUESTIONS.map((q, i) => (
-            <div key={q.id} style={styles.huntQuestion}>
-              <div style={styles.hqHeader} onClick={() => setActiveQuestion(activeQuestion === i ? null : i)}>
-                <span style={styles.hqNum}>Q{i + 1}</span>
-                <span style={styles.hqText}>{q.text.substring(0, 60)}...</span>
-                <span style={styles.hqArrow}>{activeQuestion === i ? "▼" : "▶"}</span>
-              </div>
-              {activeQuestion === i && (
-                <div style={styles.hqBody}>
-                  <p style={styles.hqFullText}>{q.text}</p>
-                  <textarea
-                    style={styles.hqInput}
-                    placeholder="Document your findings..."
-                    value={answers[q.id] || ""}
-                    onChange={(e) => setAnswers({ ...answers, [q.id]: e.target.value })}
-                    rows={6}
-                  />
-                </div>
-              )}
-            </div>
-          ))}
-          <button style={styles.submitBtn}>SUBMIT HUNT REPORT →</button>
-        </div>
+        {/* Right - Hunt Questions REMOVED — display-only mode */}
       </div>
     </div>
   );

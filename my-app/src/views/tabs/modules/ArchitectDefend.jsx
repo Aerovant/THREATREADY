@@ -166,48 +166,7 @@ export default function ArchitectDefend() {
           </div>
         </div>
 
-        {/* Right — Your Architecture */}
-        <div style={styles.archPanel}>
-          <h3 style={styles.panelTitle}>YOUR ARCHITECTURE ({selectedComponents.length} components)</h3>
-          
-          {selectedComponents.length === 0 ? (
-            <div style={styles.emptyArch}>
-              <span style={styles.emptyIcon}>🏗️</span>
-              <p style={styles.emptyText}>Select components from the palette to build your secure architecture</p>
-            </div>
-          ) : (
-            <div style={styles.selectedGrid}>
-              {CATEGORIES.filter(cat => selectedComponents.some(c => c.category === cat)).map(cat => (
-                <div key={cat} style={styles.catGroup}>
-                  <span style={styles.catGroupTitle}>{cat.toUpperCase()}</span>
-                  <div style={styles.catGroupItems}>
-                    {selectedComponents.filter(c => c.category === cat).map(comp => (
-                      <div key={comp.id} style={{ ...styles.selectedComp, borderColor: comp.color }}>
-                        <span>{comp.icon} {comp.label}</span>
-                        <button style={styles.removeBtn} onClick={() => toggleComponent(comp)}>×</button>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-
-          <div style={styles.notesSection}>
-            <h4 style={styles.notesTitle}>ARCHITECTURE JUSTIFICATION</h4>
-            <textarea
-              style={styles.notesInput}
-              placeholder="Explain your architecture decisions:&#10;&#10;- Why did you choose these components?&#10;- How do they work together for security?&#10;- How does this design meet HIPAA requirements?&#10;- What trade-offs did you make?"
-              value={architectureNotes}
-              onChange={(e) => setArchitectureNotes(e.target.value)}
-              rows={8}
-            />
-          </div>
-
-          <button style={styles.submitBtn} onClick={() => setShowEval(true)} disabled={selectedComponents.length < 3}>
-            SUBMIT FOR AI EVALUATION →
-          </button>
-        </div>
+        {/* Right — Your Architecture (REMOVED — display-only mode) */}
       </div>
     </div>
   );
@@ -225,17 +184,17 @@ const styles = {
   reqItem: { display: "flex", gap: "8px", alignItems: "flex-start", padding: "8px 12px", background: "rgba(0,0,0,0.2)", borderRadius: "8px" },
   reqCat: { fontSize: "8px", fontWeight: "700", color: "#06b6d4", background: "rgba(6,182,212,0.1)", padding: "2px 6px", borderRadius: "3px", letterSpacing: "1px", flexShrink: 0, fontFamily: "'JetBrains Mono', monospace" },
   reqText: { fontSize: "11px", color: "#aaa", lineHeight: "1.4" },
-  mainGrid: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0", minHeight: "calc(100vh - 280px)" },
-  palettePanel: { padding: "20px 24px", borderRight: "1px solid rgba(255,255,255,0.04)" },
+  mainGrid: { display: "block", padding: "0", minHeight: "auto" },
+  palettePanel: { padding: "20px 24px", borderRight: "none" },
   archPanel: { padding: "20px 24px", overflowY: "auto" },
-  panelTitle: { fontSize: "10px", fontWeight: "700", color: "#555", letterSpacing: "2.5px", marginBottom: "14px", margin: "0 0 14px 0", fontFamily: "'JetBrains Mono', monospace" },
-  catFilters: { display: "flex", gap: "4px", flexWrap: "wrap", marginBottom: "14px" },
-  catBtn: { padding: "4px 10px", border: "1px solid rgba(255,255,255,0.06)", borderRadius: "6px", color: "#999", fontSize: "10px", cursor: "pointer", fontFamily: "'JetBrains Mono', monospace" },
-  compGrid: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px" },
-  compCard: { display: "flex", flexDirection: "column", alignItems: "center", gap: "4px", padding: "14px 10px", border: "1px solid rgba(255,255,255,0.06)", borderRadius: "10px", cursor: "pointer", textAlign: "center", transition: "all 0.2s", position: "relative", background: "transparent" },
-  compIcon: { fontSize: "22px" },
-  compLabel: { fontSize: "11px", color: "#ddd", fontWeight: "500" },
-  compCat: { fontSize: "9px", letterSpacing: "0.5px" },
+  panelTitle: { fontSize: "12px", fontWeight: "700", color: "#888", letterSpacing: "2.5px", marginBottom: "16px", margin: "0 0 16px 0", fontFamily: "'JetBrains Mono', monospace" },
+  catFilters: { display: "flex", gap: "6px", flexWrap: "wrap", marginBottom: "18px" },
+  catBtn: { padding: "6px 14px", border: "1px solid rgba(255,255,255,0.08)", borderRadius: "6px", color: "#bbb", fontSize: "12px", cursor: "pointer", fontFamily: "'JetBrains Mono', monospace" },
+  compGrid: { display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(180px, 1fr))", gap: "10px" },
+  compCard: { display: "flex", flexDirection: "column", alignItems: "center", gap: "6px", padding: "16px 12px", border: "1px solid rgba(255,255,255,0.06)", borderRadius: "10px", cursor: "pointer", textAlign: "center", transition: "all 0.2s", position: "relative", background: "transparent" },
+  compIcon: { fontSize: "26px" },
+  compLabel: { fontSize: "13px", color: "#eee", fontWeight: "500" },
+  compCat: { fontSize: "10px", letterSpacing: "0.5px" },
   checkMark: { position: "absolute", top: "6px", right: "8px", fontSize: "12px", color: "#22c55e", fontWeight: "700" },
   emptyArch: { display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "60px 20px", background: "rgba(255,255,255,0.01)", borderRadius: "12px", border: "2px dashed rgba(255,255,255,0.06)" },
   emptyIcon: { fontSize: "48px", marginBottom: "12px" },
