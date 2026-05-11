@@ -1100,43 +1100,58 @@ app.get('/api/sessions/:scenarioId', auth, async (req, res) => {
 // ═══════════════════════════════════════════════════════════════
 // DEMO EVALUATION (no auth required)
 // ═══════════════════════════════════════════════════════════════
+
 app.post('/api/demo/evaluate', async (req, res) => {
   console.log('--- DEMO EVALUATION ---');
   try {
     const { question, answer } = req.body;
     if (!answer?.trim()) return res.status(400).json({ error: 'Answer required' });
+    if (answer.length > 5000) return res.status(400).json({ error: 'Answer too long' });
 
     const Anthropic = require('@anthropic-ai/sdk');
     const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
     const msg = await anthropic.messages.create({
       model: MODEL_EVALUATION,
-      max_tokens: 500,
+      max_tokens: 700,
       messages: [{
         role: 'user',
-        content: `You are evaluating a cybersecurity professional's answer. Score 4 dimensions, each 1-10. Be strict and honest.
+        content: `You are evaluating a cybersecurity professional's answer to an incident-response scenario. Score 5 specific dimensions on a 0-10 integer scale. Be strict and honest.
 
-        Question: ${question}
-        Answer: ${answer}
+Question: ${question}
+Answer: ${answer}
 
-        Score these dimensions:
-        - tech: Technical depth, accuracy, correct terminology (1-10)
-        - comm: Communication clarity, structure, completeness (1-10)
-        - dec: Decision-making, prioritization, justification (1-10)
-        - score: Overall weighted = tech*0.4 + comm*0.3 + dec*0.3 (1-10)
+SCORING RULES — apply consistently to every dimension:
+- Use 0 if the answer is gibberish, off-topic, blank, or contains zero relevant content for that dimension. Do NOT inflate to 1 as a sympathy floor.
+- Use 1-3 for an attempt with major misunderstandings or only superficial relevance.
+- Use 4-6 for a basic-to-competent answer that touches the dimension but misses depth.
+- Use 7-8 for a strong answer demonstrating clear understanding.
+- Use 9-10 only for exceptional answers showing senior-level depth, precision, and judgment.
 
-        Respond ONLY valid JSON: {"score":7.5,"tech":8,"comm":7,"dec":7.5,"feedback":"1 sentence of specific feedback","level":"Beginner|Intermediate|Advanced|Expert"}`
+Score these 5 dimensions (each 0-10 integer):
+- ti: Threat Identification — did they correctly identify attack vectors, techniques, MITRE ATT&CK references?
+- cr: Containment & Response — did they prioritize containment, evidence preservation, correct sequence of actions?
+- ab: Architecture & Blast Radius — did they reason about dependencies, lateral movement, scope of impact?
+- cq: Communication Quality — clarity, structure, audience awareness, technical precision?
+- fa: Framework Application — references to NIST, MITRE, OWASP, ISO27001, runbooks, principles like least-privilege?
 
+Then compute:
+- score: Overall weighted = ti*0.20 + cr*0.30 + ab*0.20 + cq*0.15 + fa*0.15 (0-10, one decimal)
+- level: One of "Off-topic / Incoherent" (score < 1), "Beginner" (1 to <5), "Intermediate" (5 to <6.5), "Advanced" (6.5 to <8), "Expert" (>= 8)
+- feedback: 1-2 sentences of specific, actionable feedback on what was strong and what was missing. For gibberish/off-topic, just say so directly.
+- model: A 2-3 sentence model answer that demonstrates a strong response to the question
+
+Respond ONLY valid JSON with keys: ti, cr, ab, cq, fa, score, level, feedback, model. No markdown, no code fences, just JSON.`
       }]
-
     });
 
-    const result = JSON.parse(msg.content[0]?.text?.replace(/```json|```/g, '').trim() || '{}');
-    console.log('Demo score:', result.score);
+    const raw = msg.content[0]?.text?.replace(/```json|```/g, '').trim() || '{}';
+    const result = JSON.parse(raw);
+    console.log('Demo score:', result.score, '| level:', result.level);
     res.json(result);
   } catch (e) {
     console.error('Demo eval error:', e.message);
-    res.json({ score: 5, feedback: e.message, level: 'Intermediate' });
+    res.status(500).json({ error: 'Evaluation failed. Please try again.' });
   }
 });
 
