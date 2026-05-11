@@ -13,8 +13,7 @@ import VulnVerdict from "./modules/VulnVerdict.jsx";
 const API_BASE = "https://threatready-db.onrender.com";
 
 // Timing presets
-const MINUTE_PRESETS = [15, 30, 45];
-const HOUR_PRESETS = [1, 2, 3];
+const MINUTE_PRESETS = [10, 15, 20, 30, 45, 60, 90, 120];
 
 // Difficulty levels
 const LEVELS = [
@@ -105,8 +104,9 @@ export default function InterviewTab({
   // Session prep state
   const [resumeFile, setResumeFile] = useState(null);
   const [jdFile, setJdFile] = useState(null);
-  const [durationUnit, setDurationUnit] = useState("minutes");
   const [durationValue, setDurationValue] = useState(30); // default 30 min
+  const [isCustomDuration, setIsCustomDuration] = useState(false);
+  const [customDuration, setCustomDuration] = useState("");
   const [level, setLevel] = useState("intermediate");
   const [analyzing, setAnalyzing] = useState(false);
   const [analysisResult, setAnalysisResult] = useState(null);
@@ -115,10 +115,25 @@ export default function InterviewTab({
   const [popupModule, setPopupModule] = useState(null);
   const [sessionActive, setSessionActive] = useState(false);
 
-  // When unit changes, reset to first preset
-  const handleUnitChange = (newUnit) => {
-    setDurationUnit(newUnit);
-    setDurationValue(newUnit === "minutes" ? MINUTE_PRESETS[1] : HOUR_PRESETS[0]);
+  // Handler for dropdown change — switches to custom input when "custom" selected
+  const handleDurationChange = (e) => {
+    const v = e.target.value;
+    if (v === "custom") {
+      setIsCustomDuration(true);
+      setCustomDuration(String(durationValue));
+    } else {
+      setIsCustomDuration(false);
+      setDurationValue(parseInt(v, 10));
+    }
+  };
+
+  // Resolve the actual minutes value used everywhere
+  const effectiveMinutes = () => {
+    if (isCustomDuration) {
+      const n = parseInt(customDuration, 10);
+      return isNaN(n) ? 30 : n;
+    }
+    return durationValue;
   };
 
   const handleFileUpload = (e, setter, label) => {
@@ -178,9 +193,9 @@ export default function InterviewTab({
   };
 
   const handleStartSession = () => {
-    const minutes = durationUnit === "hours" ? durationValue * 60 : durationValue;
+    const minutes = effectiveMinutes();
     if (!minutes || minutes < 5) {
-      showToast("Please select a valid duration", "error");
+      showToast("Please select a valid duration (minimum 5 minutes)", "error");
       return;
     }
     // Unlock the browser's speech engine RIGHT NOW, inside the user-gesture
@@ -205,7 +220,7 @@ export default function InterviewTab({
 
   // ── If session is active, show the chat UI ──
   if (sessionActive) {
-    const totalMinutes = durationUnit === "hours" ? durationValue * 60 : durationValue;
+    const totalMinutes = effectiveMinutes();
     return (
       <InterviewSession
         jdFile={jdFile}
@@ -228,12 +243,12 @@ export default function InterviewTab({
 
   return (
     <div className="fadeUp">
-      <div className="card" style={{ padding: 28, marginBottom: 16 }}>
+      <div className="card" style={{ padding: 36, marginBottom: 16 }}>
         <div className="lbl" style={{ marginBottom: 4 }}>INTERVIEW PREP SESSION</div>
         <h3 style={{ fontSize: 18, fontWeight: 800, marginBottom: 6 }}>
           Personalized AI Interview Practice
         </h3>
-        <p style={{ fontSize: 12, color: "var(--tx2)", marginBottom: 18, lineHeight: 1.6 }}>
+        <p style={{ fontSize: 12, color: "var(--tx2)", marginBottom: 24, lineHeight: 1.6 }}>
           Upload your JD or resume for tailored questions — or skip and start with default content.
         </p>
 
@@ -243,7 +258,7 @@ export default function InterviewTab({
           gridTemplateColumns: "1fr auto 1fr",
           gap: 12,
           alignItems: "stretch",
-          marginBottom: 28,
+          marginBottom: 32,
         }}>
           {/* JD Upload */}
           <div className="card card-glow" style={{ padding: 14, borderTop: "3px solid #06b6d4" }}>
@@ -352,7 +367,7 @@ export default function InterviewTab({
         {/* Analysis result */}
         {analysisResult && (
           <div style={{
-            padding: 12, marginBottom: 28,
+            padding: 12, marginBottom: 32,
             background: "rgba(0,229,255,0.04)",
             border: "1px solid rgba(0,229,255,0.2)",
             borderRadius: 8,
@@ -365,58 +380,64 @@ export default function InterviewTab({
           </div>
         )}
 
-        {/* ─── Duration: unit toggle + preset dropdown ─── */}
-        <div style={{ marginBottom: 28 }}>
-          <div className="lbl" style={{ marginBottom: 8 }}>⏱️ Session Duration</div>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 8 }}>
-            <button
-              onClick={() => handleUnitChange("minutes")}
-              className="btn"
-              style={{
-                padding: "10px 8px", fontSize: 12, fontWeight: 700,
-                background: durationUnit === "minutes" ? "rgba(0,229,255,0.1)" : "var(--s2)",
-                border: durationUnit === "minutes" ? "1px solid var(--ac)" : "1px solid var(--bd)",
-                color: durationUnit === "minutes" ? "var(--ac)" : "var(--tx1)",
-                cursor: "pointer", transition: "all .2s"
-              }}
-            >
-              Minutes
-            </button>
-            <button
-              onClick={() => handleUnitChange("hours")}
-              className="btn"
-              style={{
-                padding: "10px 8px", fontSize: 12, fontWeight: 700,
-                background: durationUnit === "hours" ? "rgba(0,229,255,0.1)" : "var(--s2)",
-                border: durationUnit === "hours" ? "1px solid var(--ac)" : "1px solid var(--bd)",
-                color: durationUnit === "hours" ? "var(--ac)" : "var(--tx1)",
-                cursor: "pointer", transition: "all .2s"
-              }}
-            >
-              Hours
-            </button>
-          </div>
+        {/* ─── Session Duration (minutes only, preset or custom) ─── */}
+        <div
+          className="card"
+          style={{
+            padding: 22,
+            marginBottom: 32,
+            background: "var(--s2)",
+            borderTop: "3px solid #a855f7",
+          }}
+        >
+          <div className="lbl" style={{ marginBottom: 12 }}>⏱️ Session Duration</div>
 
-          {/* Preset value dropdown */}
+          {/* Preset dropdown — last option opens custom number input */}
           <select
-            value={durationValue}
-            onChange={(e) => setDurationValue(parseInt(e.target.value, 10))}
+            value={isCustomDuration ? "custom" : String(durationValue)}
+            onChange={handleDurationChange}
             className="input"
-            style={{ width: "100%", fontSize: 14, padding: "10px 12px" }}
+            style={{ width: "100%", fontSize: 14, padding: "12px 14px" }}
           >
-            {(durationUnit === "minutes" ? MINUTE_PRESETS : HOUR_PRESETS).map((v) => (
+            {MINUTE_PRESETS.map((v) => (
               <option key={v} value={v}>
-                {v} {durationUnit === "minutes" ? "minutes" : (v === 1 ? "hour" : "hours")}
+                {v} minutes
               </option>
             ))}
+            <option value="custom">Custom…</option>
           </select>
-          <div style={{ fontSize: 11, color: "var(--tx2)", marginTop: 6 }}>
-            Total: {durationUnit === "hours" ? durationValue * 60 : durationValue} minutes
+
+          {/* Custom number input — appears only when "Custom…" is selected */}
+          {isCustomDuration && (
+            <div style={{ marginTop: 14, display: "flex", alignItems: "center", gap: 12 }}>
+              <input
+                type="number"
+                min={5}
+                max={240}
+                step={5}
+                value={customDuration}
+                onChange={(e) => setCustomDuration(e.target.value)}
+                placeholder="Enter minutes (5–240)"
+                className="input"
+                style={{ flex: 1, fontSize: 14, padding: "12px 14px" }}
+                autoFocus
+              />
+              <span style={{ fontSize: 12, color: "var(--tx2)", whiteSpace: "nowrap" }}>minutes</span>
+            </div>
+          )}
+
+          <div style={{ fontSize: 11, color: "var(--tx2)", marginTop: 12 }}>
+            Total: <strong style={{ color: "var(--tx1)" }}>{effectiveMinutes()} minutes</strong>
+            {isCustomDuration && effectiveMinutes() < 5 && (
+              <span style={{ color: "#f59e0b", marginLeft: 8 }}>
+                · minimum 5 minutes required
+              </span>
+            )}
           </div>
         </div>
 
         {/* ─── Difficulty Level Selector ─── */}
-        <div style={{ marginBottom: 28 }}>
+        <div style={{ marginBottom: 32 }}>
           <div className="lbl" style={{ marginBottom: 8 }}>🎯 Difficulty Level</div>
           <div style={{
             display: "grid",
@@ -462,7 +483,7 @@ export default function InterviewTab({
         </div>
 
         {/* Modules — clickable for detailed info */}
-        <div style={{ marginBottom: 28 }}>
+        <div style={{ marginBottom: 32 }}>
           <div className="lbl" style={{ marginBottom: 8 }}>📚 This Session Covers (click any for details)</div>
           <div style={{
             display: "grid",
