@@ -183,6 +183,23 @@ export default function InterviewTab({
       showToast("Please select a valid duration", "error");
       return;
     }
+    // Unlock the browser's speech engine RIGHT NOW, inside the user-gesture
+    // (click) context. Chrome silently refuses speechSynthesis.speak() if
+    // the user gesture is stale. We speak a LONG silent utterance at slow
+    // rate so the engine keeps running through the 5–15s backend wait —
+    // when the real welcome arrives, speakText() calls cancel() to stop the
+    // primer and play the welcome. Without this continuous "keep-alive",
+    // Chrome considers the engine idle by the time we want to speak.
+    if ("speechSynthesis" in window) {
+      try {
+        const primer = new SpeechSynthesisUtterance(
+          "preparing your interview session please wait one moment"
+        );
+        primer.volume = 0;
+        primer.rate = 0.5;
+        window.speechSynthesis.speak(primer);
+      } catch (_) { /* ignore */ }
+    }
     setSessionActive(true);
   };
 
@@ -195,7 +212,16 @@ export default function InterviewTab({
         resumeFile={resumeFile}
         durationMinutes={totalMinutes}
         level={level}
-        onEnd={() => setSessionActive(false)}
+        onEnd={(action) => {
+          setSessionActive(false);
+          // Allow App-level navigation when user clicks "Go to Home" in the report.
+          // App.jsx can listen for this event and switch to the Home tab.
+          if (action === "home") {
+            try {
+              window.dispatchEvent(new CustomEvent("threatready:navigate", { detail: { to: "home" } }));
+            } catch (_) { /* ignore */ }
+          }
+        }}
       />
     );
   }
