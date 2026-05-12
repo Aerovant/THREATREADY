@@ -4196,6 +4196,149 @@ app.get('/api/linkedin/status', auth, async (req, res) => {
 });
 
 // ════════════════════════════════════════════════════════════════════════════
+// ════════════════════════════════════════════════════════════════════════════
+// /api/interview/chat — Generates AI panel responses during interview
+// ════════════════════════════════════════════════════════════════════════════
+// Called by the 6-person interview panel UI in InterviewSession.jsx.
+// First call: { messages, jdText, resumeText, durationMinutes, level }
+// Subsequent: { messages, timeRemaining, level }
+// Returns:    { reply: "AI response text" }
+//
+// Uses MODEL_QUESTIONS (Haiku) for fast, cheap question generation.
+
+app.post('/api/interview/chat', auth, async (req, res) => {
+  try {
+    const {
+      messages = [],
+      jdText = '',
+      resumeText = '',
+      durationMinutes = 30,
+      timeRemaining = null,
+      level = 'intermediate',
+    } = req.body;
+
+    if (!Array.isArray(messages) || messages.length === 0) {
+      return res.status(400).json({ error: 'messages array is required' });
+    }
+
+    // Build system prompt for the AI interview panel
+    const levelGuidance = {
+      beginner: 'Ask foundational questions. Define jargon when used. Focus on understanding of concepts rather than deep technical detail.',
+      intermediate: 'Ask practical, scenario-based questions. Expect candidates to know common frameworks (MITRE ATT&CK, NIST, zero-trust) and explain trade-offs.',
+      advanced: 'Ask deep technical questions with nuance. Probe edge cases. Expect detailed implementation reasoning, threat modeling, and architectural trade-offs.',
+    };
+
+    const guidance = levelGuidance[level] || levelGuidance.intermediate;
+
+    // Trim long context to keep token usage reasonable
+    const jdSnippet = (jdText || '').slice(0, 2500);
+    const resumeSnippet = (resumeText || '').slice(0, 2500);
+
+    let systemPrompt = `You are a 6-person AI interview panel conducting a cybersecurity interview. The panelists are:
+- Maya Chen (Security Architect — Architecture & Defense)
+- Marcus Rodriguez (IR Lead — Incident Response)
+- Sarah Okonkwo (CISO — Strategy & Communication)
+- Aiden Wright (Threat Hunter — Threat Hunting & Detection)
+- Priya Subramanian (AppSec Engineer — Vulnerability & Code Security)
+- Raj Patel (Red Team Lead — Adversarial Reasoning)
+
+DIFFICULTY LEVEL: ${level}. ${guidance}
+
+INTERVIEW DURATION: ${durationMinutes} minutes total.${timeRemaining !== null ? ` Time remaining: ${Math.round(timeRemaining / 60)} minutes.` : ''}
+
+INTERVIEW FLOW RULES:
+- Cover all 6 cybersecurity domains across the session (one per panelist).
+- Each question should be tagged with a domain in this format at the start: **[ARCHITECT & DEFEND]**, **[INCIDENT RESPONSE]**, **[STRATEGY & COMMS]**, **[THREAT HUNTING]**, **[VULN & APPSEC]**, or **[RED TEAM]**.
+- Mix question types: scenario-based ("Your org has X, how would you..."), conceptual ("Explain..."), trade-off ("X vs Y, which and why?"), and behavioral ("Walk me through a time when...").
+- Ask ONE question at a time. Wait for the candidate's answer before the next.
+- Keep each question focused and concise (2-4 sentences max).
+
+FORMATTING AFTER CANDIDATE'S ANSWER:
+After each candidate answer, respond in TWO PARTS separated by a line containing only "===":
+- Part 1 (above ===): brief acknowledgment (under 12 words). e.g. "Good reasoning." or "Solid framework choice." Acknowledge the answer's strengths or main idea briefly.
+- Part 2 (below ===): the NEXT question, tagged with its domain. e.g. "**[INCIDENT RESPONSE]** Your SIEM just alerted on..."
+
+EXAMPLE response after candidate's answer:
+\`\`\`
+Solid reasoning on the zero-trust principles.
+===
+**[INCIDENT RESPONSE]** Your team detects unusual outbound traffic from a finance workstation at 2am. Walk me through your first 30 minutes.
+\`\`\`
+
+FIRST MESSAGE ONLY:
+For the very first message (welcome + first question), do NOT use the === separator. Output a SHORT one-line welcome (under 12 words) immediately followed by the first tagged question.
+
+EXAMPLE first message:
+\`\`\`
+Welcome to the panel — let's dive in.
+
+**[ARCHITECT & DEFEND]** Your company is moving its on-prem ERP system to AWS. The CISO wants zero-trust enforced. What are your top 3 priorities and why?
+\`\`\`
+
+CRITICAL RULES:
+- Never give the candidate the answer.
+- Never write more than one question per response.
+- Never give long lectures or paragraphs of feedback — only short acknowledgments.
+- Stay in character as a professional interview panel.`;
+
+    if (jdSnippet) {
+      systemPrompt += `\n\nJOB DESCRIPTION (use to tailor questions):\n${jdSnippet}`;
+    }
+    if (resumeSnippet) {
+      systemPrompt += `\n\nCANDIDATE RESUME (use to probe claimed experience):\n${resumeSnippet}`;
+    }
+
+    // Map messages to Claude's expected format
+    // Frontend sends { role: 'user'|'assistant', content: '...' }
+    const claudeMessages = messages
+      .filter((m) => m && m.role && m.content)
+      .map((m) => ({
+        role: m.role === 'assistant' ? 'assistant' : 'user',
+        content: String(m.content),
+      }));
+
+    if (claudeMessages.length === 0) {
+      return res.status(400).json({ error: 'No valid messages found' });
+    }
+
+    const Anthropic = require('@anthropic-ai/sdk');
+    const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+
+    let claudeResponse;
+    try {
+      claudeResponse = await anthropic.messages.create({
+        model: MODEL_QUESTIONS, // Haiku — fast & cheap for question generation
+        max_tokens: 1024,
+        system: systemPrompt,
+        messages: claudeMessages,
+      });
+    } catch (claudeErr) {
+      console.error('Claude error in /api/interview/chat:', claudeErr.message);
+      return res.status(500).json({ error: 'AI service error: ' + claudeErr.message });
+    }
+
+    // Extract text from Claude's response
+    const reply = (claudeResponse.content || [])
+      .filter((c) => c.type === 'text')
+      .map((c) => c.text)
+      .join('\n')
+      .trim();
+
+    if (!reply) {
+      return res.status(500).json({ error: 'AI returned an empty response' });
+    }
+
+    res.json({ reply });
+  } catch (e) {
+    console.error('/api/interview/chat error:', e.message);
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// ════════════════════════════════════════════════════════════════════════════
+// END of /api/interview/chat
+// ════════════════════════════════════════════════════════════════════════════
+
 // ADD TO server.js — paste this BEFORE the line: app.listen(PORT, async () => {
 // (typically near the bottom, around line 4198)
 // ════════════════════════════════════════════════════════════════════════════
