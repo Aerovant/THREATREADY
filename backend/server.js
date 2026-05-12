@@ -1100,43 +1100,58 @@ app.get('/api/sessions/:scenarioId', auth, async (req, res) => {
 // ═══════════════════════════════════════════════════════════════
 // DEMO EVALUATION (no auth required)
 // ═══════════════════════════════════════════════════════════════
+
 app.post('/api/demo/evaluate', async (req, res) => {
   console.log('--- DEMO EVALUATION ---');
   try {
     const { question, answer } = req.body;
     if (!answer?.trim()) return res.status(400).json({ error: 'Answer required' });
+    if (answer.length > 5000) return res.status(400).json({ error: 'Answer too long' });
 
     const Anthropic = require('@anthropic-ai/sdk');
     const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
     const msg = await anthropic.messages.create({
       model: MODEL_EVALUATION,
-      max_tokens: 500,
+      max_tokens: 700,
       messages: [{
         role: 'user',
-        content: `You are evaluating a cybersecurity professional's answer. Score 4 dimensions, each 1-10. Be strict and honest.
+        content: `You are evaluating a cybersecurity professional's answer to an incident-response scenario. Score 5 specific dimensions on a 0-10 integer scale. Be strict and honest.
 
-        Question: ${question}
-        Answer: ${answer}
+Question: ${question}
+Answer: ${answer}
 
-        Score these dimensions:
-        - tech: Technical depth, accuracy, correct terminology (1-10)
-        - comm: Communication clarity, structure, completeness (1-10)
-        - dec: Decision-making, prioritization, justification (1-10)
-        - score: Overall weighted = tech*0.4 + comm*0.3 + dec*0.3 (1-10)
+SCORING RULES — apply consistently to every dimension:
+- Use 0 if the answer is gibberish, off-topic, blank, or contains zero relevant content for that dimension. Do NOT inflate to 1 as a sympathy floor.
+- Use 1-3 for an attempt with major misunderstandings or only superficial relevance.
+- Use 4-6 for a basic-to-competent answer that touches the dimension but misses depth.
+- Use 7-8 for a strong answer demonstrating clear understanding.
+- Use 9-10 only for exceptional answers showing senior-level depth, precision, and judgment.
 
-        Respond ONLY valid JSON: {"score":7.5,"tech":8,"comm":7,"dec":7.5,"feedback":"1 sentence of specific feedback","level":"Beginner|Intermediate|Advanced|Expert"}`
+Score these 5 dimensions (each 0-10 integer):
+- ti: Threat Identification — did they correctly identify attack vectors, techniques, MITRE ATT&CK references?
+- cr: Containment & Response — did they prioritize containment, evidence preservation, correct sequence of actions?
+- ab: Architecture & Blast Radius — did they reason about dependencies, lateral movement, scope of impact?
+- cq: Communication Quality — clarity, structure, audience awareness, technical precision?
+- fa: Framework Application — references to NIST, MITRE, OWASP, ISO27001, runbooks, principles like least-privilege?
 
+Then compute:
+- score: Overall weighted = ti*0.20 + cr*0.30 + ab*0.20 + cq*0.15 + fa*0.15 (0-10, one decimal)
+- level: One of "Off-topic / Incoherent" (score < 1), "Beginner" (1 to <5), "Intermediate" (5 to <6.5), "Advanced" (6.5 to <8), "Expert" (>= 8)
+- feedback: 1-2 sentences of specific, actionable feedback on what was strong and what was missing. For gibberish/off-topic, just say so directly.
+- model: A 2-3 sentence model answer that demonstrates a strong response to the question
+
+Respond ONLY valid JSON with keys: ti, cr, ab, cq, fa, score, level, feedback, model. No markdown, no code fences, just JSON.`
       }]
-
     });
 
-    const result = JSON.parse(msg.content[0]?.text?.replace(/```json|```/g, '').trim() || '{}');
-    console.log('Demo score:', result.score);
+    const raw = msg.content[0]?.text?.replace(/```json|```/g, '').trim() || '{}';
+    const result = JSON.parse(raw);
+    console.log('Demo score:', result.score, '| level:', result.level);
     res.json(result);
   } catch (e) {
     console.error('Demo eval error:', e.message);
-    res.json({ score: 5, feedback: e.message, level: 'Intermediate' });
+    res.status(500).json({ error: 'Evaluation failed. Please try again.' });
   }
 });
 
@@ -4195,349 +4210,106 @@ app.get('/api/linkedin/status', auth, async (req, res) => {
   }
 });
 
-// ════════════════════════════════════════════════════════════════════════════
-// ════════════════════════════════════════════════════════════════════════════
-// /api/interview/chat — Generates AI panel responses during interview
-// ════════════════════════════════════════════════════════════════════════════
-// Called by the 6-person interview panel UI in InterviewSession.jsx.
-// First call: { messages, jdText, resumeText, durationMinutes, level }
-// Subsequent: { messages, timeRemaining, level }
-// Returns:    { reply: "AI response text" }
-//
-// Uses MODEL_QUESTIONS (Haiku) for fast, cheap question generation.
+
+
+// ═══════════════════════════════════════════════════════════════
+// INTERVIEW CHAT — AI-powered interview session via Anthropic
+// ═══════════════════════════════════════════════════════════════
+
+app.post('/api/interview/analyze', auth, async (req, res) => {
+  try {
+    const { jdText = '', resumeText = '' } = req.body;
+    if (!jdText.trim() && !resumeText.trim()) {
+      return res.status(400).json({ error: 'Provide JD or resume text' });
+    }
+    const apiKey = process.env.ANTHROPIC_API_KEY;
+    if (!apiKey) return res.status(500).json({ error: 'Anthropic API key not configured' });
+
+    const prompt = `Analyze the following uploaded materials and identify key skills, technologies, and focus areas for an interview prep session. Be concise (under 150 words).
+
+${jdText ? '=== JOB DESCRIPTION ===\n' + jdText.substring(0, 5000) + '\n\n' : ''}${resumeText ? '=== RESUME ===\n' + resumeText.substring(0, 5000) : ''}`;
+
+    const response = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': apiKey,
+        'anthropic-version': '2023-06-01',
+      },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-20250514',
+        max_tokens: 500,
+        messages: [{ role: 'user', content: prompt }],
+      }),
+    });
+    const data = await response.json();
+    if (data.error) return res.status(500).json({ error: data.error.message });
+    res.json({ analysis: data.content?.[0]?.text || 'No analysis generated' });
+  } catch (e) {
+    console.error('Analyze error:', e.message);
+    res.status(500).json({ error: e.message });
+  }
+});
 
 app.post('/api/interview/chat', auth, async (req, res) => {
   try {
-    const {
-      messages = [],
-      jdText = '',
-      resumeText = '',
-      durationMinutes = 30,
-      timeRemaining = null,
-      level = 'intermediate',
-    } = req.body;
-
+    const { messages = [], jdText = '', resumeText = '', durationMinutes = 30, level = 'intermediate', timeRemaining } = req.body;
     if (!Array.isArray(messages) || messages.length === 0) {
-      return res.status(400).json({ error: 'messages array is required' });
+      return res.status(400).json({ error: 'messages array required' });
     }
+    const apiKey = process.env.ANTHROPIC_API_KEY;
+    if (!apiKey) return res.status(500).json({ error: 'Anthropic API key not configured' });
 
-    // Build system prompt for the AI interview panel
     const levelGuidance = {
-      beginner: 'Ask foundational questions. Define jargon when used. Focus on understanding of concepts rather than deep technical detail.',
-      intermediate: 'Ask practical, scenario-based questions. Expect candidates to know common frameworks (MITRE ATT&CK, NIST, zero-trust) and explain trade-offs.',
-      advanced: 'Ask deep technical questions with nuance. Probe edge cases. Expect detailed implementation reasoning, threat modeling, and architectural trade-offs.',
+      beginner: 'Ask BEGINNER questions: foundational concepts, definitions, basic scenarios. Use accessible language.',
+      intermediate: 'Ask INTERMEDIATE questions: multi-step problems, real-world tradeoffs, applied scenarios.',
+      expert: 'Ask EXPERT questions: advanced architecture, edge cases, deep technical depth, adversarial scenarios.',
+      collaborate: 'Mix BEGINNER, INTERMEDIATE, and EXPERT questions. Vary difficulty across the session.',
     };
 
-    const guidance = levelGuidance[level] || levelGuidance.intermediate;
+    const systemPrompt = `You are a senior cybersecurity interviewer conducting a live interview. Cover topics across these 5 areas as the session progresses, mixing them naturally:
+1. Architect & Defend (zero-trust, segmentation, secure design, HIPAA/PCI/SOC2)
+2. Incident Simulator (detection, containment, lateral movement, IAM compromise)
+3. Threat Brief (board, exec, customer, regulator briefings)
+4. Threat Hunt (log analysis, IoC identification, attack timeline)
+5. Vuln Verdict (CVSS, exploit availability, business impact, prioritization)
 
-    // Trim long context to keep token usage reasonable
-    const jdSnippet = (jdText || '').slice(0, 2500);
-    const resumeSnippet = (resumeText || '').slice(0, 2500);
+DIFFICULTY: ${levelGuidance[level] || levelGuidance.intermediate}
 
-    let systemPrompt = `You are a 6-person AI interview panel conducting a cybersecurity interview. The panelists are:
-- Maya Chen (Security Architect — Architecture & Defense)
-- Marcus Rodriguez (IR Lead — Incident Response)
-- Sarah Okonkwo (CISO — Strategy & Communication)
-- Aiden Wright (Threat Hunter — Threat Hunting & Detection)
-- Priya Subramanian (AppSec Engineer — Vulnerability & Code Security)
-- Raj Patel (Red Team Lead — Adversarial Reasoning)
+Rules:
+- Ask ONE clear question at a time. Wait for the answer before next question.
+- Don't repeat questions or topics already covered in this conversation.
+- Adapt difficulty based on user's answer quality.
+- For a session of ${durationMinutes} minutes, aim for ~${Math.max(5, Math.floor(durationMinutes / 4))} questions.
+- Keep questions concise (1-3 sentences). Reference real-world scenarios where relevant.
+- After receiving an answer, briefly acknowledge (1 sentence) then ask next question covering a different module.
+- Label your question with the module it covers: "[ARCHITECT & DEFEND]" or "[INCIDENT SIMULATOR]" etc. at the start.
 
-DIFFICULTY LEVEL: ${level}. ${guidance}
+${jdText ? '\nCANDIDATE TARGET JD:\n' + jdText.substring(0, 3000) : ''}
+${resumeText ? '\nCANDIDATE BACKGROUND:\n' + resumeText.substring(0, 3000) : ''}`;
 
-INTERVIEW DURATION: ${durationMinutes} minutes total.${timeRemaining !== null ? ` Time remaining: ${Math.round(timeRemaining / 60)} minutes.` : ''}
-
-INTERVIEW FLOW RULES:
-- Cover all 6 cybersecurity domains across the session (one per panelist).
-- Each question should be tagged with a domain in this format at the start: **[ARCHITECT & DEFEND]**, **[INCIDENT RESPONSE]**, **[STRATEGY & COMMS]**, **[THREAT HUNTING]**, **[VULN & APPSEC]**, or **[RED TEAM]**.
-- Mix question types: scenario-based ("Your org has X, how would you..."), conceptual ("Explain..."), trade-off ("X vs Y, which and why?"), and behavioral ("Walk me through a time when...").
-- Ask ONE question at a time. Wait for the candidate's answer before the next.
-- Keep each question focused and concise (2-4 sentences max).
-
-FORMATTING AFTER CANDIDATE'S ANSWER:
-After each candidate answer, respond in TWO PARTS separated by a line containing only "===":
-- Part 1 (above ===): brief acknowledgment (under 12 words). e.g. "Good reasoning." or "Solid framework choice." Acknowledge the answer's strengths or main idea briefly.
-- Part 2 (below ===): the NEXT question, tagged with its domain. e.g. "**[INCIDENT RESPONSE]** Your SIEM just alerted on..."
-
-EXAMPLE response after candidate's answer:
-\`\`\`
-Solid reasoning on the zero-trust principles.
-===
-**[INCIDENT RESPONSE]** Your team detects unusual outbound traffic from a finance workstation at 2am. Walk me through your first 30 minutes.
-\`\`\`
-
-FIRST MESSAGE ONLY:
-For the very first message (welcome + first question), do NOT use the === separator. Output a SHORT one-line welcome (under 12 words) immediately followed by the first tagged question.
-
-EXAMPLE first message:
-\`\`\`
-Welcome to the panel — let's dive in.
-
-**[ARCHITECT & DEFEND]** Your company is moving its on-prem ERP system to AWS. The CISO wants zero-trust enforced. What are your top 3 priorities and why?
-\`\`\`
-
-CRITICAL RULES:
-- Never give the candidate the answer.
-- Never write more than one question per response.
-- Never give long lectures or paragraphs of feedback — only short acknowledgments.
-- Stay in character as a professional interview panel.`;
-
-    if (jdSnippet) {
-      systemPrompt += `\n\nJOB DESCRIPTION (use to tailor questions):\n${jdSnippet}`;
-    }
-    if (resumeSnippet) {
-      systemPrompt += `\n\nCANDIDATE RESUME (use to probe claimed experience):\n${resumeSnippet}`;
-    }
-
-    // Map messages to Claude's expected format
-    // Frontend sends { role: 'user'|'assistant', content: '...' }
-    const claudeMessages = messages
-      .filter((m) => m && m.role && m.content)
-      .map((m) => ({
-        role: m.role === 'assistant' ? 'assistant' : 'user',
-        content: String(m.content),
-      }));
-
-    if (claudeMessages.length === 0) {
-      return res.status(400).json({ error: 'No valid messages found' });
-    }
-
-    const Anthropic = require('@anthropic-ai/sdk');
-    const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
-
-    let claudeResponse;
-    try {
-      claudeResponse = await anthropic.messages.create({
-        model: MODEL_QUESTIONS, // Haiku — fast & cheap for question generation
-        max_tokens: 1024,
+    const response = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': apiKey,
+        'anthropic-version': '2023-06-01',
+      },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-20250514',
+        max_tokens: 600,
         system: systemPrompt,
-        messages: claudeMessages,
-      });
-    } catch (claudeErr) {
-      console.error('Claude error in /api/interview/chat:', claudeErr.message);
-      return res.status(500).json({ error: 'AI service error: ' + claudeErr.message });
-    }
-
-    // Extract text from Claude's response
-    const reply = (claudeResponse.content || [])
-      .filter((c) => c.type === 'text')
-      .map((c) => c.text)
-      .join('\n')
-      .trim();
-
-    if (!reply) {
-      return res.status(500).json({ error: 'AI returned an empty response' });
-    }
-
-    res.json({ reply });
+        messages: messages.map(m => ({ role: m.role, content: m.content })),
+      }),
+    });
+    const data = await response.json();
+    if (data.error) return res.status(500).json({ error: data.error.message });
+    res.json({ reply: data.content?.[0]?.text || 'No response generated' });
   } catch (e) {
-    console.error('/api/interview/chat error:', e.message);
+    console.error('Interview chat error:', e.message);
     res.status(500).json({ error: e.message });
   }
 });
-
-// ════════════════════════════════════════════════════════════════════════════
-// END of /api/interview/chat
-// ════════════════════════════════════════════════════════════════════════════
-
-// ADD TO server.js — paste this BEFORE the line: app.listen(PORT, async () => {
-// (typically near the bottom, around line 4198)
-// ════════════════════════════════════════════════════════════════════════════
-// Generates an end-of-session interview report from the panel-interview transcript.
-// Uses your existing MODEL_EVALUATION (claude-sonnet-4-20250514) for scoring.
-// No new DB table required.
-
-app.post('/api/interview/generate-report', auth, async (req, res) => {
-  try {
-    const {
-      messages = [],
-      jdText = '',
-      resumeText = '',
-      level = 'intermediate',
-      durationMinutes = 0,
-      durationSeconds = 0,
-      questionsAnswered = 0,
-      startedAt,
-      completedAt,
-      panelists = [],
-    } = req.body;
-
-    if (!Array.isArray(messages) || messages.length === 0) {
-      return res.status(400).json({ error: 'No interview transcript provided' });
-    }
-
-    // Pull candidate identity from logged-in user
-    const u = await pool.query(
-      'SELECT id, name, email FROM users WHERE id = $1',
-      [req.user.id]
-    );
-    const user = u.rows[0] || {};
-
-    // Build the transcript text for Claude
-    const transcriptLines = [];
-    let qIndex = 0;
-    for (const m of messages) {
-      if (m.role === 'assistant') {
-        qIndex += 1;
-        const panelistTag = m.panelistName ? ` [${m.panelistName} · ${m.panelistTitle || ''}]` : '';
-        transcriptLines.push(`Q${qIndex}${panelistTag}: ${m.content}`);
-      } else if (m.role === 'user') {
-        transcriptLines.push(`A${qIndex}: ${m.content}`);
-      }
-    }
-    const transcript = transcriptLines.join('\n\n');
-
-    // Cap transcript at ~12k chars to keep prompt manageable
-    const cappedTranscript = transcript.length > 12000
-      ? transcript.slice(0, 12000) + '\n\n[transcript truncated]'
-      : transcript;
-
-    const jdSnippet = (jdText || '').slice(0, 1500);
-    const resumeSnippet = (resumeText || '').slice(0, 1500);
-
-    const prompt = `You are a senior cybersecurity hiring manager generating a final interview report.
-
-CANDIDATE: ${user.name || 'Candidate'} (${user.email || ''})
-DIFFICULTY LEVEL: ${level}
-SESSION DURATION: ${durationMinutes} min (${durationSeconds}s actual)
-QUESTIONS ANSWERED: ${questionsAnswered}
-
-${jdSnippet ? `JOB DESCRIPTION (snippet):\n${jdSnippet}\n\n` : ''}${resumeSnippet ? `RESUME (snippet):\n${resumeSnippet}\n\n` : ''}PANEL (round-robin):
-${panelists.map(p => `- ${p.name} · ${p.title} · ${p.specialty}`).join('\n')}
-
-INTERVIEW TRANSCRIPT:
-${cappedTranscript}
-
-Your task: produce a structured JSON report. Score every dimension 0.0–10.0 (one decimal). Be strict but fair. Reward technical correctness, specificity, and clear reasoning. Penalize vague filler, copy-paste behavior, and "I don't know" answers without follow-up reasoning.
-
-Return ONLY valid JSON with this EXACT structure (no markdown, no prose around it):
-
-{
-  "overall": {
-    "score": <int 0-100>,
-    "outOf": 100,
-    "badge": "<one of: Platinum | Gold | Silver | Bronze | Not Ready>",
-    "verdict": "<one short phrase: 'Recommended for next round' | 'Recommended with reservations' | 'Needs more practice' | 'Not yet ready'>"
-  },
-  "summary": "<2-3 sentence overall assessment of the candidate's performance>",
-  "categoryScores": [
-    { "name": "Threat Identification", "score": <0.0-10.0>, "outOf": 10 },
-    { "name": "Containment & Response", "score": <0.0-10.0>, "outOf": 10 },
-    { "name": "Architecture & Blast Radius", "score": <0.0-10.0>, "outOf": 10 },
-    { "name": "Communication Quality", "score": <0.0-10.0>, "outOf": 10 },
-    { "name": "Framework Application", "score": <0.0-10.0>, "outOf": 10 }
-  ],
-  "skillsRadar": [
-    { "skill": "IAM & Identity", "score": <0.0-10.0> },
-    { "skill": "Detection & Logging", "score": <0.0-10.0> },
-    { "skill": "Remediation", "score": <0.0-10.0> },
-    { "skill": "Architecture", "score": <0.0-10.0> },
-    { "skill": "Communication", "score": <0.0-10.0> }
-  ],
-  "strengths": [
-    "<3-5 concrete strength bullets, specific to what they actually said>"
-  ],
-  "growthAreas": [
-    "<3-5 concrete growth area bullets, specific>"
-  ],
-  "suggestedFocus": "<1-2 sentences on what kind of follow-up interview they should do>",
-  "topicsToStudy": [
-    "<4-6 specific topics, e.g. 'MITRE ATT&CK T1078 Valid Accounts', 'NIST SP 800-61 IR phases', 'Zero-trust network segmentation patterns'>"
-  ],
-  "questions": [
-    {
-      "index": 1,
-      "panelist": "<panelist name who asked>",
-      "category": "<one word: Architecture | Containment | Hunting | Strategy | Adversarial | Communication>",
-      "question": "<the full question verbatim>",
-      "candidateAnswer": "<the candidate's answer verbatim>",
-      "modelAnswer": "<3-4 sentence expert model answer>",
-      "scores": [
-        { "key": "TI", "label": "Threat ID", "score": <0.0-10.0> },
-        { "key": "CR", "label": "Containment", "score": <0.0-10.0> },
-        { "key": "FR", "label": "Framework", "score": <0.0-10.0> }
-      ],
-      "evaluatorNote": "<1-2 sentence assessment of this answer>",
-      "mitreAttack": "<MITRE technique ID and name if applicable, else null>",
-      "framework": "<relevant framework reference, e.g. 'NIST SP 800-61', else null>",
-      "realWorldParallel": "<real incident parallel if applicable, else null>"
-    }
-  ]
-}
-
-Important rules:
-- Include ALL ${questionsAnswered} questions in the questions array (one entry per Q&A pair).
-- If the candidate answered "I don't know" or gave no real answer, score that question 1-3 and note it in evaluatorNote.
-- For mitreAttack/framework/realWorldParallel use null when not applicable, not empty strings.
-- Be specific. Avoid generic phrases like "good understanding".
-- overall.score should reflect the weighted average across category scores.`;
-
-    let claudeResp;
-    try {
-      claudeResp = await anthropic.messages.create({
-        model: MODEL_EVALUATION,
-        max_tokens: 6000,
-        messages: [{ role: 'user', content: prompt }]
-      });
-    } catch (claudeErr) {
-      console.error('Claude error in generate-report:', claudeErr.message);
-      return res.status(502).json({ error: 'AI scoring service unavailable: ' + claudeErr.message });
-    }
-
-    const rawText = (claudeResp.content && claudeResp.content[0] && claudeResp.content[0].text) || '';
-    // Strip any markdown fences if Claude added them
-    const cleaned = rawText
-      .replace(/^```json\s*/i, '')
-      .replace(/^```\s*/i, '')
-      .replace(/```\s*$/i, '')
-      .trim();
-
-    let parsed;
-    try {
-      parsed = JSON.parse(cleaned);
-    } catch (parseErr) {
-      console.error('Report JSON parse error:', parseErr.message);
-      console.error('Raw response (first 500):', rawText.slice(0, 500));
-      return res.status(500).json({ error: 'Could not parse AI report. Please retry.' });
-    }
-
-    // Stitch the candidate/session metadata onto the report
-    const report = {
-      candidate: {
-        name: user.name || 'Candidate',
-        email: user.email || '',
-        role: 'Cybersecurity',
-        level: (level || '').charAt(0).toUpperCase() + (level || '').slice(1),
-      },
-      session: {
-        startedAt: startedAt || null,
-        completedAt: completedAt || new Date().toISOString(),
-        durationMinutes: durationMinutes || 0,
-        durationSeconds: durationSeconds || 0,
-        questionsAnswered: questionsAnswered || 0,
-      },
-      ...parsed,
-    };
-
-    // Map badge to color (UI also has fallback)
-    const badgeColors = {
-      Platinum: '#e2e8f0', Gold: '#f59e0b',
-      Silver: '#94a3b8', Bronze: '#b45309',
-      'Not Ready': '#ef4444',
-    };
-    if (report.overall && !report.overall.badgeColor) {
-      report.overall.badgeColor = badgeColors[report.overall.badge] || '#64748b';
-    }
-
-    res.json({ report });
-  } catch (e) {
-    console.error('generate-report error:', e.message);
-    res.status(500).json({ error: e.message });
-  }
-});
-
-// ════════════════════════════════════════════════════════════════════════════
-// END of /api/interview/generate-report
-// ════════════════════════════════════════════════════════════════════════════
 
 app.listen(PORT, async () => {
   await runMigrations();
