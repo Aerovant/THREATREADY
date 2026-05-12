@@ -3960,6 +3960,24 @@ async function runMigrations() {
       )
     `);
 
+    // Interview reports — persists end-of-session reports for the "All Reports" history panel
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS interview_reports (
+        id SERIAL PRIMARY KEY,
+        user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+        overall_score INTEGER,
+        badge VARCHAR(20),
+        questions_answered INTEGER DEFAULT 0,
+        duration_seconds INTEGER DEFAULT 0,
+        report_data JSONB NOT NULL,
+        created_at TIMESTAMP DEFAULT NOW()
+      )
+    `);
+    await pool.query(`
+      CREATE INDEX IF NOT EXISTS idx_interview_reports_user_created
+        ON interview_reports(user_id, created_at DESC)
+    `).catch(() => {});
+
     // BACKFILL: Copy any existing completed sessions into user_scenario_history
     // This recovers data for users who completed assessments before this fix
     try {
@@ -4532,7 +4550,33 @@ Generate the report JSON now.`;
       questions: Array.isArray(aiReport.questions) ? aiReport.questions : [],
     };
 
-    res.json({ report: finalReport });
+    // Persist the report so the "All Reports" panel can list it later.
+    // Failures here must NOT block the response — the user still sees their report.
+    let savedReportId = null;
+    try {
+      const userId = req.user?.id || req.user?.userId;
+      if (userId) {
+        const insert = await pool.query(
+          `INSERT INTO interview_reports
+             (user_id, overall_score, badge, questions_answered, duration_seconds, report_data)
+           VALUES ($1, $2, $3, $4, $5, $6)
+           RETURNING id`,
+          [
+            userId,
+            overallScore,
+            badge,
+            questionsAnswered || 0,
+            totalSeconds || 0,
+            JSON.stringify(finalReport),
+          ]
+        );
+        savedReportId = insert.rows?.[0]?.id || null;
+      }
+    } catch (saveErr) {
+      console.error('Failed to persist interview report:', saveErr.message);
+    }
+
+    res.json({ report: finalReport, reportId: savedReportId });
   } catch (e) {
     console.error('generate-report error:', e.message);
     res.status(500).json({ error: e.message });
@@ -4541,6 +4585,80 @@ Generate the report JSON now.`;
 
 // ════════════════════════════════════════════════════════════════════════════
 // END of /api/interview/generate-report
+// ════════════════════════════════════════════════════════════════════════════
+
+// ════════════════════════════════════════════════════════════════════════════
+// /api/interview/reports — list all reports for the logged-in user
+// ════════════════════════════════════════════════════════════════════════════
+// Returns lightweight metadata only (no report_data blob) so the history
+// panel can render fast. Full report fetched via /api/interview/reports/:id.
+
+app.get('/api/interview/reports', auth, async (req, res) => {
+  try {
+    const userId = req.user?.id || req.user?.userId;
+    if (!userId) return res.status(401).json({ error: 'Login required' });
+
+    const result = await pool.query(
+      `SELECT id, overall_score, badge, questions_answered, duration_seconds, created_at
+         FROM interview_reports
+        WHERE user_id = $1
+        ORDER BY created_at DESC
+        LIMIT 200`,
+      [userId]
+    );
+
+    res.json({ reports: result.rows || [] });
+  } catch (e) {
+    console.error('list interview_reports error:', e.message);
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// ════════════════════════════════════════════════════════════════════════════
+// /api/interview/reports/:id — fetch full report by id (owned by user)
+// ════════════════════════════════════════════════════════════════════════════
+
+app.get('/api/interview/reports/:id', auth, async (req, res) => {
+  try {
+    const userId = req.user?.id || req.user?.userId;
+    if (!userId) return res.status(401).json({ error: 'Login required' });
+
+    const id = parseInt(req.params.id, 10);
+    if (!Number.isFinite(id) || id <= 0) {
+      return res.status(400).json({ error: 'Invalid report id' });
+    }
+
+    const result = await pool.query(
+      `SELECT id, report_data, created_at
+         FROM interview_reports
+        WHERE id = $1 AND user_id = $2
+        LIMIT 1`,
+      [id, userId]
+    );
+
+    if (!result.rows || result.rows.length === 0) {
+      return res.status(404).json({ error: 'Report not found' });
+    }
+
+    const row = result.rows[0];
+    // report_data is JSONB — node-pg returns it as a parsed object already
+    const reportData = typeof row.report_data === 'string'
+      ? JSON.parse(row.report_data)
+      : row.report_data;
+
+    res.json({
+      reportId: row.id,
+      createdAt: row.created_at,
+      report: reportData,
+    });
+  } catch (e) {
+    console.error('fetch interview_report error:', e.message);
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// ════════════════════════════════════════════════════════════════════════════
+// END of interview reports endpoints
 // ════════════════════════════════════════════════════════════════════════════
 
 app.listen(PORT, async () => {
