@@ -4311,6 +4311,220 @@ ${resumeText ? '\nCANDIDATE BACKGROUND:\n' + resumeText.substring(0, 3000) : ''}
   }
 });
 
+// ════════════════════════════════════════════════════════════════════════════
+// /api/interview/generate-report — End-of-session report from panel transcript
+// ════════════════════════════════════════════════════════════════════════════
+// Called when user clicks "End & View Report" in InterviewSession.jsx.
+// Uses MODEL_EVALUATION (Sonnet) for accurate scoring across 5 categories.
+// Returns: { report: { ...comprehensive report JSON } }
+
+app.post('/api/interview/generate-report', auth, async (req, res) => {
+  try {
+    const {
+      messages = [],
+      jdText = '',
+      resumeText = '',
+      level = 'intermediate',
+      durationMinutes = 0,
+      durationSeconds = 0,
+      questionsAnswered = 0,
+      startedAt,
+      completedAt,
+      panelists = [],
+    } = req.body;
+
+    if (!Array.isArray(messages) || messages.length === 0) {
+      return res.status(400).json({ error: 'messages array is required' });
+    }
+
+    // Pull candidate info from users table (req.user is set by auth middleware)
+    let candidateName = 'Candidate';
+    let candidateEmail = '';
+    let candidateRole = '';
+    try {
+      const userId = req.user?.id || req.user?.userId;
+      if (userId) {
+        const userResult = await pool.query(
+          'SELECT name, email, role FROM users WHERE id = $1 LIMIT 1',
+          [userId]
+        );
+        if (userResult.rows && userResult.rows[0]) {
+          candidateName = userResult.rows[0].name || candidateName;
+          candidateEmail = userResult.rows[0].email || '';
+          candidateRole = userResult.rows[0].role || '';
+        }
+      }
+    } catch (dbErr) {
+      console.error('User lookup failed in generate-report:', dbErr.message);
+      // Continue anyway with defaults
+    }
+
+    // Build transcript from messages, cap to ~12k chars to stay within token budget
+    const transcript = messages
+      .filter((m) => m && m.role && m.content)
+      .map((m, i) => {
+        const speaker =
+          m.role === 'user'
+            ? `CANDIDATE`
+            : `PANEL${m.panelistIdx !== undefined ? ` (panelist ${m.panelistIdx})` : ''}`;
+        return `[${i + 1}] ${speaker}: ${String(m.content).trim()}`;
+      })
+      .join('\n\n');
+
+    const cappedTranscript = transcript.length > 12000
+      ? transcript.slice(0, 12000) + '\n\n[... transcript truncated for length ...]'
+      : transcript;
+
+    const jdSnippet = (jdText || '').slice(0, 2000);
+    const resumeSnippet = (resumeText || '').slice(0, 2000);
+
+    const totalSeconds = durationSeconds || durationMinutes * 60 || 0;
+    const minutesUsed = Math.round(totalSeconds / 60);
+
+    // Build the structured report prompt
+    const systemPrompt = `You are a senior cybersecurity hiring panel evaluator. Generate a detailed performance report for a candidate's interview, in STRICT JSON format. Be honest, specific, and grounded in the transcript.
+
+LEVEL: ${level}
+DURATION: ${minutesUsed} minutes
+QUESTIONS ANSWERED: ${questionsAnswered}
+
+OUTPUT EXACTLY this JSON schema (no markdown fences, no extra text):
+
+{
+  "overallScore": <integer 0-100>,
+  "verdict": "<one-sentence verdict, e.g. 'Strong intermediate candidate with solid IR fundamentals.'>",
+  "summary": "<2-3 sentence executive summary of performance>",
+  "categories": [
+    { "name": "Threat Identification", "score": <0-100>, "note": "<brief reasoning>" },
+    { "name": "Containment & Response", "score": <0-100>, "note": "<brief reasoning>" },
+    { "name": "Architecture & Blast Radius", "score": <0-100>, "note": "<brief reasoning>" },
+    { "name": "Communication Quality", "score": <0-100>, "note": "<brief reasoning>" },
+    { "name": "Framework Application", "score": <0-100>, "note": "<brief reasoning>" }
+  ],
+  "skills": [
+    { "axis": "IAM", "score": <0-100> },
+    { "axis": "Detection & Logging", "score": <0-100> },
+    { "axis": "Remediation", "score": <0-100> },
+    { "axis": "Architecture", "score": <0-100> },
+    { "axis": "Communication", "score": <0-100> }
+  ],
+  "strengths": ["<strength 1>", "<strength 2>", "<strength 3>"],
+  "growthAreas": ["<area 1>", "<area 2>", "<area 3>"],
+  "suggestedFocus": "<one paragraph: what to study/practice next>",
+  "topicsToStudy": ["<topic 1>", "<topic 2>", "<topic 3>", "<topic 4>"],
+  "questionBreakdown": [
+    {
+      "question": "<the question asked>",
+      "candidateAnswer": "<candidate's actual answer>",
+      "modelAnswer": "<a strong reference answer>",
+      "evaluatorNote": "<what was good/missing>",
+      "references": {
+        "mitre": "<MITRE ATT&CK technique IDs if applicable, e.g. 'T1078, T1110'>",
+        "framework": "<NIST CSF / ISO 27001 / etc. reference>",
+        "realWorld": "<analogous real-world incident or example>"
+      }
+    }
+  ]
+}
+
+BADGE TIER MAPPING (use to inform overallScore):
+- Platinum: 90-100 (exceptional, ready for senior roles)
+- Gold: 75-89 (strong, hire confidently for level)
+- Silver: 60-74 (solid foundation, hire with onboarding)
+- Bronze: 45-59 (junior, needs significant ramp-up)
+- Not Ready: 0-44 (does not meet bar)
+
+RULES:
+- Be honest. If answers were weak or gibberish, score low (under 30).
+- Reference specific things the candidate said in evaluatorNote.
+- For questions where candidate did not answer or answered very briefly, note that.
+- Output VALID JSON only. No markdown code fences. No preamble or postamble.`;
+
+    const userPrompt = `INTERVIEW TRANSCRIPT:
+
+${cappedTranscript}
+
+${jdSnippet ? `\n\nJOB DESCRIPTION:\n${jdSnippet}` : ''}
+${resumeSnippet ? `\n\nCANDIDATE RESUME:\n${resumeSnippet}` : ''}
+
+Generate the report JSON now.`;
+
+    const Anthropic = require('@anthropic-ai/sdk');
+    const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+
+    let claudeResponse;
+    try {
+      claudeResponse = await anthropic.messages.create({
+        model: MODEL_EVALUATION,
+        max_tokens: 6000,
+        system: systemPrompt,
+        messages: [{ role: 'user', content: userPrompt }],
+      });
+    } catch (claudeErr) {
+      console.error('Claude error in generate-report:', claudeErr.message);
+      return res.status(500).json({ error: 'AI scoring service error: ' + claudeErr.message });
+    }
+
+    // Extract and parse the JSON
+    let rawText = (claudeResponse.content || [])
+      .filter((c) => c.type === 'text')
+      .map((c) => c.text)
+      .join('\n')
+      .trim();
+
+    // Strip markdown fences if Claude wrapped the JSON in them
+    rawText = rawText.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '').trim();
+
+    let report;
+    try {
+      report = JSON.parse(rawText);
+    } catch (parseErr) {
+      console.error('Failed to parse Claude JSON:', parseErr.message);
+      console.error('Raw response:', rawText.slice(0, 500));
+      return res.status(500).json({ error: 'Failed to parse AI report. Please retry.' });
+    }
+
+    // Stitch in candidate + session metadata
+    const overallScore = Math.max(0, Math.min(100, Number(report.overallScore) || 0));
+    let badge = 'Not Ready';
+    let badgeColor = '#6b7280';
+    if (overallScore >= 90) { badge = 'Platinum'; badgeColor = '#e5e7eb'; }
+    else if (overallScore >= 75) { badge = 'Gold'; badgeColor = '#fbbf24'; }
+    else if (overallScore >= 60) { badge = 'Silver'; badgeColor = '#9ca3af'; }
+    else if (overallScore >= 45) { badge = 'Bronze'; badgeColor = '#b45309'; }
+
+    const finalReport = {
+      ...report,
+      overallScore,
+      badge,
+      badgeColor,
+      candidate: {
+        name: candidateName,
+        email: candidateEmail,
+        role: candidateRole || 'Cybersecurity Candidate',
+        level,
+      },
+      session: {
+        startedAt: startedAt || null,
+        completedAt: completedAt || new Date().toISOString(),
+        durationMinutes: minutesUsed,
+        durationSeconds: totalSeconds,
+        questionsAnswered,
+        panelists: Array.isArray(panelists) ? panelists : [],
+      },
+    };
+
+    res.json({ report: finalReport });
+  } catch (e) {
+    console.error('generate-report error:', e.message);
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// ════════════════════════════════════════════════════════════════════════════
+// END of /api/interview/generate-report
+// ════════════════════════════════════════════════════════════════════════════
+
 app.listen(PORT, async () => {
   await runMigrations();
   console.log('');
