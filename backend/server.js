@@ -4316,7 +4316,7 @@ ${resumeText ? '\nCANDIDATE BACKGROUND:\n' + resumeText.substring(0, 3000) : ''}
 // ════════════════════════════════════════════════════════════════════════════
 // Called when user clicks "End & View Report" in InterviewSession.jsx.
 // Uses MODEL_EVALUATION (Sonnet) for accurate scoring across 5 categories.
-// Returns: { report: { ...comprehensive report JSON } }
+// Returns: { report: { ...comprehensive report JSON in InterviewReport.jsx shape } }
 
 app.post('/api/interview/generate-report', auth, async (req, res) => {
   try {
@@ -4356,10 +4356,9 @@ app.post('/api/interview/generate-report', auth, async (req, res) => {
       }
     } catch (dbErr) {
       console.error('User lookup failed in generate-report:', dbErr.message);
-      // Continue anyway with defaults
     }
 
-    // Build transcript from messages, cap to ~12k chars to stay within token budget
+    // Build transcript from messages, cap to ~12k chars
     const transcript = messages
       .filter((m) => m && m.role && m.content)
       .map((m, i) => {
@@ -4381,27 +4380,29 @@ app.post('/api/interview/generate-report', auth, async (req, res) => {
     const totalSeconds = durationSeconds || durationMinutes * 60 || 0;
     const minutesUsed = Math.round(totalSeconds / 60);
 
-    // Build the structured report prompt
+    // Build the structured report prompt — schema matches InterviewReport.jsx exactly
     const systemPrompt = `You are a senior cybersecurity hiring panel evaluator. Generate a detailed performance report for a candidate's interview, in STRICT JSON format. Be honest, specific, and grounded in the transcript.
 
 LEVEL: ${level}
 DURATION: ${minutesUsed} minutes
 QUESTIONS ANSWERED: ${questionsAnswered}
 
-OUTPUT EXACTLY this JSON schema (no markdown fences, no extra text):
+OUTPUT EXACTLY this JSON schema (no markdown fences, no extra text, no preamble):
 
 {
-  "overallScore": <integer 0-100>,
-  "verdict": "<one-sentence verdict, e.g. 'Strong intermediate candidate with solid IR fundamentals.'>",
+  "overall": {
+    "score": <integer 0-100>,
+    "verdict": "<one-sentence verdict, e.g. 'Strong intermediate candidate with solid IR fundamentals.'>"
+  },
   "summary": "<2-3 sentence executive summary of performance>",
-  "categories": [
+  "categoryScores": [
     { "name": "Threat Identification", "score": <0-100>, "note": "<brief reasoning>" },
     { "name": "Containment & Response", "score": <0-100>, "note": "<brief reasoning>" },
     { "name": "Architecture & Blast Radius", "score": <0-100>, "note": "<brief reasoning>" },
     { "name": "Communication Quality", "score": <0-100>, "note": "<brief reasoning>" },
     { "name": "Framework Application", "score": <0-100>, "note": "<brief reasoning>" }
   ],
-  "skills": [
+  "skillsRadar": [
     { "axis": "IAM", "score": <0-100> },
     { "axis": "Detection & Logging", "score": <0-100> },
     { "axis": "Remediation", "score": <0-100> },
@@ -4412,33 +4413,39 @@ OUTPUT EXACTLY this JSON schema (no markdown fences, no extra text):
   "growthAreas": ["<area 1>", "<area 2>", "<area 3>"],
   "suggestedFocus": "<one paragraph: what to study/practice next>",
   "topicsToStudy": ["<topic 1>", "<topic 2>", "<topic 3>", "<topic 4>"],
-  "questionBreakdown": [
+  "questions": [
     {
+      "index": <1-based question number>,
+      "category": "<short tag e.g. 'ARCHITECT & DEFEND'>",
+      "panelist": "<panelist name e.g. 'Maya Chen'>",
       "question": "<the question asked>",
-      "candidateAnswer": "<candidate's actual answer>",
+      "candidateAnswer": "<candidate's actual answer verbatim>",
       "modelAnswer": "<a strong reference answer>",
-      "evaluatorNote": "<what was good/missing>",
-      "references": {
-        "mitre": "<MITRE ATT&CK technique IDs if applicable, e.g. 'T1078, T1110'>",
-        "framework": "<NIST CSF / ISO 27001 / etc. reference>",
-        "realWorld": "<analogous real-world incident or example>"
-      }
+      "evaluatorNote": "<what was good/missing in candidate's answer>",
+      "scores": [
+        { "label": "Tech", "score": <0-10 with one decimal> },
+        { "label": "Comm", "score": <0-10 with one decimal> }
+      ],
+      "mitreAttack": "<MITRE ATT&CK technique IDs if applicable, e.g. 'T1078, T1110'>",
+      "framework": "<NIST CSF / ISO 27001 / etc. reference>",
+      "realWorldParallel": "<analogous real-world incident or example>"
     }
   ]
 }
 
-BADGE TIER MAPPING (use to inform overallScore):
+BADGE TIER MAPPING (determines badge from overall.score):
 - Platinum: 90-100 (exceptional, ready for senior roles)
 - Gold: 75-89 (strong, hire confidently for level)
 - Silver: 60-74 (solid foundation, hire with onboarding)
 - Bronze: 45-59 (junior, needs significant ramp-up)
-- Not Ready: 0-44 (does not meet bar)
+- Not Ready: 0-44 (does not meet bar — gibberish, echoed questions, no real answers)
 
 RULES:
-- Be honest. If answers were weak or gibberish, score low (under 30).
-- Reference specific things the candidate said in evaluatorNote.
-- For questions where candidate did not answer or answered very briefly, note that.
-- Output VALID JSON only. No markdown code fences. No preamble or postamble.`;
+- Be honest. If candidate gave gibberish, echoed the questions, or didn't answer, score under 30.
+- Reference specific phrases the candidate said in evaluatorNote.
+- If candidate did not answer a question or gave only a few words, set candidateAnswer to their exact words (even if blank).
+- Include ALL questions asked in the questions array (even unanswered ones).
+- Output VALID JSON only. NO markdown code fences. NO preamble or postamble.`;
 
     const userPrompt = `INTERVIEW TRANSCRIPT:
 
@@ -4475,17 +4482,17 @@ Generate the report JSON now.`;
     // Strip markdown fences if Claude wrapped the JSON in them
     rawText = rawText.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '').trim();
 
-    let report;
+    let aiReport;
     try {
-      report = JSON.parse(rawText);
+      aiReport = JSON.parse(rawText);
     } catch (parseErr) {
       console.error('Failed to parse Claude JSON:', parseErr.message);
       console.error('Raw response:', rawText.slice(0, 500));
       return res.status(500).json({ error: 'Failed to parse AI report. Please retry.' });
     }
 
-    // Stitch in candidate + session metadata
-    const overallScore = Math.max(0, Math.min(100, Number(report.overallScore) || 0));
+    // Compute badge from score and inject into overall
+    const overallScore = Math.max(0, Math.min(100, Number(aiReport.overall?.score) || 0));
     let badge = 'Not Ready';
     let badgeColor = '#6b7280';
     if (overallScore >= 90) { badge = 'Platinum'; badgeColor = '#e5e7eb'; }
@@ -4493,11 +4500,8 @@ Generate the report JSON now.`;
     else if (overallScore >= 60) { badge = 'Silver'; badgeColor = '#9ca3af'; }
     else if (overallScore >= 45) { badge = 'Bronze'; badgeColor = '#b45309'; }
 
+    // Stitch the final report — preserve AI's structured fields, add metadata + badge
     const finalReport = {
-      ...report,
-      overallScore,
-      badge,
-      badgeColor,
       candidate: {
         name: candidateName,
         email: candidateEmail,
@@ -4512,6 +4516,20 @@ Generate the report JSON now.`;
         questionsAnswered,
         panelists: Array.isArray(panelists) ? panelists : [],
       },
+      overall: {
+        score: overallScore,
+        verdict: aiReport.overall?.verdict || 'Session evaluated',
+        badge,
+        badgeColor,
+      },
+      summary: aiReport.summary || '',
+      categoryScores: Array.isArray(aiReport.categoryScores) ? aiReport.categoryScores : [],
+      skillsRadar: Array.isArray(aiReport.skillsRadar) ? aiReport.skillsRadar : [],
+      strengths: Array.isArray(aiReport.strengths) ? aiReport.strengths : [],
+      growthAreas: Array.isArray(aiReport.growthAreas) ? aiReport.growthAreas : [],
+      suggestedFocus: aiReport.suggestedFocus || '',
+      topicsToStudy: Array.isArray(aiReport.topicsToStudy) ? aiReport.topicsToStudy : [],
+      questions: Array.isArray(aiReport.questions) ? aiReport.questions : [],
     };
 
     res.json({ report: finalReport });
