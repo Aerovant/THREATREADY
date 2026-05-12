@@ -76,6 +76,12 @@ import B2BHelpTab from "./views/tabs/B2BHelpTab.jsx";
 
 // Convert URL pathname → view name
 function pathToView(pathname) {
+
+  // Strip /app prefix if present
+  if (pathname.startsWith('/app')) {
+    pathname = pathname.slice(4) || '/';
+  }
+
   if (pathname === '/' || pathname === '') return 'landing';
   if (pathname.startsWith('/auth')) return 'auth';
   if (pathname === '/trial') return 'trial-role-select';
