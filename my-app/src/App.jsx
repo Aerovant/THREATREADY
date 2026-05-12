@@ -77,10 +77,12 @@ import B2BHelpTab from "./views/tabs/B2BHelpTab.jsx";
 // Convert URL pathname → view name
 function pathToView(pathname) {
 
-  // Strip /app prefix if present
-  if (pathname.startsWith('/app')) {
+ const hadAppPrefix = pathname.startsWith('/app');
+  if (hadAppPrefix) {
     pathname = pathname.slice(4) || '/';
   }
+  // If user is at /app/ root, let saved-view logic decide (don't force landing)
+  if (hadAppPrefix && (pathname === '/' || pathname === '')) return null;
 
   if (pathname === '/' || pathname === '') return 'landing';
   if (pathname.startsWith('/auth')) return 'auth';
