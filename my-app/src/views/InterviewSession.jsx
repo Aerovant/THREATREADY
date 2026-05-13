@@ -52,7 +52,7 @@ const PANELISTS = [
     initials: "MC",
     color: "#14b8a6",
     gender: "female",
-    avatarUrl: "/panelists/maya.jpg",
+    avatarUrl: "maya.jpg",
   },
   {
     id: "marcus",
@@ -62,7 +62,7 @@ const PANELISTS = [
     initials: "MR",
     color: "#f97316",
     gender: "male",
-    avatarUrl: "/panelists/marcus.jpg",
+    avatarUrl: "marcus.jpg",
   },
   {
     id: "sarah",
@@ -72,7 +72,7 @@ const PANELISTS = [
     initials: "SO",
     color: "#a855f7",
     gender: "female",
-    avatarUrl: "/panelists/sarah.jpg",
+    avatarUrl: "sarah.jpg",
   },
   {
     id: "aiden",
@@ -82,7 +82,7 @@ const PANELISTS = [
     initials: "AW",
     color: "#3b82f6",
     gender: "male",
-    avatarUrl: "/panelists/aiden.jpg",
+    avatarUrl: "aiden.jpg",
   },
   {
     id: "priya",
@@ -92,7 +92,7 @@ const PANELISTS = [
     initials: "PS",
     color: "#22c55e",
     gender: "female",
-    avatarUrl: "/panelists/priya.jpg",
+    avatarUrl: "priya.jpg",
   },
   {
     id: "raj",
@@ -102,7 +102,7 @@ const PANELISTS = [
     initials: "RP",
     color: "#06b6d4",
     gender: "male",
-    avatarUrl: "/panelists/raj.jpg",
+    avatarUrl: "raj.jpg",
   },
 ];
 
