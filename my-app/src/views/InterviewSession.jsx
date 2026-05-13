@@ -220,6 +220,10 @@ export default function InterviewSession({
   const [ttsAvailable, setTtsAvailable] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
   const voicesRef = useRef([]);
+  // Refs that mirror the React state, so async callbacks read the current value
+  // not a stale closure. Critical for the first-question TTS path.
+  const ttsAvailableRef = useRef(false);
+  const ttsMutedRef = useRef(false);
 
   const [isRecording, setIsRecording] = useState(false);
   const [voiceSupported, setVoiceSupported] = useState(false);
@@ -237,8 +241,9 @@ export default function InterviewSession({
 
   // Load TTS voices
   useEffect(() => {
-    if (!("speechSynthesis" in window)) { setTtsAvailable(false); return; }
+    if (!("speechSynthesis" in window)) { setTtsAvailable(false); ttsAvailableRef.current = false; return; }
     setTtsAvailable(true);
+    ttsAvailableRef.current = true;
     const loadVoices = () => {
       const voices = window.speechSynthesis.getVoices();
       if (voices && voices.length > 0) voicesRef.current = voices;
@@ -256,7 +261,7 @@ export default function InterviewSession({
   }, []);
 
   const speakText = (text, panelistIdx) => {
-    if (!ttsAvailable || ttsMuted || !text) return;
+    if (!ttsAvailableRef.current || ttsMutedRef.current || !text) return;
     try {
       window.speechSynthesis.cancel();
       const utterance = new SpeechSynthesisUtterance(text);
@@ -283,7 +288,7 @@ export default function InterviewSession({
 
   const toggleMute = () => {
     if (!ttsMuted) stopSpeaking();
-    setTtsMuted((m) => !m);
+    setTtsMuted((m) => { ttsMutedRef.current = !m; return !m; });
   };
 
 
@@ -411,10 +416,13 @@ export default function InterviewSession({
           setMessages((prev) => [...prev, { role: "assistant", content: fullText, panelistIdx }]);
 
           // Speak and resolve when speech finishes (or if TTS unavailable, resolve now).
-          if (!ttsAvailable || ttsMuted || !fullText) {
+          // Use refs (not state) to read CURRENT values, since this function may have
+          // been captured from a render where ttsAvailable was still false.
+          if (!ttsAvailableRef.current || ttsMutedRef.current || !fullText) {
             resolve();
             return;
           }
+
           try {
             window.speechSynthesis.cancel();
             const utterance = new SpeechSynthesisUtterance(fullText);
