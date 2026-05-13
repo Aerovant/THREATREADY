@@ -1370,11 +1370,12 @@ app.get('/auth/google/callback', async (req, res) => {
     );
 
     // Redirect to frontend with token
-    res.redirect(`${process.env.FRONTEND_URL || "http://localhost:5173"}/auth/callback?token=${token}&name=${encodeURIComponent(name)}&email=${encodeURIComponent(email)}`);
+    res.redirect(`${process.env.FRONTEND_URL || "http://localhost:5173"}/app/auth?token=${token}&name=${encodeURIComponent(name)}&email=${encodeURIComponent(email)}`);
 
   } catch (e) {
     console.error('Google OAuth error:', e.message);
-    res.redirect(`${process.env.FRONTEND_URL || 'http://localhost:5173'}/auth/callback?error=google_failed`);
+
+    res.redirect(`${process.env.FRONTEND_URL || 'http://localhost:5173'}/app/auth?error=google_failed`);
   }
 });
 
