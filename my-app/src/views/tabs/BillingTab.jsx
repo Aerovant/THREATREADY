@@ -41,7 +41,7 @@ const BILL_CSS = `
 }
 .tr-bill-toggle{
   display:inline-flex;gap:4px;padding:4px;
-  background:#fff;border:1px solid var(--bd,#e9e5f3);border-radius:11px;
+  background:var(--s1);border:1px solid var(--bd,#e9e5f3);border-radius:11px;
 }
 .tr-bill-toggle-btn{
   padding:8px 18px;

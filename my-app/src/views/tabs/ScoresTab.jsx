@@ -81,7 +81,7 @@ const SCORES_CSS = `
   cursor:pointer;font-family:inherit;
   transition:background .12s;
 }
-.tr-scores-dropdown-item:hover{background:#faf8ff}
+.tr-scores-dropdown-item:hover{background:var(--s2)}
 .tr-scores-dropdown-item.active{background:#ede9fe;color:#7c3aed;font-weight:600}
 
 .tr-scores-export-btn{
@@ -94,7 +94,7 @@ const SCORES_CSS = `
   cursor:pointer;font-family:inherit;
   transition:all .15s ease;
 }
-.tr-scores-export-btn:hover{background:#faf8ff;border-color:#c4b5fd;transform:translateY(-1px)}
+.tr-scores-export-btn:hover{background:var(--s2);border-color:#c4b5fd;transform:translateY(-1px)}
 .tr-scores-export-btn svg{width:16px;height:16px}
 
 /* Main empty-state card */
@@ -169,7 +169,7 @@ const SCORES_CSS = `
 .tr-scores-info-icon{
   width:40px;height:40px;flex-shrink:0;
   display:grid;place-items:center;
-  background:#fff;
+  background:var(--s1);
   border-radius:10px;
   font-size:20px;
 }
@@ -193,11 +193,118 @@ const SCORES_CSS = `
 }
 .tr-scores-info-btn:hover{background:#ede9fe;border-color:#7c3aed}
 
-/* Mobile */
+/* ═══════════════════════════════════════════════════════════════
+   DARK MODE OVERRIDES — gradients + light purple chips
+   ═══════════════════════════════════════════════════════════════ */
+
+/* Stat icons (4 stat cards top of page) — were light purple #ede9fe */
+[data-theme="dark"] .tr-scores-stat-icon{
+  background: rgba(167,139,250,.18);
+  color: #c4b5fd;
+}
+[data-theme="dark"] .tr-scores-stat:hover{
+  box-shadow: 0 12px 28px rgba(0,0,0,.40), 0 0 0 1px rgba(167,139,250,.12);
+}
+
+/* Dropdown menus + items */
+[data-theme="dark"] .tr-scores-dropdown:hover{
+  border-color: rgba(167,139,250,.40);
+}
+[data-theme="dark"] .tr-scores-dropdown svg{
+  color: #c4b5fd;
+}
+[data-theme="dark"] .tr-scores-dropdown-menu{
+  background: var(--s1);
+  border-color: rgba(255,255,255,.10);
+  box-shadow: 0 12px 30px rgba(0,0,0,.50);
+}
+[data-theme="dark"] .tr-scores-dropdown-item:hover{
+  background: rgba(167,139,250,.10);
+}
+[data-theme="dark"] .tr-scores-dropdown-item.active{
+  background: rgba(167,139,250,.18);
+  color: #c4b5fd;
+}
+
+/* Export button */
+[data-theme="dark"] .tr-scores-export-btn{
+  background: var(--s1);
+  border-color: rgba(167,139,250,.30);
+  color: #c4b5fd;
+}
+[data-theme="dark"] .tr-scores-export-btn:hover{
+  background: rgba(167,139,250,.10);
+  border-color: #a78bfa;
+}
+
+/* Info banner — light purple gradient */
+[data-theme="dark"] .tr-scores-info{
+  background: linear-gradient(135deg, rgba(167,139,250,.12) 0%, rgba(124,58,237,.08) 100%);
+  border-color: rgba(167,139,250,.25);
+}
+[data-theme="dark"] .tr-scores-info-icon{
+  background: rgba(255,255,255,.06);
+  border: 1px solid rgba(255,255,255,.10);
+}
+[data-theme="dark"] .tr-scores-info-title{
+  color: #c4b5fd;
+}
+[data-theme="dark"] .tr-scores-info-btn{
+  background: transparent;
+  border-color: rgba(167,139,250,.40);
+  color: #c4b5fd;
+}
+[data-theme="dark"] .tr-scores-info-btn:hover{
+  background: rgba(167,139,250,.12);
+  border-color: #a78bfa;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   RESPONSIVE — tablet (≤880) + phone (≤640) + small (≤420)
+   ═══════════════════════════════════════════════════════════════ */
+
+/* Tablet */
 @media (max-width:880px){
   .tr-scores-stats{grid-template-columns:repeat(2,1fr)}
   .tr-scores-info{grid-template-columns:1fr;text-align:left}
   .tr-scores-info-btn{justify-self:start}
+}
+
+/* Phone */
+@media (max-width: 640px){
+  .tr-scores-stat{padding:14px;gap:12px}
+  .tr-scores-stat-icon{width:42px;height:42px}
+  .tr-scores-stat-icon svg{width:20px;height:20px}
+  .tr-scores-stat-num{font-size:26px}
+  .tr-scores-stat-lbl{font-size:10.5px;letter-spacing:1.2px}
+  .tr-scores-stat-sub{font-size:10.5px}
+
+  .tr-scores-filter-row{margin-bottom:12px}
+  .tr-scores-dropdown,
+  .tr-scores-export-btn{padding:9px 12px;font-size:12.5px}
+  .tr-scores-dropdown svg,
+  .tr-scores-export-btn svg{width:14px;height:14px}
+
+  .tr-scores-info{padding:12px 14px;gap:11px}
+  .tr-scores-info-icon{width:34px;height:34px;font-size:17px}
+  .tr-scores-info-title{font-size:13px}
+  .tr-scores-info-text{font-size:11.5px}
+  .tr-scores-info-btn{padding:8px 12px;font-size:12px;width:100%;justify-content:center}
+}
+
+/* Small phone */
+@media (max-width: 420px){
+  .tr-scores-stats{grid-template-columns:1fr 1fr;gap:8px}
+  .tr-scores-stat{padding:12px;gap:10px}
+  .tr-scores-stat-icon{width:36px;height:36px}
+  .tr-scores-stat-icon svg{width:18px;height:18px}
+  .tr-scores-stat-num{font-size:22px}
+  .tr-scores-stat-lbl{font-size:10px}
+
+  .tr-scores-filter-row{flex-direction:column;align-items:stretch;gap:8px}
+  .tr-scores-dropdown-wrap,
+  .tr-scores-dropdown,
+  .tr-scores-export-btn{width:100%;justify-content:center}
 }
 `;
 
@@ -301,30 +408,162 @@ export default function ScoresTab({
 
   const hasData = stats.totalInterviews > 0;
 
-  // Export Report — generates and downloads a JSON snapshot
-  const handleExport = () => {
-    const payload = {
-      generated_at: new Date().toISOString(),
-      user: user?.name || "anonymous",
-      summary: {
-        interviews_taken: stats.totalInterviews,
-        average_score: stats.avg,
-        highest_score: stats.high,
-        total_hours_estimate: stats.totalHoursLabel,
-      },
-      score_history: scoreHistory || [],
-      weakness_tracker: weaknessTracker || [],
+  // Export Report — generates a clean PDF (opens print dialog) or CSV download
+  const handleExport = (format = "pdf") => {
+    if (format === "csv") return exportCSV();
+    return exportPDF();
+  };
+
+  // ── CSV: spreadsheet-friendly export of score history + summary ──
+  const exportCSV = () => {
+    const esc = (v) => {
+      const s = v == null ? "" : String(v);
+      return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
     };
-    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
+    const rows = [];
+    rows.push(["ThreatReady — Score Report"]);
+    rows.push(["Generated", new Date().toLocaleString()]);
+    rows.push(["User", user?.name || "anonymous"]);
+    rows.push([]);
+    rows.push(["SUMMARY"]);
+    rows.push(["Interviews Taken", stats.totalInterviews]);
+    rows.push(["Average Score", stats.avg]);
+    rows.push(["Highest Score", stats.high]);
+    rows.push(["Total Hours", stats.totalHoursLabel]);
+    rows.push([]);
+
+    if (Array.isArray(scoreHistory) && scoreHistory.length) {
+      rows.push(["SCORE HISTORY"]);
+      rows.push(["#", "Date", "Role / Scenario", "Score", "Difficulty"]);
+      scoreHistory.forEach((h, i) => {
+        rows.push([
+          i + 1,
+          h.completed_at ? new Date(h.completed_at).toLocaleDateString() : "—",
+          h.role || h.scenario || h.title || "—",
+          h.overall_score ?? h.score ?? "—",
+          h.difficulty || "—",
+        ]);
+      });
+      rows.push([]);
+    }
+
+    if (Array.isArray(weaknessTracker) && weaknessTracker.length) {
+      rows.push(["WEAKNESS TRACKER"]);
+      rows.push(["Topic / Area", "Score", "Attempts"]);
+      weaknessTracker.forEach((w) => {
+        rows.push([w.topic || w.area || w.name || "—", w.score ?? "—", w.attempts ?? "—"]);
+      });
+    }
+
+    const csv = rows.map((r) => r.map(esc).join(",")).join("\n");
+    const blob = new Blob(["\ufeff" + csv], { type: "text/csv;charset=utf-8;" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `threatready-scores-${new Date().toISOString().slice(0,10)}.json`;
+    a.download = `threatready-scores-${new Date().toISOString().slice(0,10)}.csv`;
     document.body.appendChild(a);
     a.click();
     a.remove();
     URL.revokeObjectURL(url);
   };
+
+  // ── PDF: open print-ready HTML in new window, auto-trigger print dialog ──
+  const exportPDF = () => {
+    const generated = new Date().toLocaleString();
+    const username = user?.name || "anonymous";
+
+    const historyRows = (scoreHistory || []).map((h, i) => `
+      <tr>
+        <td>${i + 1}</td>
+        <td>${h.completed_at ? new Date(h.completed_at).toLocaleDateString() : "—"}</td>
+        <td>${escapeHtml(h.role || h.scenario || h.title || "—")}</td>
+        <td class="num">${h.overall_score ?? h.score ?? "—"}</td>
+        <td>${escapeHtml(h.difficulty || "—")}</td>
+      </tr>`).join("");
+
+    const weaknessRows = (weaknessTracker || []).map((w) => `
+      <tr>
+        <td>${escapeHtml(w.topic || w.area || w.name || "—")}</td>
+        <td class="num">${w.score ?? "—"}</td>
+        <td class="num">${w.attempts ?? "—"}</td>
+      </tr>`).join("");
+
+    const html = `<!doctype html>
+<html><head><meta charset="utf-8"><title>ThreatReady — Score Report</title>
+<style>
+  @page { margin: 14mm 12mm; size: A4 portrait; }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:'Inter','Segoe UI',Arial,sans-serif;color:#0f0a1f;padding:24px;font-size:12px;line-height:1.5}
+  .head{display:flex;justify-content:space-between;align-items:flex-end;border-bottom:2px solid #7c3aed;padding-bottom:14px;margin-bottom:18px}
+  .brand{font-size:22px;font-weight:800;letter-spacing:-.3px;color:#7c3aed}
+  .brand .ico{display:inline-block;margin-right:6px}
+  .meta{text-align:right;font-size:11px;color:#5b5475}
+  h1{font-size:22px;font-weight:800;margin:2px 0 4px;letter-spacing:-.4px;color:#0f0a1f}
+  .sub{font-size:12px;color:#5b5475}
+  .section{margin:22px 0 14px;page-break-inside:avoid}
+  .section-h{font-size:10px;font-weight:800;letter-spacing:2px;color:#7c3aed;text-transform:uppercase;margin-bottom:8px;padding-bottom:5px;border-bottom:1px solid #e3dcf2}
+  .stats{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:6px}
+  .stat{padding:14px 12px;border:1px solid #e3dcf2;border-radius:10px;text-align:center}
+  .stat-v{font-size:24px;font-weight:800;letter-spacing:-.6px;color:#7c3aed;font-family:'JetBrains Mono',monospace}
+  .stat-l{font-size:9.5px;font-weight:700;letter-spacing:1.4px;color:#5b5475;text-transform:uppercase;margin-top:4px}
+  table{width:100%;border-collapse:collapse;font-size:11.5px;margin-top:4px}
+  th{background:#f6f3ff;color:#5b5475;text-align:left;padding:9px 11px;font-size:10px;font-weight:800;letter-spacing:.8px;text-transform:uppercase;border-bottom:1px solid #e3dcf2}
+  td{padding:9px 11px;border-bottom:1px solid #f0eafa}
+  td.num{font-family:'JetBrains Mono',monospace;font-weight:600;color:#0f0a1f}
+  tr:last-child td{border-bottom:none}
+  .empty{padding:16px;text-align:center;color:#8b85a4;font-size:11px;border:1px dashed #e3dcf2;border-radius:8px}
+  .foot{margin-top:24px;padding-top:14px;border-top:1px solid #e3dcf2;font-size:10px;color:#8b85a4;text-align:center}
+</style></head><body>
+<div class="head">
+  <div>
+    <div class="brand"><span class="ico">⚡</span>THREATREADY</div>
+    <h1>Score Report</h1>
+    <div class="sub">${escapeHtml(username)}</div>
+  </div>
+  <div class="meta">Generated<br><strong>${escapeHtml(generated)}</strong></div>
+</div>
+
+<div class="section">
+  <div class="section-h">Summary</div>
+  <div class="stats">
+    <div class="stat"><div class="stat-v">${stats.totalInterviews ?? 0}</div><div class="stat-l">Interviews</div></div>
+    <div class="stat"><div class="stat-v">${stats.avg ?? "—"}</div><div class="stat-l">Avg Score</div></div>
+    <div class="stat"><div class="stat-v">${stats.high ?? "—"}</div><div class="stat-l">Highest</div></div>
+    <div class="stat"><div class="stat-v">${escapeHtml(String(stats.totalHoursLabel ?? "—"))}</div><div class="stat-l">Total Time</div></div>
+  </div>
+</div>
+
+<div class="section">
+  <div class="section-h">Score History</div>
+  ${historyRows ? `<table><thead><tr><th>#</th><th>Date</th><th>Role / Scenario</th><th>Score</th><th>Difficulty</th></tr></thead><tbody>${historyRows}</tbody></table>` : `<div class="empty">No interviews recorded yet.</div>`}
+</div>
+
+<div class="section">
+  <div class="section-h">Weakness Tracker</div>
+  ${weaknessRows ? `<table><thead><tr><th>Topic / Area</th><th>Score</th><th>Attempts</th></tr></thead><tbody>${weaknessRows}</tbody></table>` : `<div class="empty">No weak areas identified yet — keep practicing.</div>`}
+</div>
+
+<div class="foot">ThreatReady · Cybersecurity Interview Prep · Generated ${escapeHtml(generated)}</div>
+
+<script>window.onload = function(){ setTimeout(function(){ window.print(); }, 200); };</script>
+</body></html>`;
+
+    const w = window.open("", "_blank", "width=900,height=1100");
+    if (!w) { alert("Pop-up blocked — please allow pop-ups for this site to download your PDF report."); return; }
+    w.document.open();
+    w.document.write(html);
+    w.document.close();
+  };
+
+  // Tiny HTML-escape helper for safe injection of user-controlled strings
+  function escapeHtml(s){
+    return String(s == null ? "" : s)
+      .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;").replace(/'/g, "&#39;");
+  }
+
+  // Export menu visibility (PDF / CSV chooser)
+  const [showExportMenu, setShowExportMenu] = useState(false);
 
   const filterOptions = ["All Time", "This Month", "Last 7 Days"];
 
@@ -383,9 +622,24 @@ export default function ScoresTab({
             )}
           </div>
 
-          <button type="button" className="tr-scores-export-btn" onClick={handleExport}>
-            {I.download} Export Report
-          </button>
+          <div className="tr-scores-dropdown-wrap" style={{ position: "relative" }}>
+            <button type="button" className="tr-scores-export-btn" onClick={() => setShowExportMenu((p) => !p)}>
+              {I.download} Export Report <span style={{ marginLeft: 4, opacity: .65 }}>▾</span>
+            </button>
+            {showExportMenu && (
+              <>
+                <div onClick={() => setShowExportMenu(false)} style={{ position: "fixed", inset: 0, zIndex: 9 }} />
+                <div className="tr-scores-dropdown-menu" style={{ right: 0, left: "auto", minWidth: 160 }}>
+                  <button type="button" className="tr-scores-dropdown-item" onClick={() => { setShowExportMenu(false); handleExport("pdf"); }}>
+                    📄 Download as PDF
+                  </button>
+                  <button type="button" className="tr-scores-dropdown-item" onClick={() => { setShowExportMenu(false); handleExport("csv"); }}>
+                    📊 Download as CSV
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
         </div>
 
         {/* ── Main content: empty state OR data ── */}

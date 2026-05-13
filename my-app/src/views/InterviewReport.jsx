@@ -113,7 +113,7 @@ function RadarChart({ data, size = 300 }) {
 // ───────────────────────────────────────────────────────────────
 // MAIN — InterviewReport
 // ───────────────────────────────────────────────────────────────
-export default function InterviewReport({ report, onRestart, onHome }) {
+export default function InterviewReport({ report, onRestart, onHome, hideActions = false }) {
   const [expandedQ, setExpandedQ] = useState(null);
 
   if (!report) {
@@ -159,17 +159,19 @@ export default function InterviewReport({ report, onRestart, onHome }) {
             Generated on {formatDateTime(new Date().toISOString())}
           </div>
         </div>
-        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-          <button className="btn bs" onClick={() => window.print()} style={{ fontSize: 12, padding: "8px 14px" }}>
-            🖨️ Print / PDF
-          </button>
-          <button className="btn bs" onClick={onHome} style={{ fontSize: 12, padding: "8px 14px" }}>
-            🏠 Go to Home
-          </button>
-          <button className="btn bp" onClick={onRestart} style={{ fontSize: 12, padding: "8px 14px", fontWeight: 700 }}>
-            🔄 Start Interview Again
-          </button>
-        </div>
+        {!hideActions && (
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+            <button className="btn bs" onClick={() => window.print()} style={{ fontSize: 12, padding: "8px 14px" }}>
+              🖨️ Print / PDF
+            </button>
+            <button className="btn bs" onClick={onHome} style={{ fontSize: 12, padding: "8px 14px" }}>
+              🏠 Go to Home
+            </button>
+            <button className="btn bp" onClick={onRestart} style={{ fontSize: 12, padding: "8px 14px", fontWeight: 700 }}>
+              🔄 Start Interview Again
+            </button>
+          </div>
+        )}
       </div>
 
       {/* ═══ Candidate header card ═══ */}
@@ -685,25 +687,27 @@ export default function InterviewReport({ report, onRestart, onHome }) {
       )}
 
       {/* ═══ Final action buttons ═══ */}
-      <div style={{
-        display: "flex", gap: 12, justifyContent: "center",
-        marginTop: 24, flexWrap: "wrap",
-      }}>
-        <button
-          className="btn bs"
-          onClick={onHome}
-          style={{ padding: "14px 28px", fontSize: 14, fontWeight: 700 }}
-        >
-          🏠 Go to Home
-        </button>
-        <button
-          className="btn bp"
-          onClick={onRestart}
-          style={{ padding: "14px 28px", fontSize: 14, fontWeight: 700 }}
-        >
-          🔄 Start Interview Again
-        </button>
-      </div>
+      {!hideActions && (
+        <div style={{
+          display: "flex", gap: 12, justifyContent: "center",
+          marginTop: 24, flexWrap: "wrap",
+        }}>
+          <button
+            className="btn bs"
+            onClick={onHome}
+            style={{ padding: "14px 28px", fontSize: 14, fontWeight: 700 }}
+          >
+            🏠 Go to Home
+          </button>
+          <button
+            className="btn bp"
+            onClick={onRestart}
+            style={{ padding: "14px 28px", fontSize: 14, fontWeight: 700 }}
+          >
+            🔄 Start Interview Again
+          </button>
+        </div>
+      )}
 
       <style>{`
         @media print {

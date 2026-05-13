@@ -53,6 +53,10 @@ const HOME_CSS = `
 .tr-home-stat-icon.xp{background:#ede9fe;color:#7c3aed}
 .tr-home-stat-icon.tracks{background:#fce7f3;color:#ec4899}
 .tr-home-stat-icon.streak{background:#ffedd5;color:#f97316}
+[data-theme="dark"] .tr-home-stat-icon.completed{background: rgba(167,139,250,.18); color:#c4b5fd}
+[data-theme="dark"] .tr-home-stat-icon.xp{background: rgba(167,139,250,.18); color:#c4b5fd}
+[data-theme="dark"] .tr-home-stat-icon.tracks{background: rgba(236,72,153,.18); color:#f9a8d4}
+[data-theme="dark"] .tr-home-stat-icon.streak{background: rgba(249,115,22,.18); color:#fdba74}
 .tr-home-stat-icon svg{width:26px;height:26px}
 .tr-home-stat-num{font-size:38px;font-weight:800;color:var(--tx1);line-height:1;letter-spacing:-1px}
 .tr-home-stat-lbl{font-size:11px;color:var(--tx2);text-transform:uppercase;letter-spacing:1.5px;margin-top:6px;font-weight:600}
@@ -65,11 +69,20 @@ const HOME_CSS = `
   border:1px solid var(--bd,#e9e5f3);
   border-radius:14px;
 }
+[data-theme="dark"] .tr-home-daily{
+  background:linear-gradient(135deg, rgba(124,58,237,.18) 0%, rgba(99,102,241,.10) 100%);
+  border-color: rgba(167,139,250,.30);
+  box-shadow: 0 1px 0 rgba(255,255,255,.04) inset;
+}
 .tr-home-daily-icon{
   width:48px;height:48px;flex-shrink:0;
   display:grid;place-items:center;
   background:linear-gradient(135deg,#ede9fe,#ddd6fe);
   border-radius:13px;color:#7c3aed;
+}
+[data-theme="dark"] .tr-home-daily-icon{
+  background:linear-gradient(135deg, rgba(167,139,250,.25), rgba(124,58,237,.30));
+  color:#c4b5fd;
 }
 .tr-home-daily-icon svg{width:26px;height:26px}
 .tr-home-daily-title{font-size:15px;font-weight:700;color:var(--tx1)}
@@ -78,7 +91,11 @@ const HOME_CSS = `
 .tr-home-daily-timer{display:flex;gap:6px}
 .tr-home-timer-cell{
   min-width:46px;text-align:center;padding:6px 4px;
-  background:#fff;border:1px solid var(--bd,#e9e5f3);border-radius:9px;
+  background:var(--s1);border:1px solid var(--bd,#e9e5f3);border-radius:9px;
+}
+[data-theme="dark"] .tr-home-timer-cell{
+  background: rgba(255,255,255,.06);
+  border-color: rgba(255,255,255,.12);
 }
 .tr-home-timer-num{font-size:18px;font-weight:800;color:var(--tx1);line-height:1;font-variant-numeric:tabular-nums}
 .tr-home-timer-lbl{font-size:9px;color:var(--tx2);text-transform:uppercase;letter-spacing:1px;margin-top:3px;font-weight:600}
@@ -98,6 +115,10 @@ const HOME_CSS = `
 
 /* Main 2-col grid */
 .tr-home-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px}
+
+/* Full-width vertical stack (Launch Platform + Live Contests row) */
+.tr-home-stack{display:flex;flex-direction:column;gap:14px;margin-bottom:14px;width:100%}
+.tr-home-stack > *{width:100%}
 
 /* Card */
 .tr-home-card{
@@ -149,7 +170,7 @@ const HOME_CSS = `
 .tr-home-btn-primary:hover{transform:translateY(-1px);box-shadow:0 10px 22px rgba(124,58,237,.35)}
 .tr-home-btn-outline{
   padding:9px 16px;
-  background:#fff;
+  background:var(--s1);
   color:var(--ac);
   border:1.5px dashed var(--bd2,#d4cce8);
   border-radius:11px;
@@ -160,7 +181,7 @@ const HOME_CSS = `
   width:100%;
   font-family:inherit;
 }
-.tr-home-btn-outline:hover{background:#faf8ff;border-color:var(--ac);border-style:solid}
+.tr-home-btn-outline:hover{background:var(--s2);border-color:var(--ac);border-style:solid}
 
 /* Learning paths — populated list */
 .tr-home-paths{display:flex;flex-direction:column;gap:8px;flex:1;overflow-y:auto;padding-right:2px}
@@ -169,13 +190,13 @@ const HOME_CSS = `
 .tr-home-path-row{
   display:flex;align-items:center;gap:12px;
   padding:10px 12px;
-  background:#faf8ff;
+  background:var(--s2);
   border:1px solid var(--bd,#e9e5f3);
   border-radius:10px;
   cursor:pointer;
   transition:all .2s ease;
 }
-.tr-home-path-row:hover{background:#f3eeff;border-color:var(--ac);transform:translateX(2px)}
+.tr-home-path-row:hover{background:var(--s3);border-color:var(--ac);transform:translateX(2px)}
 .tr-home-path-icon{font-size:22px;line-height:1}
 .tr-home-path-name{font-size:13px;font-weight:600;color:var(--tx1)}
 .tr-home-path-sub{font-size:11px;color:var(--tx2);margin-top:1px}
@@ -216,8 +237,8 @@ const HOME_CSS = `
   padding:7px 10px;border-radius:8px;
   transition:background .15s;
 }
-.tr-home-board-row:hover{background:#faf8ff}
-.tr-home-board-row.you{background:#f3eeff;border:1px solid #c4b5fd;padding:7px 10px}
+.tr-home-board-row:hover{background:var(--s2)}
+.tr-home-board-row.you{background:var(--s3);border:1px solid #c4b5fd;padding:7px 10px}
 .tr-home-board-rank{font-size:12px;color:var(--tx2);font-weight:600;text-align:center}
 .tr-home-board-row.you .tr-home-board-rank{color:var(--ac);font-weight:700}
 .tr-home-board-avatar{
@@ -250,7 +271,7 @@ const HOME_CSS = `
 .tr-home-launch-tag strong{color:var(--tx1);font-weight:600;display:block}
 .tr-home-launch-btn{
   padding:8px 16px;
-  background:#fff;
+  background:var(--s1);
   color:var(--ac);
   border:1px solid var(--bd2,#d4cce8);
   border-radius:10px;
@@ -271,7 +292,7 @@ const HOME_CSS = `
 .tr-home-contest-card{
   display:grid;grid-template-columns:auto 1fr auto auto;align-items:center;gap:14px;
   padding:14px;
-  background:#faf8ff;
+  background:var(--s2);
   border:1px solid var(--bd,#e9e5f3);
   border-radius:12px;
 }
@@ -294,7 +315,7 @@ const HOME_CSS = `
 .tr-home-contest-count svg{width:14px;height:14px}
 .tr-home-contest-btn{
   padding:8px 14px;
-  background:#fff;
+  background:var(--s1);
   color:var(--ac);
   border:1px solid var(--ac);
   border-radius:10px;
@@ -305,13 +326,171 @@ const HOME_CSS = `
 }
 .tr-home-contest-btn:hover{background:var(--ac);color:#fff;transform:translateY(-1px)}
 
-/* Responsive */
+/* ═══════════════════════════════════════════════════════════════
+   DARK MODE OVERRIDES — gradients + specialty surfaces
+   ═══════════════════════════════════════════════════════════════ */
+
+/* Empty state icon — was light purple #ede9fe */
+[data-theme="dark"] .tr-home-empty-icon{
+  background: rgba(167,139,250,.18);
+  color: #c4b5fd;
+}
+
+/* Outline button hover — was #faf8ff */
+[data-theme="dark"] .tr-home-btn-outline{
+  background: var(--s1);
+  border-color: rgba(255,255,255,.16);
+}
+[data-theme="dark"] .tr-home-btn-outline:hover{
+  background: rgba(167,139,250,.10);
+  border-color: #a78bfa;
+}
+
+/* Learning path rows — light purple bg */
+[data-theme="dark"] .tr-home-path-row{
+  background: var(--s2);
+  border-color: rgba(255,255,255,.08);
+}
+[data-theme="dark"] .tr-home-path-row:hover{
+  background: rgba(167,139,250,.12);
+  border-color: #a78bfa;
+}
+
+/* Leaderboard rows */
+[data-theme="dark"] .tr-home-board-row:hover{
+  background: rgba(255,255,255,.05);
+}
+[data-theme="dark"] .tr-home-board-row.you{
+  background: rgba(167,139,250,.12);
+  border-color: rgba(167,139,250,.30);
+}
+
+/* Podium 2nd / 3rd ranks — were neutral light grays */
+[data-theme="dark"] .tr-home-podium-cell.second .tr-home-podium-rank{background:#cbd5e1}
+[data-theme="dark"] .tr-home-podium-cell.third .tr-home-podium-rank{background:#d6a26b}
+
+/* Launch Platform card — was 3-stop pastel gradient */
+[data-theme="dark"] .tr-home-launch{
+  background: linear-gradient(135deg, rgba(167,139,250,.18) 0%, rgba(124,58,237,.12) 50%, rgba(99,102,241,.10) 100%);
+  border-color: rgba(167,139,250,.25);
+  box-shadow: 0 1px 0 rgba(255,255,255,.04) inset;
+}
+[data-theme="dark"] .tr-home-launch-btn{
+  background: rgba(255,255,255,.08);
+  border-color: rgba(255,255,255,.16);
+  color: #c4b5fd;
+}
+[data-theme="dark"] .tr-home-launch-btn:hover{
+  background: var(--ac2);
+  color: #fff;
+  border-color: var(--ac2);
+}
+
+/* Contest card — was #faf8ff */
+[data-theme="dark"] .tr-home-contest-card{
+  background: linear-gradient(180deg, rgba(255,255,255,.025) 0%, var(--s1) 100%);
+  border-color: rgba(255,255,255,.08);
+}
+[data-theme="dark"] .tr-home-contest-icon{
+  background: linear-gradient(135deg, rgba(167,139,250,.22), rgba(124,58,237,.28));
+  color: #c4b5fd;
+}
+[data-theme="dark"] .tr-home-contest-btn{
+  background: var(--s2);
+  border-color: rgba(167,139,250,.40);
+  color: #c4b5fd;
+}
+[data-theme="dark"] .tr-home-contest-btn:hover{
+  background: var(--ac2);
+  color: #fff;
+}
+[data-theme="dark"] .tr-home-contest-live{
+  color: #fca5a5;
+}
+[data-theme="dark"] .tr-home-contest-live::before{
+  background: #f87171;
+}
+
+/* Scrollbar thumbs */
+[data-theme="dark"] .tr-home-paths::-webkit-scrollbar-thumb,
+[data-theme="dark"] .tr-home-board::-webkit-scrollbar-thumb{
+  background: rgba(255,255,255,.14);
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   RESPONSIVE — tablet (≤980) + phone (≤640) + small phone (≤420)
+   ═══════════════════════════════════════════════════════════════ */
+
+/* Tablet (existing breakpoint, expanded) */
 @media (max-width: 980px){
   .tr-home-stats{grid-template-columns:repeat(2,1fr)}
   .tr-home-grid{grid-template-columns:1fr}
   .tr-home-daily{grid-template-columns:auto 1fr;gap:12px}
   .tr-home-daily-timer{grid-column:1 / -1;justify-content:center}
   .tr-home-daily-btn{grid-column:1 / -1;justify-content:center}
+  .tr-home-launch{grid-template-columns:1fr;text-align:center}
+  .tr-home-launch-art{margin:0 auto}
+}
+
+/* Phone (≤640px) */
+@media (max-width: 640px){
+  .tr-home-stat-card{padding:14px;gap:12px}
+  .tr-home-stat-icon{width:44px;height:44px;border-radius:11px}
+  .tr-home-stat-icon svg{width:22px;height:22px}
+  .tr-home-stat-num{font-size:30px}
+  .tr-home-stat-lbl{font-size:10.5px;letter-spacing:1.2px}
+
+  .tr-home-daily{padding:12px 14px;gap:12px}
+  .tr-home-daily-icon{width:40px;height:40px}
+  .tr-home-daily-icon svg{width:22px;height:22px}
+  .tr-home-daily-title{font-size:14px}
+  .tr-home-daily-meta{font-size:11px}
+  .tr-home-timer-cell{min-width:40px;padding:5px 3px}
+  .tr-home-timer-num{font-size:16px}
+  .tr-home-timer-lbl{font-size:8.5px}
+  .tr-home-daily-btn{padding:9px 14px;font-size:12.5px}
+
+  .tr-home-card{padding:14px;border-radius:12px}
+  .tr-home-card-title{font-size:11px;letter-spacing:1.4px}
+
+  .tr-home-launch{padding:14px;min-height:auto}
+  .tr-home-launch-name{font-size:16px}
+  .tr-home-launch-tag{font-size:12px}
+  .tr-home-launch-btn{padding:8px 14px;font-size:12px}
+  .tr-home-launch-art{width:80px;height:80px}
+
+  .tr-home-contest-card{padding:11px 12px;grid-template-columns:auto 1fr;gap:10px;flex-wrap:wrap}
+  .tr-home-contest-icon{width:36px;height:36px}
+  .tr-home-contest-count{grid-column:2;font-size:11px}
+  .tr-home-contest-btn{grid-column:1 / -1;width:100%;justify-content:center;padding:9px 12px}
+
+  .tr-home-podium{gap:8px}
+  .tr-home-podium-avatar{width:46px;height:46px;font-size:14px}
+  .tr-home-podium-name{font-size:11.5px}
+  .tr-home-podium-xp{font-size:10px}
+
+  .tr-home-board-row{padding:6px 8px;gap:8px}
+  .tr-home-board-avatar{width:22px;height:22px;font-size:9px}
+  .tr-home-board-name{font-size:11.5px}
+  .tr-home-board-xp{font-size:11px}
+}
+
+/* Small phone (≤420px) — extra-compact */
+@media (max-width: 420px){
+  .tr-home-stats{grid-template-columns:1fr 1fr;gap:8px}
+  .tr-home-stat-card{padding:12px;gap:10px}
+  .tr-home-stat-icon{width:38px;height:38px}
+  .tr-home-stat-num{font-size:26px}
+  .tr-home-stat-lbl{font-size:10px}
+
+  .tr-home-daily{grid-template-columns:auto 1fr;gap:10px;padding:11px 12px}
+  .tr-home-daily-timer{gap:4px}
+  .tr-home-timer-cell{min-width:34px;padding:4px 2px}
+  .tr-home-timer-num{font-size:14px}
+
+  .tr-home-card{padding:12px;border-radius:11px}
+  .tr-home-launch-name{font-size:15px}
+  .tr-home-launch-art{width:60px;height:60px}
 }
 `;
 
@@ -654,27 +833,10 @@ export default function HomeTab({
           </div>
         </div>
 
-        {/* ─────────── Launch Platform + Live Contests ─────────── */}
-        <div className="tr-home-grid">
+        {/* ─────────── Launch Platform + Live Contests (full-width stacked) ─────────── */}
+        <div className="tr-home-stack">
 
-          {/* Launch Platform */}
-          <div className="tr-home-launch fadeUp">
-            <div>
-              <div className="tr-home-launch-name">
-                ThreatReady.io
-                <span className="tr-home-launch-badge">New</span>
-              </div>
-              <div className="tr-home-launch-tag">
-                <strong>Real-world incidents.</strong>
-                Real-time readiness.
-              </div>
-              <button className="tr-home-launch-btn" onClick={() => { setDashTab("interview"); localStorage.setItem('cyberprep_tab', 'interview'); }}>
-                Launch Platform {I.arrow}
-              </button>
-            </div>
-            <div className="tr-home-launch-art" aria-hidden="true">{I.shield}</div>
-          </div>
-
+         
           {/* Live Contests */}
           <div className="tr-home-card fadeUp" style={{ padding: 14 }}>
             <div className="tr-home-card-head" style={{ marginBottom: 10 }}>

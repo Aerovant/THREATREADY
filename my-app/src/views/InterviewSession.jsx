@@ -28,24 +28,21 @@ const readFileAsText = (file) => new Promise((resolve, reject) => {
 // ─── Panelist directory ─────────────────────────────────────────────────
 // Each panelist's photo loads from your React app's public/panelists/ folder.
 //
-// TO MAKE THE PHOTOS APPEAR (one-time setup):
-//   1. Create the folder:        D:\cyberprep-api\my-app\public\panelists\
-//   2. Save each panelist photo into that folder with these EXACT filenames:
-//        maya.jpg      ← Maya Chen (Security Architect)
-//        marcus.jpg    ← Marcus Rodriguez (IR Lead)
-//        sarah.jpg     ← Sarah Okonkwo (CISO)
-//        aiden.jpg     ← Aiden Wright (Threat Hunter)
-//        priya.jpg     ← Priya Subramanian (AppSec Engineer)
-//        raj.jpg       ← Raj Patel (Red Team Lead)
-//   3. Refresh — the photos render exactly as saved (no resize, no recompress).
+// Photos in use (must exist at these exact paths):
+//   D:\cyberprep-api\my-app\public\panelists\maya.jpg
+//   D:\cyberprep-api\my-app\public\panelists\marcus.jpg
+//   D:\cyberprep-api\my-app\public\panelists\sarah.jpg
+//   D:\cyberprep-api\my-app\public\panelists\aiden.jpg
+//   D:\cyberprep-api\my-app\public\panelists\priya.jpg
+//   D:\cyberprep-api\my-app\public\panelists\raj.jpg
 //
 // Policy:
 //   - The app displays ONLY the literal image file at the URL — no proxying,
 //     no transformation, no AI regeneration, no placeholder substitution.
-//   - If a file is missing, the Avatar component falls back to colored
-//     initials. It will never request an AI portrait service or substitute
-//     a generated face.
-//   - Square (1:1) JPEG/PNG works best. ~400×400 minimum recommended.
+//   - If any file is missing, that panelist falls back to colored initials.
+//     The app never requests an external image service or generated face.
+//   - To replace any panelist photo: just overwrite the file in
+//     public/panelists/ with a new image (same filename) and hard-refresh.
 const PANELISTS = [
   {
     id: "maya",
@@ -1195,7 +1192,7 @@ export default function InterviewSession({
 .tr-is-btn{
   display:inline-flex;align-items:center;gap:7px;
   padding:8px 14px;
-  background:#fff;border:1px solid var(--bd,#e9e5f3);
+  background:var(--s1);border:1px solid var(--bd,#e9e5f3);
   border-radius:9px;
   font-size:12.5px;font-weight:600;color:var(--tx1,#1a1a2e);
   cursor:pointer;font-family:inherit;
@@ -1236,7 +1233,7 @@ export default function InterviewSession({
 
 /* Panelist card */
 .tr-is-pcard{
-  background:#fff;
+  background:var(--s1);
   border:1px solid var(--bd,#e9e5f3);
   border-radius:12px;
   padding:0;
@@ -1360,7 +1357,7 @@ export default function InterviewSession({
   cursor:pointer;outline:none;
   transition:background .15s ease;
 }
-.tr-is-history-head:hover{background:#fafafa}
+.tr-is-history-head:hover{background:var(--s2)}
 .tr-is-history-head:focus-visible{background:rgba(124,58,237,.04)}
 .tr-is-history-lbl{
   font-size:11.5px;font-weight:800;color:#7c3aed;
@@ -1426,7 +1423,7 @@ export default function InterviewSession({
 .tr-is-textarea{
   width:100%;min-height:110px;
   padding:14px 16px;
-  background:#fafafa;
+  background:var(--s2);
   border:1px solid var(--bd,#e9e5f3);
   border-radius:11px;
   font-size:13.5px;line-height:1.6;
@@ -1439,7 +1436,7 @@ export default function InterviewSession({
 .tr-is-textarea:focus{
   border-color:#7c3aed;
   box-shadow:0 0 0 3px rgba(124,58,237,.08);
-  background:#fff;
+  background:var(--s1);
 }
 .tr-is-textarea::placeholder{color:var(--tx2,#8890b0)}
 .tr-is-textarea:disabled{opacity:.6;cursor:not-allowed}
@@ -1493,6 +1490,137 @@ export default function InterviewSession({
 }
 .tr-is-submit-btn:hover:not(:disabled){background:#6d28d9;transform:translateY(-1px);box-shadow:0 6px 18px rgba(124,58,237,.35)}
 .tr-is-submit-btn:disabled{opacity:.4;cursor:not-allowed;box-shadow:none;transform:none}
+
+/* ═══════════════════════════════════════════════════════════════
+   DARK MODE OVERRIDES — InterviewSession (light-theme by default)
+   The token swaps above handle solid surfaces; these patch:
+    • panelist card visibility (opacity:.55 → .72 in dark mode so names stay readable)
+    • title color (was hardcoded color from p.color, but inactive needs override)
+    • shadows + borders
+    • input + answer textarea
+   ═══════════════════════════════════════════════════════════════ */
+
+[data-theme="dark"] .tr-is-pcard{
+  background: linear-gradient(180deg, rgba(255,255,255,.025) 0%, var(--s1) 100%);
+  border-color: rgba(255,255,255,.10);
+  /* Bump inactive opacity so names remain legible in dark mode */
+  opacity: .72;
+}
+[data-theme="dark"] .tr-is-pcard.active{
+  opacity: 1;
+  background: linear-gradient(180deg, rgba(255,255,255,.06) 0%, var(--s1) 100%);
+  border-color: rgba(167,139,250,.30);
+  box-shadow: 0 8px 22px rgba(0,0,0,.40), 0 0 0 1px rgba(167,139,250,.10);
+}
+[data-theme="dark"] .tr-is-pcard-name{
+  color: #f0eefa;
+}
+[data-theme="dark"] .tr-is-pcard-specialty{
+  color: var(--tx3);
+}
+[data-theme="dark"] .tr-is-pcard-dot{
+  border-color: var(--s1);
+}
+
+/* Question zone + active stage in dark */
+[data-theme="dark"] .tr-is-question-zone,
+[data-theme="dark"] .tr-is-question-area,
+[data-theme="dark"] .tr-is-active-stage{
+  background: var(--s1);
+  border-color: rgba(255,255,255,.08);
+}
+[data-theme="dark"] .tr-is-asked-by{
+  background: rgba(167,139,250,.10);
+  color: #c4b5fd;
+  border-color: rgba(167,139,250,.25);
+}
+
+/* Conversation history in dark mode */
+[data-theme="dark"] .tr-is-history-head{
+  background: var(--s2);
+  border-color: var(--bd);
+}
+[data-theme="dark"] .tr-is-history-head:hover{
+  background: rgba(255,255,255,.05);
+}
+[data-theme="dark"] .tr-is-history-body{
+  background: var(--s1);
+  border-color: var(--bd);
+}
+[data-theme="dark"] .tr-is-history-msg-user,
+[data-theme="dark"] .tr-is-history-msg-ai{
+  background: var(--s2);
+  border-color: rgba(255,255,255,.08);
+  color: var(--tx1);
+}
+
+/* Answer input area */
+[data-theme="dark"] .tr-is-answer-area,
+[data-theme="dark"] .tr-is-input-area,
+[data-theme="dark"] textarea.tr-is-textarea{
+  background: var(--s2);
+  border-color: var(--bd);
+  color: var(--tx1);
+}
+[data-theme="dark"] textarea.tr-is-textarea::placeholder{
+  color: var(--tx3);
+}
+
+/* Typing indicator */
+[data-theme="dark"] .tr-is-typing{
+  color: var(--tx3);
+}
+
+/* Mode buttons (Type / Voice) */
+[data-theme="dark"] .tr-is-mode-btn{
+  background: var(--s2);
+  border-color: var(--bd);
+  color: var(--tx2);
+}
+[data-theme="dark"] .tr-is-mode-btn.active{
+  background: linear-gradient(135deg, #a78bfa, #7c3aed);
+  color: #fff;
+  border-color: transparent;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   RESPONSIVE — InterviewSession (tablet + phone)
+   ═══════════════════════════════════════════════════════════════ */
+
+@media (max-width: 960px){
+  .tr-is-panel{padding:14px}
+  .tr-is-pcard-photo > div{width:96px !important;height:96px !important;min-width:96px !important;min-height:96px !important}
+  .tr-is-pcard-name{font-size:13px}
+  .tr-is-pcard-title{font-size:11.5px}
+  .tr-is-pcard-specialty{font-size:10.5px}
+  .tr-is-question-zone{padding:14px 16px 18px}
+}
+
+@media (max-width: 640px){
+  .tr-is-panel{padding:10px}
+  .tr-is-panel-grid{gap:8px}
+  .tr-is-pcard{border-radius:10px}
+  .tr-is-pcard-photo{padding:10px 10px 6px}
+  .tr-is-pcard-photo > div{width:74px !important;height:74px !important;min-width:74px !important;min-height:74px !important}
+  .tr-is-pcard-name{font-size:11.5px;margin:4px 6px 1px}
+  .tr-is-pcard-title{font-size:10.5px;margin:0 6px 1px}
+  .tr-is-pcard-specialty{font-size:10px;margin:0 6px 10px}
+  .tr-is-pcard-dot{width:11px;height:11px;right:16px;bottom:10px}
+  .tr-is-question-zone{padding:12px 12px 14px}
+  .tr-is-asked-by{font-size:10px;padding:3px 9px}
+  .tr-is-history-head{padding:10px 12px;font-size:12px}
+  .tr-is-textarea{min-height:80px;font-size:13.5px;padding:10px 12px}
+  .tr-is-mode-btn{padding:6px 11px;font-size:12px}
+  .tr-is-submit-btn{padding:10px 18px;font-size:13px}
+}
+
+@media (max-width: 420px){
+  .tr-is-panel-grid{grid-template-columns:repeat(2,1fr)}
+  .tr-is-pcard-photo > div{width:62px !important;height:62px !important;min-width:62px !important;min-height:62px !important}
+  .tr-is-pcard-name{font-size:11px}
+  .tr-is-pcard-title{font-size:10px}
+  .tr-is-pcard-specialty{display:none}
+}
       `}</style>
 
       {/* End Interview confirm — clean floating card, NO dark backdrop */}
@@ -1612,8 +1740,8 @@ function EndInterviewConfirm({ onCancel, onConfirm }) {
         left: "50%",
         transform: "translate(-50%, -50%)",
         zIndex: 9999,
-        background: "#ffffff",
-        border: "1px solid #e9e5f3",
+        background: "var(--s1)",
+        border: "1px solid var(--bd)",
         borderRadius: 14,
         maxWidth: 440,
         width: "calc(100% - 40px)",
@@ -1622,7 +1750,7 @@ function EndInterviewConfirm({ onCancel, onConfirm }) {
           "0 24px 64px rgba(20, 14, 50, 0.18), 0 6px 20px rgba(124,58,237,0.10)",
         animation: "trEndPopIn .25s cubic-bezier(0.16, 1, 0.3, 1) both",
         fontFamily: "'Inter','Segoe UI',sans-serif",
-        color: "#1a1a2e",
+        color: "var(--tx1)",
       }}
     >
       <style>{`
@@ -1652,7 +1780,7 @@ function EndInterviewConfirm({ onCancel, onConfirm }) {
         style={{
           fontSize: 19,
           fontWeight: 800,
-          color: "#1a1a2e",
+          color: "var(--tx1)",
           margin: "0 0 10px",
           letterSpacing: -0.2,
         }}
@@ -1662,7 +1790,7 @@ function EndInterviewConfirm({ onCancel, onConfirm }) {
       <p
         style={{
           fontSize: 13,
-          color: "#8890b0",
+          color: "var(--tx2)",
           lineHeight: 1.6,
           margin: "0 0 22px",
         }}
@@ -1680,8 +1808,8 @@ function EndInterviewConfirm({ onCancel, onConfirm }) {
             fontSize: 13,
             fontWeight: 600,
             background: "transparent",
-            border: "1px solid #e9e5f3",
-            color: "#1a1a2e",
+            border: "1px solid var(--bd)",
+            color: "var(--tx1)",
             borderRadius: 9,
             cursor: "pointer",
             fontFamily: "inherit",
@@ -1693,8 +1821,8 @@ function EndInterviewConfirm({ onCancel, onConfirm }) {
             e.currentTarget.style.background = "rgba(124,58,237,0.04)";
           }}
           onMouseLeave={(e) => {
-            e.currentTarget.style.borderColor = "#e9e5f3";
-            e.currentTarget.style.color = "#1a1a2e";
+            e.currentTarget.style.borderColor = "var(--bd)";
+            e.currentTarget.style.color = "var(--tx1)";
             e.currentTarget.style.background = "transparent";
           }}
         >

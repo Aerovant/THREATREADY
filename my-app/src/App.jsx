@@ -272,6 +272,39 @@ export default function ThreatReady() {
     }
   }, []);
 
+  // ── Theme state (reactive — drives icon switch + lets topbar render correctly) ──
+  const [appTheme, setAppTheme] = useState(() => {
+    try {
+      const saved = localStorage.getItem('cyberprep_theme');
+      return saved === 'dark' ? 'dark' : 'light';
+    } catch (_) { return 'light'; }
+  });
+  const toggleAppTheme = () => {
+    const next = appTheme === 'dark' ? 'light' : 'dark';
+    setAppTheme(next);
+    document.documentElement.setAttribute('data-theme', next);
+    try { localStorage.setItem('cyberprep_theme', next); } catch (_) {}
+  };
+
+  // ── Mobile sidebar drawer state ──
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const openSidebar  = () => setSidebarOpen(true);
+  const closeSidebar = () => setSidebarOpen(false);
+  // Auto-close drawer if viewport widens past tablet breakpoint
+  useEffect(() => {
+    const onResize = () => { if (window.innerWidth >= 980) setSidebarOpen(false); };
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, []);
+  // Lock body scroll when drawer is open on mobile
+  useEffect(() => {
+    if (sidebarOpen) {
+      const prev = document.body.style.overflow;
+      document.body.style.overflow = 'hidden';
+      return () => { document.body.style.overflow = prev; };
+    }
+  }, [sidebarOpen]);
+
   // ── Sync view state when URL changes from external source (back/forward, manual edit) ──
   useEffect(() => {
     
@@ -1835,12 +1868,7 @@ export default function ThreatReady() {
     localStorage.removeItem('cyberprep_streak');
     localStorage.removeItem('cyberprep_completed_scenarios');
     localStorage.removeItem('cyberprep_local_sessions');
-   
     localStorage.removeItem('cyberprep_hr_paid');
-    localStorage.removeItem('isPaid');
-    localStorage.removeItem('cyberprep_nav_history');
-
-
     setUser(null); setUserType('b2c'); setSettingsName('');
     setResumeText(''); setTargetRole(''); setExperienceLevel('');
     setResumeAiData(null); setReadiness(null);
@@ -1853,16 +1881,10 @@ export default function ThreatReady() {
     // Clear all login form fields so next user doesn't see previous credentials
     setAuthEmail(''); setAuthPassword(''); setAuthName('');
     setAuthError(''); setOtpCode(''); setOtpError('');
-
     setAuthMode('login'); setAuthStep('form');
     setView("landing");
-    // CRITICAL: clear the URL so refresh/theme-toggle doesn't bounce back to /dashboard.
-    // setView writes localStorage + React state, but the browser URL still says
-    // /app/dashboard. Any subsequent re-render that runs the URL-sync useEffect
-    // reads that stale URL and routes us back. Force the URL to /app/ now.
-    window.history.replaceState({}, "", "/app/");
   };
-  
+
   const logout = () => showConfirm('Are you sure you want to logout?', doLogout);
 
   // ═══════════════════════════════════════════════════════════════
@@ -2288,15 +2310,33 @@ export default function ThreatReady() {
   min-width: 0;
 }
 .tr-dash-premium-btn {
-  width: 100%; padding: 8px 12px;
-  background: #fff; color: #6d28d9;
+  width: 100%; padding: 9px 12px;
+  background: #ffffff !important;
+  color: #6d28d9 !important;
   border: none; border-radius: 9px;
   font-size: 12.5px; font-weight: 700;
   cursor: pointer; font-family: inherit;
   display: inline-flex; align-items: center; justify-content: center; gap: 6px;
   transition: all .2s ease;
+  box-shadow: 0 4px 12px rgba(0,0,0,.15);
 }
-.tr-dash-premium-btn:hover { transform: translateY(-1px); box-shadow: 0 8px 18px rgba(0,0,0,.18); }
+.tr-dash-premium-btn:hover {
+  background: #ffffff !important;
+  color: #5b21b6 !important;
+  transform: translateY(-1px);
+  box-shadow: 0 8px 18px rgba(0,0,0,.25);
+}
+/* The button sits on top of the purple gradient card → keep white-on-purple
+   in BOTH themes so it always reads cleanly. !important blocks any inline-style
+   or global catch-all rules from changing the bg or text color. */
+[data-theme="dark"] .tr-dash-premium-btn {
+  background: #ffffff !important;
+  color: #6d28d9 !important;
+}
+[data-theme="dark"] .tr-dash-premium-btn:hover {
+  background: #ffffff !important;
+  color: #5b21b6 !important;
+}
 
 /* Push content right on desktop */
 @media (min-width: 980px) {
@@ -2426,12 +2466,98 @@ export default function ThreatReady() {
   .tr-dash-avatar-btn { padding: 4px; }
 }
 
+/* ─── HAMBURGER BUTTON — desktop hidden, mobile visible ─── */
+.tr-dash-burger{
+  display: none;
+  width: 38px; height: 38px;
+  align-items: center; justify-content: center;
+  background: transparent;
+  border: 1px solid #e3dcf2;
+  color: #1a1530;
+  border-radius: 9px;
+  cursor: pointer;
+  transition: all .2s ease;
+  flex-shrink: 0;
+  margin-right: auto;
+}
+.tr-dash-burger:hover{ border-color: #7c3aed; color: #7c3aed; background: rgba(124,58,237,.05); }
+.tr-dash-burger svg{ width: 20px; height: 20px; }
+[data-theme="dark"] .tr-dash-burger{ border-color: rgba(255,255,255,.14); color: #f0eefa; }
+[data-theme="dark"] .tr-dash-burger:hover{ border-color: #c4b5fd; color: #c4b5fd; background: rgba(167,139,250,.08); }
+
+/* ─── MOBILE SIDEBAR BACKDROP — fades in when drawer is open ─── */
+.tr-dash-sidebar-backdrop{
+  position: fixed; inset: 0;
+  background: rgba(15, 10, 31, 0.55);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  z-index: 50;
+  opacity: 0; pointer-events: none;
+  transition: opacity .25s ease;
+}
+.tr-dash-sidebar-backdrop.open{ opacity: 1; pointer-events: auto; }
+[data-theme="dark"] .tr-dash-sidebar-backdrop{ background: rgba(0, 0, 0, 0.65); }
+@media (min-width: 980px){ .tr-dash-sidebar-backdrop{ display: none; } }
+
+/* ─── MOBILE: show hamburger, sidebar becomes a 280px slide-in drawer ─── */
+@media (max-width: 979px) {
+  .tr-dash-burger{ display: inline-flex; }
+  .tr-dash-sidebar{
+    position: fixed; top: 0; left: 0; bottom: 0;
+    width: 280px; max-width: 84vw;
+    z-index: 60;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, .35);
+  }
+  [data-theme="dark"] .tr-dash-sidebar{
+    box-shadow: 0 20px 60px rgba(0, 0, 0, .65);
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   GLOBAL TEXT VISIBILITY RULES — applied across entire dashboard
+   Force dark-mode legibility on common UI patterns.
+   ═══════════════════════════════════════════════════════════════ */
+
+/* Sidebar nav text: stronger in dark mode (was #b8b0d4 = 5:1; #d4cce8 = 9:1) */
+[data-theme="dark"] .tr-dash-nav-btn { color: #d4cce8 !important; font-weight: 500; }
+[data-theme="dark"] .tr-dash-nav-btn:hover { background: rgba(167,139,250,.12); color: #ffffff !important; }
+[data-theme="dark"] .tr-dash-nav-btn.active { background: rgba(167,139,250,.22); color: #c4b5fd !important; font-weight: 700; }
+
+/* Logo wordmark always crisp */
+[data-theme="dark"] .tr-dash-logo { color: #ffffff !important; }
+
+/* Topbar text in dark */
+[data-theme="dark"] .tr-dash-xp { color: #f0eefa; background: rgba(255,255,255,.06); border-color: rgba(255,255,255,.10); }
+[data-theme="dark"] .tr-dash-avatar-name { color: #f0eefa; }
+
+/* Premium Access card content stays bright */
+[data-theme="dark"] .tr-dash-premium-li-text { color: #ffffff; }
+[data-theme="dark"] .tr-dash-premium { color: #ffffff; }
+
+/* Generic page headings + sub */
+[data-theme="dark"] h1, [data-theme="dark"] h2, [data-theme="dark"] h3,
+[data-theme="dark"] h4, [data-theme="dark"] h5, [data-theme="dark"] h6 {
+  color: #ffffff;
+}
+
+/* Buttons in dark mode — force strong text */
+[data-theme="dark"] button:not([class*="bp"]):not([class*="primary"]):not([class*="bdn"]):not([class*="bok"]) {
+  color: var(--tx1);
+}
+
 /* Hide the OLD horizontal nav-tabs entirely on this dashboard render */
 .tr-dash-cnt .nav-tabs { display: none !important; }
           `}</style>
 
+          {/* ── MOBILE BACKDROP — fades in when sidebar drawer is open ── */}
+          <div
+            className={`tr-dash-sidebar-backdrop${sidebarOpen ? ' open' : ''}`}
+            onClick={closeSidebar}
+            aria-hidden="true"
+          />
+
           {/* ── SIDEBAR ── */}
-          <aside className="tr-dash-sidebar">
+          <aside className={`tr-dash-sidebar${sidebarOpen ? ' open' : ''}`}>
             <div className="tr-dash-logo">
               <span className="tr-dash-logo-icon" aria-hidden="true">
                 <svg width="32" height="30" viewBox="0 0 48 46" fill="none">
@@ -2472,7 +2598,7 @@ export default function ThreatReady() {
                 return (
                   <button key={id} type="button"
                     className={"tr-dash-nav-btn " + (dashTab === id ? "active" : "")}
-                    onClick={() => { setDashTab(id); localStorage.setItem('cyberprep_tab', id); }}>
+                    onClick={() => { setDashTab(id); localStorage.setItem('cyberprep_tab', id); closeSidebar(); }}>
                     {ico}<span>{label}</span>
                   </button>
                 );
@@ -2556,6 +2682,21 @@ export default function ThreatReady() {
 
           {/* ── TOPBAR ── */}
           <header className="tr-dash-topbar">
+            {/* Hamburger — mobile only, opens sidebar drawer */}
+            <button
+              type="button"
+              className="tr-dash-burger"
+              onClick={openSidebar}
+              aria-label="Open navigation menu"
+              aria-expanded={sidebarOpen}
+            >
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <line x1="3" y1="6"  x2="21" y2="6"/>
+                <line x1="3" y1="12" x2="21" y2="12"/>
+                <line x1="3" y1="18" x2="21" y2="18"/>
+              </svg>
+            </button>
+
             <div className="tr-dash-xp">
               <svg viewBox="0 0 24 24" fill="currentColor"><path d="M13 2L3 14h7l-1 8 11-12h-7l1-8z"/></svg>
               {xp} XP
@@ -2602,13 +2743,14 @@ export default function ThreatReady() {
             </div>
 
             {/* Theme toggle */}
-            <button type="button" className="tr-dash-iconbtn" onClick={() => {
-              const cur = document.documentElement.getAttribute('data-theme') === 'dark' ? 'dark' : 'light';
-              const next = cur === 'dark' ? 'light' : 'dark';
-              document.documentElement.setAttribute('data-theme', next);
-              localStorage.setItem('cyberprep_theme', next);
-            }} title="Toggle theme">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+            <button type="button" className="tr-dash-iconbtn" onClick={toggleAppTheme}
+              title={appTheme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
+              aria-label={appTheme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}>
+              {appTheme === 'dark' ? (
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/></svg>
+              ) : (
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+              )}
             </button>
 
             {/* Avatar + Dropdown */}
@@ -3025,12 +3167,7 @@ export default function ThreatReady() {
               </div>
 
 
-              <button className="btn bs" style={{ padding: "5px 10px", fontSize: 12, marginRight: 8 }} onClick={() => {
-                const cur = document.documentElement.getAttribute('data-theme') === 'dark' ? 'dark' : 'light';
-                const next = cur === 'dark' ? 'light' : 'dark';
-                document.documentElement.setAttribute('data-theme', next);
-                localStorage.setItem('cyberprep_theme', next);
-              }} title="Toggle theme">{document.documentElement.getAttribute('data-theme') === 'dark' ? '☀' : '🌙'}</button>
+              <button className="btn bs" style={{ padding: "5px 10px", fontSize: 12, marginRight: 8 }} onClick={toggleAppTheme} title={appTheme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}>{appTheme === 'dark' ? '☀' : '🌙'}</button>
               <button className="btn bs" style={{ padding: "5px 10px", fontSize: 12 }} onClick={logout}>Logout</button>
 
             </div>

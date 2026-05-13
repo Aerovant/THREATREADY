@@ -58,7 +58,7 @@ const PROFILE_CSS = `
 .tr-prof-input{
   width:100%;
   padding:11px 14px;
-  background:#fff;
+  background:var(--s1);
   border:1px solid var(--bd,#e9e5f3);
   border-radius:10px;
   font-size:13.5px;color:var(--tx1);font-weight:500;
@@ -101,7 +101,7 @@ const PROFILE_CSS = `
   width:22px;height:22px;
   border:1.5px solid var(--bd,#d4cce8);
   border-radius:6px;
-  background:#fff;cursor:pointer;
+  background:var(--s1);cursor:pointer;
   display:grid;place-items:center;
   flex-shrink:0;
   transition:all .15s ease;
@@ -137,13 +137,28 @@ const PROFILE_CSS = `
   border-radius:12px;
   padding:14px 16px;
 }
+[data-theme="dark"] .tr-prof-ai{
+  background:linear-gradient(135deg, rgba(167,139,250,.10), rgba(124,58,237,.06));
+  border-color: rgba(167,139,250,.30);
+}
 .tr-prof-ai-h{font-size:11.5px;font-weight:700;color:#7c3aed;letter-spacing:1.5px;text-transform:uppercase;margin-bottom:7px}
+[data-theme="dark"] .tr-prof-ai-h{color:#c4b5fd}
 .tr-prof-pills{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px}
 .tr-prof-pill{
-  background:#fff;border:1px solid #c4b5fd;color:#6d28d9;
+  background:var(--s1);border:1px solid #c4b5fd;color:#6d28d9;
   font-size:12px;padding:4px 10px;border-radius:12px;font-weight:600;
 }
+[data-theme="dark"] .tr-prof-pill{
+  background: rgba(167,139,250,.10);
+  border-color: rgba(167,139,250,.30);
+  color:#c4b5fd;
+}
 .tr-prof-pill.warn{border-color:#fcd34d;color:#92400e;background:#fffbeb}
+[data-theme="dark"] .tr-prof-pill.warn{
+  background: rgba(252,211,77,.10);
+  border-color: rgba(252,211,77,.30);
+  color: #fde68a;
+}
 
 /* Readiness card */
 .tr-prof-readiness{text-align:center;padding:6px 0}
@@ -277,25 +292,107 @@ export default function ProfileTab({
   };
 
   const handleDownloadReport = () => {
-    // Client-side generated snapshot (JSON). No backend dependency.
-    const payload = {
-      generated_at: new Date().toISOString(),
-      user: { name: fullName, email },
-      privacy: { public: privPublic, leaderboard: privLeaderboard, benchmark: privBenchmark },
-      career_goals: { target_role: targetRole, experience_level: experienceLevel },
-      resume_text: resumeText || "",
-      readiness: readiness || null,
-    };
-    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `threatready-profile-${new Date().toISOString().slice(0,10)}.json`;
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    URL.revokeObjectURL(url);
-    showToast("Report downloaded", "success");
+    // Generates a print-ready PDF (opens print dialog in new window)
+    const generated = new Date().toLocaleString();
+    const esc = (s) => String(s == null ? "" : s)
+      .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;").replace(/'/g, "&#39;").replace(/\n/g, "<br>");
+
+    const privacyRow = (label, val) => `
+      <tr><td>${esc(label)}</td><td><strong>${val ? "Yes" : "No"}</strong></td></tr>`;
+
+    const readinessSection = readiness ? `
+      <div class="section">
+        <div class="section-h">Readiness Snapshot</div>
+        <div class="readiness-grid">
+          ${Object.entries(readiness).map(([k, v]) => `
+            <div class="kv"><div class="k">${esc(k)}</div><div class="v">${esc(typeof v === "object" ? JSON.stringify(v) : v)}</div></div>
+          `).join("")}
+        </div>
+      </div>` : "";
+
+    const html = `<!doctype html>
+<html><head><meta charset="utf-8"><title>ThreatReady — Profile Report</title>
+<style>
+  @page { margin: 14mm 12mm; size: A4 portrait; }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:'Inter','Segoe UI',Arial,sans-serif;color:#0f0a1f;padding:24px;font-size:12px;line-height:1.55}
+  .head{display:flex;justify-content:space-between;align-items:flex-end;border-bottom:2px solid #7c3aed;padding-bottom:14px;margin-bottom:18px}
+  .brand{font-size:22px;font-weight:800;letter-spacing:-.3px;color:#7c3aed}
+  .brand .ico{display:inline-block;margin-right:6px}
+  .meta{text-align:right;font-size:11px;color:#5b5475}
+  h1{font-size:22px;font-weight:800;margin:2px 0 4px;letter-spacing:-.4px;color:#0f0a1f}
+  .sub{font-size:12px;color:#5b5475}
+  .section{margin:20px 0 14px;page-break-inside:avoid}
+  .section-h{font-size:10px;font-weight:800;letter-spacing:2px;color:#7c3aed;text-transform:uppercase;margin-bottom:8px;padding-bottom:5px;border-bottom:1px solid #e3dcf2}
+  .grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  .kv{padding:11px 14px;border:1px solid #e3dcf2;border-radius:9px;background:#faf8ff}
+  .k{font-size:10px;font-weight:700;letter-spacing:1.2px;color:#5b5475;text-transform:uppercase;margin-bottom:4px}
+  .v{font-size:13px;color:#0f0a1f;font-weight:600;word-break:break-word}
+  table{width:100%;border-collapse:collapse;font-size:12px;border:1px solid #e3dcf2;border-radius:9px;overflow:hidden}
+  th{background:#f6f3ff;color:#5b5475;text-align:left;padding:9px 12px;font-size:10px;font-weight:800;letter-spacing:.8px;text-transform:uppercase;border-bottom:1px solid #e3dcf2}
+  td{padding:10px 12px;border-bottom:1px solid #f0eafa}
+  tr:last-child td{border-bottom:none}
+  .resume{padding:14px;border:1px solid #e3dcf2;border-radius:9px;background:#faf8ff;font-size:12px;line-height:1.65;color:#0f0a1f;white-space:pre-wrap}
+  .empty{padding:14px;text-align:center;color:#8b85a4;font-size:11px;border:1px dashed #e3dcf2;border-radius:8px}
+  .readiness-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  .foot{margin-top:24px;padding-top:14px;border-top:1px solid #e3dcf2;font-size:10px;color:#8b85a4;text-align:center}
+</style></head><body>
+<div class="head">
+  <div>
+    <div class="brand"><span class="ico">⚡</span>THREATREADY</div>
+    <h1>Profile Report</h1>
+    <div class="sub">${esc(fullName || "User")} · ${esc(email || "—")}</div>
+  </div>
+  <div class="meta">Generated<br><strong>${esc(generated)}</strong></div>
+</div>
+
+<div class="section">
+  <div class="section-h">Account Information</div>
+  <div class="grid">
+    <div class="kv"><div class="k">Full Name</div><div class="v">${esc(fullName || "—")}</div></div>
+    <div class="kv"><div class="k">Email Address</div><div class="v">${esc(email || "—")}</div></div>
+  </div>
+</div>
+
+<div class="section">
+  <div class="section-h">Privacy Preferences</div>
+  <table>
+    <thead><tr><th>Setting</th><th>Status</th></tr></thead>
+    <tbody>
+      ${privacyRow("Make profile public", privPublic)}
+      ${privacyRow("Include in leaderboard", privLeaderboard)}
+      ${privacyRow("Allow benchmarking data", privBenchmark)}
+    </tbody>
+  </table>
+</div>
+
+<div class="section">
+  <div class="section-h">Career Goals</div>
+  <div class="grid">
+    <div class="kv"><div class="k">Target Role</div><div class="v">${esc(targetRole || "—")}</div></div>
+    <div class="kv"><div class="k">Experience Level</div><div class="v">${esc(experienceLevel || "—")}</div></div>
+  </div>
+</div>
+
+<div class="section">
+  <div class="section-h">Resume / Context</div>
+  ${resumeText ? `<div class="resume">${esc(resumeText)}</div>` : `<div class="empty">No resume context uploaded yet.</div>`}
+</div>
+
+${readinessSection}
+
+<div class="foot">ThreatReady · Cybersecurity Interview Prep · Generated ${esc(generated)}</div>
+
+<script>window.onload = function(){ setTimeout(function(){ window.print(); }, 200); };</script>
+</body></html>`;
+
+    const w = window.open("", "_blank", "width=900,height=1100");
+    if (!w) { showToast("Pop-up blocked — please allow pop-ups to download your PDF report.", "error"); return; }
+    w.document.open();
+    w.document.write(html);
+    w.document.close();
+    showToast("PDF report ready — check the new window", "success");
   };
 
   const handleDeleteAccount = async () => {

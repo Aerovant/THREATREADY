@@ -114,7 +114,7 @@ const BADGES_CSS = `
   cursor:pointer;
 }
 .tr-badges-milestone-row:last-child{border-bottom:none}
-.tr-badges-milestone-row:hover{background:#faf8ff}
+.tr-badges-milestone-row:hover{background:var(--s2)}
 .tr-badges-milestone-emoji{font-size:18px;line-height:1;width:24px;text-align:center}
 .tr-badges-milestone-label{font-size:13.5px;color:var(--tx1);font-weight:500}
 .tr-badges-milestone-progress{
@@ -126,13 +126,136 @@ const BADGES_CSS = `
 .tr-badges-milestone-chev{color:var(--tx2);display:grid;place-items:center}
 .tr-badges-milestone-chev svg{width:16px;height:16px}
 
-/* Mobile */
+/* ═══════════════════════════════════════════════════════════════
+   DARK MODE OVERRIDES — gradients + tier chips + slot states
+   ═══════════════════════════════════════════════════════════════ */
+
+/* Stat icons (Badges Earned / Rare Badges / Total Points / 30-Day Streak) */
+[data-theme="dark"] .tr-badges-stat-icon{
+  background: rgba(167,139,250,.18);
+  color: #c4b5fd;
+}
+[data-theme="dark"] .tr-badges-stat:hover{
+  box-shadow: 0 12px 28px rgba(0,0,0,.40), 0 0 0 1px rgba(167,139,250,.10);
+}
+
+/* Section labels (YOUR BADGES / MILESTONES) */
+[data-theme="dark"] .tr-badges-section-label{
+  color: #c4b5fd;
+}
+
+/* Big cards (YOUR BADGES card + MILESTONES card) */
+[data-theme="dark"] .tr-badges-card,
+[data-theme="dark"] .tr-badges-milestones{
+  background: linear-gradient(180deg, rgba(255,255,255,.025) 0%, var(--s1) 100%);
+  border-color: rgba(255,255,255,.08);
+  box-shadow: 0 1px 0 rgba(255,255,255,.04) inset, 0 8px 24px rgba(0,0,0,.30);
+}
+
+/* Slot tiles (the 12 badge slots inside YOUR BADGES) */
+[data-theme="dark"] .tr-badges-slot{
+  background: rgba(255,255,255,.04);
+  border-color: rgba(255,255,255,.08);
+}
+[data-theme="dark"] .tr-badges-slot:hover{
+  border-color: rgba(167,139,250,.30);
+  box-shadow: 0 6px 18px rgba(0,0,0,.40), 0 0 0 1px rgba(167,139,250,.10);
+}
+
+/* EARNED slot variant — was light purple gradient */
+[data-theme="dark"] .tr-badges-slot.earned{
+  background: linear-gradient(135deg, rgba(167,139,250,.18), rgba(124,58,237,.12));
+  border-color: rgba(167,139,250,.35);
+}
+[data-theme="dark"] .tr-badges-slot.earned .tr-badges-slot-status{
+  color: #c4b5fd;
+}
+
+/* Tier chips — preserve their warm tier colors but adapt for dark bg */
+[data-theme="dark"] .tr-badges-tier.bronze{
+  background: rgba(217,119,6,.18);
+  color: #fbbf24;
+}
+[data-theme="dark"] .tr-badges-tier.silver{
+  background: rgba(148,163,184,.18);
+  color: #cbd5e1;
+}
+[data-theme="dark"] .tr-badges-tier.gold{
+  background: rgba(245,158,11,.20);
+  color: #fde68a;
+}
+[data-theme="dark"] .tr-badges-tier.platinum{
+  background: rgba(167,139,250,.22);
+  color: #c4b5fd;
+}
+
+/* Milestone rows */
+[data-theme="dark"] .tr-badges-milestone-row{
+  border-bottom-color: rgba(255,255,255,.06);
+}
+[data-theme="dark"] .tr-badges-milestone-row:hover{
+  background: rgba(167,139,250,.08);
+}
+[data-theme="dark"] .tr-badges-milestone-progress{
+  color: #c4b5fd;
+}
+[data-theme="dark"] .tr-badges-milestone-progress.done{
+  color: #34d399;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   RESPONSIVE — tablet (≤880) + phone (≤640) + small (≤420)
+   ═══════════════════════════════════════════════════════════════ */
+
+/* Tablet */
 @media (max-width:880px){
   .tr-badges-stats{grid-template-columns:repeat(2,1fr)}
   .tr-badges-grid{grid-template-columns:repeat(2,1fr)}
 }
-@media (max-width:560px){
+
+/* Phone */
+@media (max-width: 640px){
+  .tr-badges-stat{padding:14px;gap:12px}
+  .tr-badges-stat-icon{width:42px;height:42px}
+  .tr-badges-stat-icon svg{width:20px;height:20px}
+  .tr-badges-stat-num{font-size:22px}
+  .tr-badges-stat-lbl{font-size:12px}
+  .tr-badges-stat-sub{font-size:10.5px}
+
+  .tr-badges-card{padding:16px;border-radius:14px;margin-bottom:14px}
+  .tr-badges-section-label{font-size:11px;letter-spacing:1.6px;margin-bottom:10px}
+
+  .tr-badges-slot{padding:11px 12px;gap:11px}
+  .tr-badges-slot-icon{width:42px;height:42px}
+  .tr-badges-slot-icon svg{width:26px;height:26px}
+  .tr-badges-slot-name{font-size:12.5px}
+  .tr-badges-slot-status{font-size:10.5px}
+
+  .tr-badges-tier{font-size:8.5px;padding:2px 6px;margin-left:4px}
+
+  .tr-badges-milestone-row{padding:12px 14px;gap:11px}
+  .tr-badges-milestone-emoji{font-size:16px}
+  .tr-badges-milestone-label{font-size:12.5px}
+  .tr-badges-milestone-progress{font-size:12px}
+  .tr-badges-milestone-chev svg{width:14px;height:14px}
+}
+
+/* Small phone */
+@media (max-width: 560px){
   .tr-badges-grid{grid-template-columns:1fr}
+}
+
+@media (max-width: 420px){
+  .tr-badges-stats{grid-template-columns:1fr 1fr;gap:8px}
+  .tr-badges-stat{padding:12px;gap:10px}
+  .tr-badges-stat-icon{width:36px;height:36px}
+  .tr-badges-stat-icon svg{width:18px;height:18px}
+  .tr-badges-stat-num{font-size:19px}
+  .tr-badges-stat-lbl{font-size:11.5px}
+
+  .tr-badges-card{padding:14px;border-radius:12px}
+  .tr-badges-slot{padding:10px 11px}
+  .tr-badges-milestone-row{padding:10px 12px}
 }
 `;
 

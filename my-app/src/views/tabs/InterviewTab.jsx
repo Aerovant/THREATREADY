@@ -85,14 +85,14 @@ const IV_CSS = `
   flex:1;
   display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;
   padding:18px 12px;
-  background:#fff;
+  background:var(--s1);
   border:1.5px dashed #d4cce8;
   border-radius:10px;
   cursor:pointer;
   text-align:center;
   transition:all .2s ease;
 }
-.tr-iv-upload-zone:hover{background:#faf8ff;border-color:#a78bfa}
+.tr-iv-upload-zone:hover{background:var(--s2);border-color:#a78bfa}
 .tr-iv-upload-zone.active{background:rgba(124,58,237,.05);border-color:#7c3aed;border-style:solid}
 .tr-iv-upload-zone svg.upload-icon{width:24px;height:24px;color:#7c3aed;margin-bottom:2px}
 .tr-iv-upload-main{font-size:13px;font-weight:600;color:var(--tx1)}
@@ -125,7 +125,7 @@ const IV_CSS = `
   cursor:pointer;font-family:inherit;
   transition:all .2s ease;
 }
-.tr-iv-analyze-btn:hover:not(:disabled){border-color:#a78bfa;background:#faf8ff;transform:translateY(-1px)}
+.tr-iv-analyze-btn:hover:not(:disabled){border-color:#a78bfa;background:var(--s2);transform:translateY(-1px)}
 .tr-iv-analyze-btn:disabled{opacity:.5;cursor:not-allowed}
 .tr-iv-analyze-result{
   margin:0 0 22px;padding:14px 16px;
@@ -157,7 +157,7 @@ const IV_CSS = `
 .tr-iv-select{
   width:100%;
   padding:11px 14px;
-  background:#fff;
+  background:var(--s1);
   border:1px solid var(--bd,#e9e5f3);
   border-radius:10px;
   font-size:13.5px;color:var(--tx1);font-weight:500;
@@ -171,7 +171,7 @@ const IV_CSS = `
 .tr-iv-duration-custom{margin-top:12px;display:flex;align-items:center;gap:10px}
 .tr-iv-duration-custom input{
   flex:1;padding:11px 14px;
-  background:#fff;border:1px solid var(--bd,#e9e5f3);
+  background:var(--s1);border:1px solid var(--bd,#e9e5f3);
   border-radius:10px;font-size:13.5px;color:var(--tx1);font-family:inherit;
 }
 .tr-iv-duration-total{font-size:12px;color:var(--tx2);margin-top:10px;font-weight:500}
@@ -388,13 +388,13 @@ const IV_CSS = `
 }
 .tr-iv-history-latest-btn.primary{background:#7c3aed;color:#fff;box-shadow:0 2px 6px rgba(124,58,237,.20)}
 .tr-iv-history-latest-btn.primary:hover{background:#6d28d9;transform:translateY(-1px)}
-.tr-iv-history-latest-btn.outline{background:#fff;border:1px solid var(--bd,#e9e5f3);color:var(--tx1,#1a1a2e)}
+.tr-iv-history-latest-btn.outline{background:var(--s1);border:1px solid var(--bd,#e9e5f3);color:var(--tx1,#1a1a2e)}
 .tr-iv-history-latest-btn.outline:hover{border-color:#7c3aed;color:#7c3aed;background:rgba(124,58,237,.04)}
 
 /* Empty preview */
 .tr-iv-history-empty-preview{
   padding:18px 12px;text-align:center;
-  background:#fafafa;
+  background:var(--s2);
   border:1px dashed var(--bd,#e9e5f3);
   border-radius:11px;
 }
@@ -433,7 +433,7 @@ const IV_CSS = `
 
 /* ── Modal container ── */
 .tr-iv-modal{
-  background:#fff;
+  background:var(--s1);
   border-radius:16px;
   width:100%;
   max-width:920px;
@@ -477,7 +477,7 @@ const IV_CSS = `
 .tr-iv-modal-stat{
   display:flex;align-items:center;gap:11px;
   padding:12px 14px;
-  background:#fff;border:1px solid var(--bd,#e9e5f3);
+  background:var(--s1);border:1px solid var(--bd,#e9e5f3);
   border-radius:11px;
 }
 .tr-iv-modal-stat-icon{
@@ -501,19 +501,19 @@ const IV_CSS = `
   display:flex;gap:10px;flex-wrap:wrap;
   padding:16px 28px;
   border-bottom:1px solid var(--bd,#e9e5f3);
-  background:#fff;
+  background:var(--s1);
   flex-shrink:0;
 }
 .tr-iv-modal-search{
   position:relative;flex:1;min-width:240px;
   display:flex;align-items:center;
-  background:#fafafa;
+  background:var(--s2);
   border:1px solid var(--bd,#e9e5f3);
   border-radius:10px;
   padding:9px 36px 9px 38px;
   transition:border-color .15s,box-shadow .15s;
 }
-.tr-iv-modal-search:focus-within{border-color:#7c3aed;box-shadow:0 0 0 3px rgba(124,58,237,.08);background:#fff}
+.tr-iv-modal-search:focus-within{border-color:#7c3aed;box-shadow:0 0 0 3px rgba(124,58,237,.08);background:var(--s1)}
 .tr-iv-modal-search-icon{position:absolute;left:13px;top:50%;transform:translateY(-50%);color:var(--tx2,#8890b0);display:inline-flex}
 .tr-iv-modal-search input{flex:1;border:none;background:transparent;outline:none;font-size:13px;color:var(--tx1,#1a1a2e);font-family:inherit;width:100%}
 .tr-iv-modal-search input::placeholder{color:var(--tx2,#8890b0)}
@@ -527,7 +527,7 @@ const IV_CSS = `
 .tr-iv-modal-search-clear:hover{background:rgba(0,0,0,.04);color:#dc2626}
 .tr-iv-modal-filter{
   padding:9px 14px;
-  background:#fafafa;
+  background:var(--s2);
   border:1px solid var(--bd,#e9e5f3);
   border-radius:10px;
   font-size:12.5px;font-weight:600;color:var(--tx1,#1a1a2e);
@@ -539,7 +539,7 @@ const IV_CSS = `
 .tr-iv-modal-count{
   padding:10px 28px;
   font-size:12px;color:var(--tx2,#8890b0);
-  background:#fafafa;border-bottom:1px solid var(--bd,#e9e5f3);
+  background:var(--s2);border-bottom:1px solid var(--bd,#e9e5f3);
   flex-shrink:0;
 }
 .tr-iv-modal-count strong{color:#7c3aed;font-weight:800}
@@ -566,7 +566,7 @@ const IV_CSS = `
 /* History item */
 .tr-iv-history-item{
   display:flex;gap:16px;
-  background:#fff;border:1px solid var(--bd,#e9e5f3);
+  background:var(--s1);border:1px solid var(--bd,#e9e5f3);
   border-radius:12px;
   padding:16px 18px;
   transition:all .15s ease;
@@ -597,7 +597,7 @@ const IV_CSS = `
 }
 .tr-iv-history-badge{color:#b45309;font-weight:700;font-size:11px}
 .tr-iv-history-item-id{font-size:10.5px;color:var(--tx2,#8890b0);font-family:monospace}
-.tr-iv-history-item-id code{background:#fafafa;padding:1px 6px;border-radius:4px;border:1px solid var(--bd,#e9e5f3);color:#7c3aed;font-size:10px}
+.tr-iv-history-item-id code{background:var(--s2);padding:1px 6px;border-radius:4px;border:1px solid var(--bd,#e9e5f3);color:#7c3aed;font-size:10px}
 
 .tr-iv-history-item-actions{display:flex;flex-direction:column;gap:6px;align-items:stretch;min-width:170px;flex-shrink:0}
 
@@ -613,7 +613,7 @@ const IV_CSS = `
 }
 .tr-iv-modal-btn.primary{background:#7c3aed;color:#fff;box-shadow:0 4px 12px rgba(124,58,237,.20)}
 .tr-iv-modal-btn.primary:hover{background:#6d28d9;transform:translateY(-1px);box-shadow:0 6px 16px rgba(124,58,237,.30)}
-.tr-iv-modal-btn.outline{background:#fff;border:1px solid var(--bd,#e9e5f3);color:var(--tx1,#1a1a2e)}
+.tr-iv-modal-btn.outline{background:var(--s1);border:1px solid var(--bd,#e9e5f3);color:var(--tx1,#1a1a2e)}
 .tr-iv-modal-btn.outline:hover{border-color:#7c3aed;color:#7c3aed;background:rgba(124,58,237,.04)}
 .tr-iv-modal-btn.small{padding:6px 10px;font-size:11.5px;flex:1}
 .tr-iv-modal-btn.big{padding:12px 22px;font-size:14px;flex:1}
@@ -659,7 +659,7 @@ const IV_CSS = `
 .tr-iv-detail-tags{display:flex;gap:6px;justify-content:center;flex-wrap:wrap}
 .tr-iv-detail-tag{
   display:inline-flex;align-items:center;gap:4px;
-  padding:4px 11px;background:#fff;border:1px solid var(--bd,#e9e5f3);
+  padding:4px 11px;background:var(--s1);border:1px solid var(--bd,#e9e5f3);
   border-radius:7px;font-size:11px;font-weight:700;color:var(--tx1,#1a1a2e);
 }
 .tr-iv-detail-tag.ok{background:rgba(16,185,129,.12);border-color:rgba(16,185,129,.25);color:#059669}
@@ -671,7 +671,7 @@ const IV_CSS = `
   display:flex;align-items:center;gap:24px;
   padding:22px 28px;
   border-bottom:1px solid var(--bd,#e9e5f3);
-  background:#fff;
+  background:var(--s1);
 }
 @media (max-width:600px){.tr-iv-detail-score-card{flex-direction:column;align-items:stretch}}
 .tr-iv-detail-score-left{flex-shrink:0}
@@ -700,11 +700,11 @@ const IV_CSS = `
 }
 @media (max-width:600px){.tr-iv-detail-grid{grid-template-columns:repeat(2,1fr)}}
 .tr-iv-detail-cell{
-  padding:14px;background:#fafafa;border:1px solid var(--bd,#e9e5f3);
+  padding:14px;background:var(--s2);border:1px solid var(--bd,#e9e5f3);
   border-radius:11px;text-align:center;
   transition:all .15s ease;
 }
-.tr-iv-detail-cell:hover{border-color:#7c3aed;background:#fff;transform:translateY(-1px)}
+.tr-iv-detail-cell:hover{border-color:#7c3aed;background:var(--s1);transform:translateY(-1px)}
 .tr-iv-detail-cell-icon{
   width:32px;height:32px;
   border-radius:9px;
@@ -735,14 +735,14 @@ const IV_CSS = `
 .tr-iv-detail-actions{
   display:flex;gap:10px;
   padding:20px 28px;
-  background:#fafafa;
+  background:var(--s2);
   flex-wrap:wrap;
 }
 
 /* ── Full saved-report overlay (renders InterviewReport from saved payload) ── */
 .tr-iv-full-report-overlay{
   position:fixed;inset:0;z-index:10001;
-  background:#fff;
+  background:var(--s1);
   display:flex;flex-direction:column;
   overflow:hidden;
   animation:trIvFadeBg .25s ease both;
@@ -750,7 +750,7 @@ const IV_CSS = `
 .tr-iv-full-report-nav{
   display:flex;justify-content:space-between;align-items:center;gap:12px;
   padding:12px 24px;
-  background:#fff;
+  background:var(--s1);
   border-bottom:1px solid var(--bd,#e9e5f3);
   box-shadow:0 1px 2px rgba(0,0,0,.02);
   flex-shrink:0;z-index:2;
@@ -768,13 +768,104 @@ const IV_CSS = `
 .tr-iv-full-report-body{
   flex:1;
   overflow-y:auto;
-  background:#fafafa;
+  background:var(--s2);
 }
 .tr-iv-full-report-body::-webkit-scrollbar{width:10px}
 .tr-iv-full-report-body::-webkit-scrollbar-thumb{background:#d4ccea;border-radius:5px}
 .tr-iv-full-report-body::-webkit-scrollbar-thumb:hover{background:#7c3aed}
 /* InterviewReport inside the overlay should not duplicate the topbar clearance */
 .tr-iv-full-report-body > .fadeUp{padding-top:24px !important}
+
+/* ═══════════════════════════════════════════════════════════════
+   DARK MODE OVERRIDES — gradients + special cards
+   The token swaps above handle solid surfaces; these patch the
+   hardcoded light gradients + the warning yellow card.
+   ═══════════════════════════════════════════════════════════════ */
+
+/* Hover states on upload zone / analyze button — were light purple #faf8ff */
+[data-theme="dark"] .tr-iv-upload-zone:hover,
+[data-theme="dark"] .tr-iv-analyze-btn:hover:not(:disabled){
+  background: rgba(167,139,250,.10);
+  border-color: #a78bfa;
+}
+
+/* AI analysis gradient blocks */
+[data-theme="dark"] [style*="linear-gradient(135deg,#faf8ff,#f3eeff)"],
+[data-theme="dark"] [style*="linear-gradient(135deg, #faf8ff, #f3eeff)"]{
+  background: linear-gradient(135deg, rgba(167,139,250,.10), rgba(124,58,237,.06)) !important;
+}
+
+/* History panel & report-side gradient cards (line 347, 472) */
+.tr-iv-history-side,
+.tr-iv-history-card,
+.tr-iv-history-latest,
+.tr-iv-history-detail-side{
+  /* Light mode has linear-gradient(180deg,#faf8ff 0%,#fff 100%) — leave as is */
+}
+[data-theme="dark"] .tr-iv-history-side,
+[data-theme="dark"] .tr-iv-history-card,
+[data-theme="dark"] .tr-iv-history-latest,
+[data-theme="dark"] .tr-iv-history-detail-side,
+[data-theme="dark"] [class*="tr-iv-history-"]:not(button):not([class*="btn"]){
+  background: linear-gradient(180deg, rgba(255,255,255,.025) 0%, var(--s1) 100%) !important;
+  border-color: var(--bd) !important;
+}
+
+/* Warning yellow card (line 251) */
+[data-theme="dark"] [style*="background:#fffbe6"],
+[data-theme="dark"] .tr-iv-warning,
+[data-theme="dark"] [class*="warning-card"]{
+  background: rgba(252,211,77,.10) !important;
+  border-color: rgba(252,211,77,.30) !important;
+  color: #fde68a !important;
+}
+
+/* Modal headers + footers with light bgs */
+[data-theme="dark"] [class*="tr-iv-modal-head"],
+[data-theme="dark"] [class*="tr-iv-modal-foot"],
+[data-theme="dark"] [class*="tr-iv-modal-search"]{
+  background: var(--s2) !important;
+  border-color: var(--bd) !important;
+}
+
+/* Scrollbar thumb in dark mode */
+[data-theme="dark"] .tr-iv-full-report-body::-webkit-scrollbar-thumb{
+  background: rgba(255,255,255,.12);
+}
+[data-theme="dark"] .tr-iv-full-report-body::-webkit-scrollbar-thumb:hover{
+  background: #a78bfa;
+}
+
+/* Outline button (used in history latest) — had bg:#fff */
+[data-theme="dark"] .tr-iv-history-latest-btn.outline{
+  background: var(--s1) !important;
+  border-color: var(--bd) !important;
+  color: var(--tx1) !important;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   RESPONSIVE — InterviewTab specific breakpoints
+   ═══════════════════════════════════════════════════════════════ */
+
+@media (max-width: 960px){
+  .tr-iv-grid-2col{grid-template-columns:1fr !important;gap:14px !important}
+  .tr-iv-history-side{margin-top:14px}
+  .tr-iv-upload-zone{padding:24px 16px}
+  .tr-iv-modal{width:96vw !important;max-height:90vh}
+}
+@media (max-width: 640px){
+  .tr-iv-card{padding:14px}
+  .tr-iv-upload-zone{padding:18px 12px}
+  .tr-iv-upload-zone .upload-icon{width:32px;height:32px}
+  .tr-iv-analyze-btn{padding:10px 14px;font-size:13px}
+  .tr-iv-modal{padding:14px !important}
+  .tr-iv-modal-head{padding:12px 14px !important}
+  .tr-iv-modal-search{padding:8px 12px !important}
+}
+@media (max-width: 420px){
+  .tr-iv-card{padding:12px;border-radius:10px}
+  .tr-iv-upload-zone{padding:14px 10px}
+}
 `;
 
 // ── Icons (all sized explicitly so they can't balloon) ──
@@ -1052,7 +1143,7 @@ export default function InterviewTab({
 <title>Interview Report — Session #${esc(shortId)}</title>
 <style>
   *{box-sizing:border-box;margin:0;padding:0}
-  html,body{background:#fff;color:#1a1a2e;font-family:'Inter','Segoe UI',Arial,sans-serif;line-height:1.55}
+  html,body{background:var(--s1);color:#1a1a2e;font-family:'Inter','Segoe UI',Arial,sans-serif;line-height:1.55}
   body{padding:36px 44px;max-width:840px;margin:0 auto;font-size:13px}
   .head{border-bottom:2px solid #7c3aed;padding-bottom:14px;margin-bottom:22px}
   .head .pill{display:inline-block;padding:4px 11px;background:rgba(124,58,237,.10);color:#7c3aed;border-radius:7px;font-size:10px;font-weight:800;letter-spacing:1.5px;text-transform:uppercase;margin-bottom:8px}
@@ -1085,15 +1176,15 @@ export default function InterviewTab({
   ul.growth li::before{content:"→";color:#f59e0b}
   .tags{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
   .tag{display:inline-block;padding:4px 10px;background:rgba(124,58,237,.08);color:#7c3aed;border-radius:7px;font-size:11px;font-weight:600}
-  .q{padding:12px 14px;background:#fafafa;border:1px solid #e9e5f3;border-radius:9px;margin-bottom:10px;page-break-inside:avoid}
+  .q{padding:12px 14px;background:var(--s2);border:1px solid #e9e5f3;border-radius:9px;margin-bottom:10px;page-break-inside:avoid}
   .q-head{font-size:10.5px;font-weight:800;color:#7c3aed;text-transform:uppercase;letter-spacing:.8px;margin-bottom:6px}
   .q-text{font-weight:600;margin-bottom:6px;font-size:12.5px}
-  .q-ans{font-size:12px;color:#1a1a2e;background:#fff;padding:8px 10px;border-radius:6px;border-left:3px solid #22c55e;margin-bottom:6px;white-space:pre-wrap}
+  .q-ans{font-size:12px;color:#1a1a2e;background:var(--s1);padding:8px 10px;border-radius:6px;border-left:3px solid #22c55e;margin-bottom:6px;white-space:pre-wrap}
   .q-scores{font-size:11px;color:#8890b0}
   .qscore{margin-right:6px}
   .q-fb{font-size:11.5px;color:#1a1a2e;margin-top:6px;padding:6px 10px;border-left:3px solid #7c3aed;background:rgba(124,58,237,.04);border-radius:6px}
   .meta-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin:10px 0 22px}
-  .meta-cell{padding:11px;background:#fafafa;border:1px solid #e9e5f3;border-radius:8px;text-align:center}
+  .meta-cell{padding:11px;background:var(--s2);border:1px solid #e9e5f3;border-radius:8px;text-align:center}
   .meta-lbl{font-size:9.5px;color:#8890b0;text-transform:uppercase;letter-spacing:.8px;font-weight:700;margin-bottom:3px}
   .meta-val{font-size:12.5px;font-weight:700}
   .foot{margin-top:32px;padding-top:14px;border-top:1px solid #e9e5f3;text-align:center;font-size:10.5px;color:#8890b0}
@@ -1750,6 +1841,7 @@ export default function InterviewTab({
                 report={detailReport.report}
                 onHome={() => { setDetailReport(null); setHistoryOpen(false); }}
                 onRestart={() => { setDetailReport(null); setHistoryOpen(false); }}
+                hideActions={true}
               />
             ) : (
               <div className="tr-iv-modal-empty" style={{ padding: 80 }}>
@@ -1764,7 +1856,7 @@ export default function InterviewTab({
           </div>
         </div>
       )}
-      
+    
 
       {/* ── Module full-UI popup (unchanged) ── */}
       {popupModule && (() => {

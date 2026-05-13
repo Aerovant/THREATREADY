@@ -286,7 +286,7 @@ export default function SettingsTab({
       const scoreRows = scores.map(s => `<tr><td style="padding:10px;font-weight:600">${roleNames[s.role_id] || s.role_id}</td><td style="padding:10px;font-weight:800;color:${s.total_score >= 7 ? '#00e096' : s.total_score >= 5 ? '#ffab40' : '#ff5252'}">${parseFloat(s.total_score || 0).toFixed(1)}/10</td><td style="padding:10px;color:${s.badge_level === 'Platinum' ? '#e2e8f0' : s.badge_level === 'Gold' ? '#f59e0b' : s.badge_level === 'Silver' ? '#94a3b8' : '#b45309'}">${s.badge_level || '—'}</td><td style="padding:10px">${s.percentile || 0}th percentile</td><td style="padding:10px;color:#8890b0">${new Date(s.updated_at).toLocaleDateString()}</td></tr>`).join('');
       const sessionRows = sessions.slice(0, 10).map(s => `<tr><td style="padding:8px;color:#8890b0">${s.scenario_id || '—'}</td><td style="padding:8px;font-weight:700;color:${parseFloat(s.overall_score || 0) >= 7 ? '#00e096' : parseFloat(s.overall_score || 0) >= 5 ? '#ffab40' : '#ff5252'}">${s.overall_score ? parseFloat(s.overall_score).toFixed(1) + '/10' : 'Incomplete'}</td><td style="padding:8px;color:${s.badge === 'Gold' ? '#f59e0b' : s.badge === 'Platinum' ? '#e2e8f0' : '#94a3b8'}">${s.badge || '—'}</td><td style="padding:8px;color:#ffab40">+${s.earned_xp || 0} XP</td><td style="padding:8px;color:#8890b0">${s.completed_at ? new Date(s.completed_at).toLocaleDateString() : 'In Progress'}</td></tr>`).join('');
       const badgeItems = bdgs.map(b => `<span style="display:inline-block;margin:4px;padding:6px 12px;border-radius:20px;font-size:11px;font-weight:700;background:rgba(0,229,255,.1);border:1px solid rgba(0,229,255,.3);color:#00e5ff">🏅 ${b.name}</span>`).join('');
-      const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>ThreatReady Report - ${u.name || 'User'}</title><style>*{box-sizing:border-box;margin:0;padding:0}body{font-family:'Segoe UI',Arial,sans-serif;background:#0a0e1a;color:#e8eaf6;padding:40px;line-height:1.6}.header{text-align:center;margin-bottom:36px;padding-bottom:24px;border-bottom:2px solid #1e2536}.logo{font-size:32px;font-weight:900;color:#00e5ff;letter-spacing:2px;margin-bottom:4px}.subtitle{font-size:13px;color:#8890b0}.name{font-size:22px;font-weight:800;margin:12px 0 4px}.email{font-size:13px;color:#8890b0}.stats-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin:24px 0}.stat{background:#111827;border:1px solid #1e2536;border-radius:12px;padding:16px;text-align:center}.stat-val{font-size:28px;font-weight:900;color:#00e5ff;font-family:monospace}.stat-lbl{font-size:10px;color:#8890b0;margin-top:4px;text-transform:uppercase;letter-spacing:1px}.section{margin:28px 0}.section-title{font-size:11px;font-weight:800;color:#00e5ff;letter-spacing:2px;text-transform:uppercase;margin-bottom:12px;padding-bottom:6px;border-bottom:1px solid #1e2536}table{width:100%;border-collapse:collapse;background:#111827;border-radius:10px;overflow:hidden}th{background:#1a1f2e;padding:10px;text-align:left;font-size:10px;color:#00e5ff;letter-spacing:1px;text-transform:uppercase}tr{border-bottom:1px solid #1e2536}tr:last-child{border-bottom:none}tr:hover{background:#1a1f2e}.footer{text-align:center;margin-top:40px;padding-top:20px;border-top:1px solid #1e2536;font-size:11px;color:#5a6380}@media print{body{background:#fff;color:#000}.header,.stat,.section{border-color:#ddd}.stat-val,.logo{color:#0066cc}th{background:#f0f0f0;color:#333}}</style></head><body><div class="header"><div class="logo">⚡ THREATREADY</div><div class="subtitle">Cybersecurity Assessment Platform — Personal Report</div><div class="name">${u.name || 'User'}</div><div class="email">${u.email || ''} &nbsp;·&nbsp; Member since ${new Date(u.created_at).toLocaleDateString()}</div></div><div class="stats-grid"><div class="stat"><div class="stat-val">${st.total_xp || 0}</div><div class="stat-lbl">Total XP</div></div><div class="stat"><div class="stat-val">${sessions.filter(s => s.completed_at).length}</div><div class="stat-lbl">Sessions Done</div></div><div class="stat"><div class="stat-val">${avgScore}</div><div class="stat-lbl">Avg Score</div></div><div class="stat"><div class="stat-val">${bestScore}</div><div class="stat-lbl">Best Score</div></div></div>${scores.length > 0 ? `<div class="section"><div class="section-title">Skill Scores by Role</div><table><thead><tr><th>Role</th><th>Score</th><th>Badge</th><th>Percentile</th><th>Last Updated</th></tr></thead><tbody>${scoreRows}</tbody></table></div>` : ''}${bdgs.length > 0 ? `<div class="section"><div class="section-title">Earned Badges (${bdgs.length})</div><div style="margin-top:8px">${badgeItems}</div></div>` : ''}${sessions.length > 0 ? `<div class="section"><div class="section-title">Recent Sessions (Last 10)</div><table><thead><tr><th>Scenario</th><th>Score</th><th>Badge</th><th>XP</th><th>Date</th></tr></thead><tbody>${sessionRows}</tbody></table></div>` : ''}<div class="footer">ThreatReady &nbsp;·&nbsp; Report generated on ${new Date().toLocaleString()} &nbsp;·&nbsp; Confidential</div></body></html>`;
+      const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>ThreatReady Report - ${u.name || 'User'}</title><style>*{box-sizing:border-box;margin:0;padding:0}body{font-family:'Segoe UI',Arial,sans-serif;background:#0a0e1a;color:#e8eaf6;padding:40px;line-height:1.6}.header{text-align:center;margin-bottom:36px;padding-bottom:24px;border-bottom:2px solid #1e2536}.logo{font-size:32px;font-weight:900;color:#00e5ff;letter-spacing:2px;margin-bottom:4px}.subtitle{font-size:13px;color:#8890b0}.name{font-size:22px;font-weight:800;margin:12px 0 4px}.email{font-size:13px;color:#8890b0}.stats-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin:24px 0}.stat{background:#111827;border:1px solid #1e2536;border-radius:12px;padding:16px;text-align:center}.stat-val{font-size:28px;font-weight:900;color:#00e5ff;font-family:monospace}.stat-lbl{font-size:10px;color:#8890b0;margin-top:4px;text-transform:uppercase;letter-spacing:1px}.section{margin:28px 0}.section-title{font-size:11px;font-weight:800;color:#00e5ff;letter-spacing:2px;text-transform:uppercase;margin-bottom:12px;padding-bottom:6px;border-bottom:1px solid #1e2536}table{width:100%;border-collapse:collapse;background:#111827;border-radius:10px;overflow:hidden}th{background:#1a1f2e;padding:10px;text-align:left;font-size:10px;color:#00e5ff;letter-spacing:1px;text-transform:uppercase}tr{border-bottom:1px solid #1e2536}tr:last-child{border-bottom:none}tr:hover{background:#1a1f2e}.footer{text-align:center;margin-top:40px;padding-top:20px;border-top:1px solid #1e2536;font-size:11px;color:#5a6380}@media print{body{background:var(--s1);color:#000}.header,.stat,.section{border-color:#ddd}.stat-val,.logo{color:#0066cc}th{background:#f0f0f0;color:#333}}</style></head><body><div class="header"><div class="logo">⚡ THREATREADY</div><div class="subtitle">Cybersecurity Assessment Platform — Personal Report</div><div class="name">${u.name || 'User'}</div><div class="email">${u.email || ''} &nbsp;·&nbsp; Member since ${new Date(u.created_at).toLocaleDateString()}</div></div><div class="stats-grid"><div class="stat"><div class="stat-val">${st.total_xp || 0}</div><div class="stat-lbl">Total XP</div></div><div class="stat"><div class="stat-val">${sessions.filter(s => s.completed_at).length}</div><div class="stat-lbl">Sessions Done</div></div><div class="stat"><div class="stat-val">${avgScore}</div><div class="stat-lbl">Avg Score</div></div><div class="stat"><div class="stat-val">${bestScore}</div><div class="stat-lbl">Best Score</div></div></div>${scores.length > 0 ? `<div class="section"><div class="section-title">Skill Scores by Role</div><table><thead><tr><th>Role</th><th>Score</th><th>Badge</th><th>Percentile</th><th>Last Updated</th></tr></thead><tbody>${scoreRows}</tbody></table></div>` : ''}${bdgs.length > 0 ? `<div class="section"><div class="section-title">Earned Badges (${bdgs.length})</div><div style="margin-top:8px">${badgeItems}</div></div>` : ''}${sessions.length > 0 ? `<div class="section"><div class="section-title">Recent Sessions (Last 10)</div><table><thead><tr><th>Scenario</th><th>Score</th><th>Badge</th><th>XP</th><th>Date</th></tr></thead><tbody>${sessionRows}</tbody></table></div>` : ''}<div class="footer">ThreatReady &nbsp;·&nbsp; Report generated on ${new Date().toLocaleString()} &nbsp;·&nbsp; Confidential</div></body></html>`;
       const w = window.open('', '_blank');
       w.document.write(html); w.document.close();
       setTimeout(() => w.print(), 600);
@@ -997,11 +997,11 @@ export default function SettingsTab({
 .tr-set-field{display:flex;flex-direction:column;gap:6px;min-width:0}
 .tr-set-label{font-size:12px;font-weight:600;color:var(--tx1,#1a1a2e)}
 .tr-set-label-sm{font-size:12px;font-weight:600;color:var(--tx1,#1a1a2e);margin-bottom:4px}
-.tr-set-input,.tr-set-select{padding:10px 12px;background:#fafafa;border:1px solid var(--bd,#e9e5f3);border-radius:8px;font-size:13px;color:var(--tx1,#1a1a2e);font-family:inherit;outline:none;transition:border-color .15s,box-shadow .15s;width:100%;box-sizing:border-box}
+.tr-set-input,.tr-set-select{padding:10px 12px;background:var(--s2);border:1px solid var(--bd,#e9e5f3);border-radius:8px;font-size:13px;color:var(--tx1,#1a1a2e);font-family:inherit;outline:none;transition:border-color .15s,box-shadow .15s;width:100%;box-sizing:border-box}
 .tr-set-select{cursor:pointer}
 .tr-set-select.narrow{width:auto;min-width:200px;max-width:280px}
 .tr-set-input:focus,.tr-set-select:focus{border-color:#7c3aed;box-shadow:0 0 0 3px rgba(124,58,237,.08)}
-.tr-set-input:disabled,.tr-set-select:disabled{opacity:.55;cursor:not-allowed;background:#f4f4f8}
+.tr-set-input:disabled,.tr-set-select:disabled{opacity:.55;cursor:not-allowed;background:var(--s3)}
 
 /* Buttons */
 .tr-set-btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;padding:10px 18px;background:#7c3aed;border:none;border-radius:9px;color:#fff;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;transition:all .15s ease}
@@ -1010,7 +1010,7 @@ export default function SettingsTab({
 .tr-set-btn.outline{background:transparent;border:1px solid var(--bd,#e9e5f3);color:var(--tx1,#1a1a2e)}
 .tr-set-btn.outline:hover{border-color:#7c3aed;color:#7c3aed;background:rgba(124,58,237,.04);transform:none;box-shadow:none}
 .tr-set-btn.danger{background:transparent;border:1px solid #fecaca;color:#dc2626}
-.tr-set-btn.danger:hover{background:#fef2f2;border-color:#dc2626;transform:none;box-shadow:none}
+.tr-set-btn.danger:hover{background:rgba(220,38,38,.10);border-color:#dc2626;transform:none;box-shadow:none}
 .tr-set-btn.full{width:100%}
 .tr-set-btn.small{padding:7px 12px;font-size:12px}
 
@@ -1033,7 +1033,7 @@ export default function SettingsTab({
 /* Table */
 .tr-set-table-wrap{overflow-x:auto;border:1px solid var(--bd,#e9e5f3);border-radius:10px}
 .tr-set-table{width:100%;border-collapse:collapse;font-size:13px}
-.tr-set-table th{padding:12px 14px;background:#fafafa;font-size:11px;font-weight:700;color:var(--tx2,#8890b0);letter-spacing:1px;text-transform:uppercase;text-align:left;border-bottom:1px solid var(--bd,#e9e5f3)}
+.tr-set-table th{padding:12px 14px;background:var(--s2);font-size:11px;font-weight:700;color:var(--tx2,#8890b0);letter-spacing:1px;text-transform:uppercase;text-align:left;border-bottom:1px solid var(--bd,#e9e5f3)}
 .tr-set-table td{padding:14px}
 .tr-set-empty-cell{text-align:center;padding:36px 14px !important}
 .tr-set-empty-icon{display:inline-flex;width:46px;height:46px;border-radius:11px;background:rgba(124,58,237,.08);color:#7c3aed;align-items:center;justify-content:center;margin-bottom:10px}
@@ -1053,7 +1053,7 @@ export default function SettingsTab({
 .tr-set-toggle{position:relative;display:inline-block;width:42px;height:24px;flex-shrink:0;cursor:pointer}
 .tr-set-toggle input{opacity:0;width:0;height:0}
 .tr-set-toggle-slider{position:absolute;inset:0;background:#cbd5e1;border-radius:24px;transition:background .2s}
-.tr-set-toggle-slider:before{content:"";position:absolute;width:18px;height:18px;left:3px;top:3px;background:#fff;border-radius:50%;transition:transform .2s;box-shadow:0 1px 3px rgba(0,0,0,.15)}
+.tr-set-toggle-slider:before{content:"";position:absolute;width:18px;height:18px;left:3px;top:3px;background:var(--s1);border-radius:50%;transition:transform .2s;box-shadow:0 1px 3px rgba(0,0,0,.15)}
 .tr-set-toggle input:checked + .tr-set-toggle-slider{background:#7c3aed}
 .tr-set-toggle input:checked + .tr-set-toggle-slider:before{transform:translateX(18px)}
 
@@ -1075,13 +1075,13 @@ export default function SettingsTab({
 
 .tr-set-session-row{display:flex;align-items:center;gap:14px;padding:12px 0;border-bottom:1px solid var(--bd,#e9e5f3)}
 .tr-set-session-row:last-of-type{border-bottom:none}
-.tr-set-session-device-icon{width:36px;height:36px;border-radius:9px;background:#fafafa;color:var(--tx2,#8890b0);display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.tr-set-session-device-icon{width:36px;height:36px;border-radius:9px;background:var(--s2);color:var(--tx2,#8890b0);display:flex;align-items:center;justify-content:center;flex-shrink:0}
 .tr-set-session-info{flex:1;min-width:0}
 .tr-set-session-name{font-size:13.5px;font-weight:600;color:var(--tx1,#1a1a2e);display:flex;align-items:center;gap:8px;flex-wrap:wrap}
 .tr-set-session-this-pill{display:inline-block;padding:2px 8px;background:rgba(124,58,237,.1);color:#7c3aed;border-radius:6px;font-size:10.5px;font-weight:700;letter-spacing:.3px}
 .tr-set-session-meta{font-size:11.5px;color:var(--tx2,#8890b0);margin-top:2px}
 .tr-set-session-time{font-size:12px;color:var(--tx2,#8890b0);font-weight:500;flex-shrink:0}
-.tr-set-session-empty{padding:18px;text-align:center;background:#fafafa;border-radius:10px;margin:6px 0 12px}
+.tr-set-session-empty{padding:18px;text-align:center;background:var(--s2);border-radius:10px;margin:6px 0 12px}
 
 .tr-set-activity-row{display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--bd,#e9e5f3)}
 .tr-set-activity-row:last-of-type{border-bottom:none}
@@ -1096,8 +1096,8 @@ export default function SettingsTab({
 /* ── Integrations ── */
 .tr-set-int-list{display:flex;flex-direction:column;gap:8px;margin-top:6px}
 .tr-set-int-row{display:flex;align-items:center;gap:14px;padding:14px 16px;background:var(--s1,#fff);border:1px solid var(--bd,#e9e5f3);border-radius:11px;cursor:pointer;transition:all .15s ease}
-.tr-set-int-row:hover{border-color:#d4ccea;background:#fafafa}
-.tr-set-int-logo{width:42px;height:42px;border-radius:10px;background:#fafafa;display:flex;align-items:center;justify-content:center;flex-shrink:0;overflow:hidden}
+.tr-set-int-row:hover{border-color:#c8bce8;background:var(--s2)}
+.tr-set-int-logo{width:42px;height:42px;border-radius:10px;background:var(--s2);display:flex;align-items:center;justify-content:center;flex-shrink:0;overflow:hidden}
 .tr-set-int-info{flex:1;min-width:0}
 .tr-set-int-name{font-size:14px;font-weight:700;color:var(--tx1,#1a1a2e);margin-bottom:3px}
 .tr-set-int-desc{font-size:12.5px;color:var(--tx2,#8890b0);line-height:1.5}
@@ -1126,7 +1126,7 @@ export default function SettingsTab({
 .tr-set-qa-link{display:flex;align-items:center;justify-content:space-between;padding:11px 14px;background:transparent;border:none;width:100%;font-size:13px;font-weight:500;color:var(--tx1,#1a1a2e);cursor:pointer;font-family:inherit;border-radius:8px;text-align:left;transition:background .15s,color .15s}
 .tr-set-qa-link:hover{background:rgba(124,58,237,.06)}
 .tr-set-qa-link.danger{color:#dc2626}
-.tr-set-qa-link.danger:hover{background:#fef2f2}
+.tr-set-qa-link.danger:hover{background:rgba(220,38,38,.10)}
 .tr-set-qa-link-left{display:inline-flex;align-items:center;gap:11px}
 .tr-set-qa-link-right{color:var(--tx2,#8890b0);display:inline-flex;align-items:center}
 
@@ -1144,6 +1144,253 @@ export default function SettingsTab({
 /* Fade animation */
 .tr-set-root .fadeUp{animation:trSetFade .35s ease both}
 @keyframes trSetFade{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
+
+/* ═══════════════════════════════════════════════════════════════
+   DARK MODE OVERRIDES — gradients, branded chips, hover states
+   ═══════════════════════════════════════════════════════════════ */
+
+/* Form inputs in dark mode — explicit override of input bg */
+[data-theme="dark"] .tr-set-input,
+[data-theme="dark"] .tr-set-select{
+  background: var(--s2);
+  color: var(--tx1);
+  border-color: var(--bd);
+}
+[data-theme="dark"] .tr-set-input:focus,
+[data-theme="dark"] .tr-set-select:focus{
+  border-color: #a78bfa;
+  box-shadow: 0 0 0 3px rgba(167,139,250,.18);
+}
+[data-theme="dark"] .tr-set-input:disabled,
+[data-theme="dark"] .tr-set-select:disabled{
+  background: var(--s1);
+  color: var(--tx3);
+}
+[data-theme="dark"] .tr-set-input::placeholder,
+[data-theme="dark"] .tr-set-select::placeholder{
+  color: var(--tx3);
+  opacity: 1;
+}
+
+/* Outline + danger buttons in dark mode */
+[data-theme="dark"] .tr-set-btn.outline{
+  border-color: rgba(255,255,255,.14);
+}
+[data-theme="dark"] .tr-set-btn.outline:hover{
+  border-color: #a78bfa;
+  color: #c4b5fd;
+  background: rgba(167,139,250,.10);
+}
+[data-theme="dark"] .tr-set-btn.danger{
+  background: transparent;
+  border-color: rgba(248,113,113,.40);
+  color: #fca5a5;
+}
+[data-theme="dark"] .tr-set-btn.danger:hover{
+  background: rgba(248,113,113,.12);
+  border-color: #f87171;
+}
+
+/* Tab navigation pill */
+[data-theme="dark"] .tr-set-tabs{
+  background: var(--s2);
+  border-color: var(--bd);
+}
+[data-theme="dark"] .tr-set-tab{
+  color: var(--tx2);
+}
+[data-theme="dark"] .tr-set-tab:hover:not(.active){
+  background: rgba(167,139,250,.08);
+  color: var(--tx1);
+}
+[data-theme="dark"] .tr-set-tab.active{
+  background: var(--s1);
+  color: #c4b5fd;
+}
+
+/* Table header */
+[data-theme="dark"] .tr-set-table th{
+  background: var(--s2);
+  border-color: var(--bd);
+}
+[data-theme="dark"] .tr-set-table tr{
+  border-color: var(--bd);
+}
+[data-theme="dark"] .tr-set-table-wrap{
+  border-color: var(--bd);
+}
+
+/* Toggle slider — off state needed lift in dark mode */
+[data-theme="dark"] .tr-set-toggle-slider{
+  background: rgba(255,255,255,.20);
+}
+[data-theme="dark"] .tr-set-toggle-slider:before{
+  background: #ffffff;
+  box-shadow: 0 1px 4px rgba(0,0,0,.40);
+}
+[data-theme="dark"] .tr-set-toggle input:checked + .tr-set-toggle-slider{
+  background: #a78bfa;
+}
+
+/* Notification section icon */
+[data-theme="dark"] .tr-set-notif-section-icon{
+  background: rgba(167,139,250,.15);
+  color: #c4b5fd;
+}
+[data-theme="dark"] .tr-set-notif-section-title{
+  color: #c4b5fd;
+}
+
+/* Acct pill + status pill + tier */
+[data-theme="dark"] .tr-set-acct-pill,
+[data-theme="dark"] .tr-set-account-tier{
+  background: rgba(167,139,250,.18);
+  color: #c4b5fd;
+}
+[data-theme="dark"] .tr-set-status-pill.green{
+  background: rgba(52,211,153,.18);
+  color: #6ee7b7;
+}
+[data-theme="dark"] .tr-set-empty-icon{
+  background: rgba(167,139,250,.15);
+  color: #c4b5fd;
+}
+
+/* Security toggle pill */
+[data-theme="dark"] .tr-set-sec-toggle-pill{
+  background: rgba(52,211,153,.18);
+  border-color: rgba(52,211,153,.30);
+  color: #6ee7b7;
+}
+[data-theme="dark"] .tr-set-sec-toggle-pill:not(.on){
+  background: rgba(255,255,255,.04);
+  border-color: var(--bd);
+  color: var(--tx3);
+}
+
+/* Session "this device" pill */
+[data-theme="dark"] .tr-set-session-this-pill{
+  background: rgba(167,139,250,.18);
+  color: #c4b5fd;
+}
+
+/* Account summary avatar */
+[data-theme="dark"] .tr-set-account-avatar{
+  background: linear-gradient(135deg, rgba(167,139,250,.30), rgba(124,58,237,.40));
+  color: #f0eefa;
+  border-color: var(--s1);
+}
+
+/* Quick Actions hover */
+[data-theme="dark"] .tr-set-qa-link:hover{
+  background: rgba(167,139,250,.10);
+}
+[data-theme="dark"] .tr-set-qa-link.danger{
+  color: #fca5a5;
+}
+[data-theme="dark"] .tr-set-qa-link.danger:hover{
+  background: rgba(248,113,113,.12);
+}
+
+/* Help & support */
+[data-theme="dark"] .tr-set-help-link:hover{
+  color: #c4b5fd;
+}
+[data-theme="dark"] .tr-set-help-note{
+  background: rgba(167,139,250,.10);
+}
+[data-theme="dark"] .tr-set-help-note-icon{
+  color: #c4b5fd;
+}
+[data-theme="dark"] .tr-set-inline-link{
+  color: #c4b5fd;
+}
+
+/* Integration status badge */
+[data-theme="dark"] .tr-set-int-status{
+  background: rgba(52,211,153,.18);
+  border-color: rgba(52,211,153,.30);
+  color: #6ee7b7;
+}
+
+/* Side panel cards (Account Summary / Quick Actions / Help) */
+[data-theme="dark"] .tr-set-account,
+[data-theme="dark"] .tr-set-qa,
+[data-theme="dark"] .tr-set-help{
+  background: linear-gradient(180deg, rgba(255,255,255,.025) 0%, var(--s1) 100%);
+  border-color: rgba(255,255,255,.08);
+  box-shadow: 0 1px 0 rgba(255,255,255,.04) inset, 0 8px 24px rgba(0,0,0,.30);
+}
+
+/* Integration card */
+[data-theme="dark"] .tr-set-int-row{
+  background: var(--s1);
+  border-color: rgba(255,255,255,.08);
+}
+[data-theme="dark"] .tr-set-int-row:hover{
+  background: rgba(167,139,250,.08);
+  border-color: rgba(167,139,250,.25);
+}
+[data-theme="dark"] .tr-set-int-logo{
+  background: rgba(255,255,255,.06);
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   RESPONSIVE — tablet (≤960) + phone (≤640 expanded) + small (≤420)
+   ═══════════════════════════════════════════════════════════════ */
+
+@media (max-width: 960px){
+  .tr-set-layout{grid-template-columns:1fr !important}
+  .tr-set-side{margin-top:14px}
+}
+
+@media (max-width: 640px){
+  .tr-set-root{padding:0 4px}
+  .tr-set-h{font-size:22px}
+  .tr-set-sub{font-size:13px}
+
+  .tr-set-tabs{padding:3px;margin-bottom:14px;overflow-x:auto}
+  .tr-set-tab{padding:7px 12px;font-size:12.5px;white-space:nowrap}
+
+  .tr-set-card{padding:16px;border-radius:12px}
+  .tr-set-section-title{font-size:11px;letter-spacing:1.4px}
+
+  .tr-set-input,.tr-set-select{padding:9px 11px;font-size:12.5px}
+  .tr-set-label,.tr-set-label-sm{font-size:11.5px}
+  .tr-set-btn{padding:9px 14px;font-size:12.5px}
+  .tr-set-btn.small{padding:6px 10px;font-size:11.5px}
+
+  .tr-set-pref-row{flex-wrap:wrap;gap:8px}
+  .tr-set-pref-name{font-size:13px}
+  .tr-set-pref-sub{font-size:11.5px}
+
+  .tr-set-sec-row{flex-direction:column;align-items:stretch;gap:8px}
+  .tr-set-sec-toggle-pill{align-self:flex-start}
+
+  .tr-set-int-row{padding:11px 12px;gap:11px;flex-wrap:wrap}
+  .tr-set-int-logo{width:36px;height:36px}
+  .tr-set-int-name{font-size:13px}
+  .tr-set-int-desc{font-size:11.5px}
+  .tr-set-int-action{flex-basis:100%;text-align:left;margin-top:6px}
+
+  .tr-set-table th,.tr-set-table td{padding:10px 11px;font-size:12px}
+  .tr-set-table th{font-size:10px}
+
+  .tr-set-account{padding:18px}
+  .tr-set-account-avatar{width:66px;height:66px;font-size:26px;border-width:2px}
+  .tr-set-qa,.tr-set-help{padding:14px 6px}
+  .tr-set-qa-link,.tr-set-help-link{padding:10px 12px;font-size:12.5px}
+}
+
+@media (max-width: 420px){
+  .tr-set-h{font-size:19px}
+  .tr-set-tabs{margin-bottom:12px}
+  .tr-set-tab{padding:6px 10px;font-size:11.5px}
+  .tr-set-card{padding:14px;border-radius:11px}
+  .tr-set-input,.tr-set-select{padding:8px 10px;font-size:12px}
+  .tr-set-btn{padding:8px 12px;font-size:12px;border-radius:8px}
+  .tr-set-account-avatar{width:60px;height:60px;font-size:22px}
+}
       `}</style>
     </>
   );
