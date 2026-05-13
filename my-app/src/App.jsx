@@ -1032,7 +1032,7 @@ export default function ThreatReady() {
     if (error) {
       setAuthError("Google sign in failed. Please try again.");
       setView("auth");
-      window.history.replaceState({}, "", "/");
+      window.history.replaceState({}, "", "/app/auth");
       return;
     }
 
@@ -1049,8 +1049,8 @@ export default function ThreatReady() {
       localStorage.setItem('cyberprep_usertype', type);
       localStorage.setItem('cyberprep_user', JSON.stringify({ name, email }));
 
-      // Clean URL first
-      window.history.replaceState({}, "", "/");
+      // Clean URL first — stay in the dashboard app
+      window.history.replaceState({}, "", "/app/dashboard");
 
       // Show toast
       const toast = document.createElement("div");
