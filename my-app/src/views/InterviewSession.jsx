@@ -481,9 +481,16 @@ export default function InterviewSession({
     // the rest of the session.
     if ("speechSynthesis" in window) {
       try {
-        const primer = new SpeechSynthesisUtterance(" ");
+        // LONG persistent primer keeps the speech engine continuously running
+        // through the backend wait (10-15s), so the welcome auto-plays.
+        // Without this, Chrome blocks the first auto-play because the user-gesture
+        // context is considered stale by the time speakText is called.
+        // animateTyping() calls cancel() before the real welcome, stopping this primer.
+        const primer = new SpeechSynthesisUtterance(
+          "preparing your interview session please wait one moment"
+        );
         primer.volume = 0;
-        primer.rate = 10;
+        primer.rate = 0.5;
         window.speechSynthesis.speak(primer);
       } catch (_) { /* ignore */ }
     }
@@ -750,7 +757,7 @@ export default function InterviewSession({
   // ═══════════════════════════════════════════════════════════════
   if (stage === "loading-report") {
     return (
-      <div className="fadeUp" style={{ maxWidth: 700, margin: "76px auto 40px", padding: 20 }}>
+      <div className="fadeUp" style={{ maxWidth: 700, margin: "120px auto 40px", padding: 20 }}>
         <div className="card" style={{ padding: 40, textAlign: "center" }}>
           <div className="loader" style={{ margin: "0 auto 20px", width: 40, height: 40 }} />
           <h2 style={{ fontSize: 20, fontWeight: 800, marginBottom: 10 }}>Generating your report…</h2>
@@ -772,7 +779,7 @@ export default function InterviewSession({
   // ═══════════════════════════════════════════════════════════════
   if (stage === "report-error") {
     return (
-      <div className="fadeUp" style={{ maxWidth: 700, margin: "76px auto 40px", padding: 20 }}>
+      <div className="fadeUp" style={{ maxWidth: 700, margin: "120px auto 40px", padding: 20 }}>
         <div className="card" style={{ padding: 30, textAlign: "center" }}>
           <div style={{ fontSize: 48, marginBottom: 12 }}>⚠️</div>
           <h2 style={{ fontSize: 20, fontWeight: 800, marginBottom: 10 }}>Report could not be generated</h2>
@@ -810,7 +817,7 @@ export default function InterviewSession({
   if (stage === "completed") {
     const userAnswers = messages.filter((m) => m.role === "user").length;
     return (
-      <div className="fadeUp" style={{ maxWidth: 700, margin: "76px auto 40px", padding: 20 }}>
+      <div className="fadeUp" style={{ maxWidth: 700, margin: "120px auto 40px", padding: 20 }}>
         <div className="card" style={{ padding: 40, textAlign: "center" }}>
           <div style={{ fontSize: 56, marginBottom: 12 }}>✅</div>
           <h2 style={{ fontSize: 24, fontWeight: 800, marginBottom: 10 }}>Session Complete</h2>

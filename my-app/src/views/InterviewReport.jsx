@@ -48,7 +48,7 @@ function RadarChart({ data, size = 300 }) {
   const radius = size / 2 - 50;
   const n = data.length;
   const angleStep = (2 * Math.PI) / n;
-  const maxScore = 10;
+  const maxScore = 100;
   const rings = [2, 4, 6, 8, 10];
 
   const polygonPoints = (level) =>
@@ -118,7 +118,7 @@ export default function InterviewReport({ report, onRestart, onHome, hideActions
 
   if (!report) {
     return (
-      <div className="fadeUp" style={{ maxWidth: 700, margin: "76px auto 40px", padding: 20 }}>
+      <div className="fadeUp" style={{ maxWidth: 700, margin: "120px auto 40px", padding: 20 }}>
         <div className="card" style={{ padding: 30, textAlign: "center" }}>
           <div style={{ fontSize: 14, color: "var(--tx2)" }}>No report data available.</div>
         </div>
@@ -146,12 +146,13 @@ export default function InterviewReport({ report, onRestart, onHome, hideActions
   const verdict = overall.verdict || "Session evaluated";
 
   return (
-    <div className="fadeUp" style={{ maxWidth: 1100, margin: "0 auto", padding: "76px 16px 80px" }}>
+    <div className="fadeUp" style={{ maxWidth: 1100, margin: "0 auto", padding: "120px 16px 80px" }}>
 
       {/* ═══ Top bar with action buttons ═══ */}
       <div style={{
         display: "flex", justifyContent: "space-between", alignItems: "center",
         marginBottom: 16, flexWrap: "wrap", gap: 10,
+        paddingRight: 320, // leave room for dashboard topbar (XP+bell+theme+avatar)
       }}>
         <div>
           <div className="lbl" style={{ marginBottom: 2 }}>INTERVIEW REPORT</div>
@@ -269,8 +270,8 @@ export default function InterviewReport({ report, onRestart, onHome, hideActions
               </div>
             )}
             {categoryScores.map((cat, i) => {
-              const pct = (cat.score / (cat.outOf || 10)) * 100;
-              const color = scoreColor(cat.score, cat.outOf || 10);
+              const pct = (cat.score / (cat.outOf || 100)) * 100;
+              const color = scoreColor(cat.score, cat.outOf || 100);
               return (
                 <div key={i}>
                   <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
@@ -281,7 +282,7 @@ export default function InterviewReport({ report, onRestart, onHome, hideActions
                       <div style={{ fontSize: 10, color: "var(--tx2)" }}>Weighted across questions</div>
                     </div>
                     <div style={{ fontSize: 15, fontWeight: 800, color: color, fontFamily: "monospace" }}>
-                      {cat.score.toFixed(1)}<span style={{ color: "var(--tx2)", fontSize: 11 }}>/{cat.outOf || 10}</span>
+                      {cat.score.toFixed(1)}<span style={{ color: "var(--tx2)", fontSize: 11 }}>/{cat.outOf || 100}</span>
                     </div>
                   </div>
                   <div style={{
@@ -453,7 +454,7 @@ export default function InterviewReport({ report, onRestart, onHome, hideActions
             </div>
             <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
               {skillsRadar.map((s, i) => {
-                const color = scoreColor(s.score, 10);
+                const color = scoreColor(s.score, 100);
                 return (
                   <div key={i} style={{
                     display: "flex", justifyContent: "space-between", alignItems: "center",
@@ -464,7 +465,7 @@ export default function InterviewReport({ report, onRestart, onHome, hideActions
                   }}>
                     <span style={{ fontSize: 13, fontWeight: 600, color: "var(--tx1)" }}>{s.skill}</span>
                     <span style={{ fontSize: 14, fontWeight: 800, color: color, fontFamily: "monospace" }}>
-                      {s.score.toFixed(1)}<span style={{ fontSize: 10, color: "var(--tx2)" }}>/10</span>
+                      {s.score.toFixed(1)}<span style={{ fontSize: 10, color: "var(--tx2)" }}>/100</span>
                     </span>
                   </div>
                 );
