@@ -1457,11 +1457,11 @@ app.get('/auth/github/callback', async (req, res) => {
     );
 
     // Redirect to frontend with token
-    res.redirect(`${process.env.FRONTEND_URL || "http://localhost:5173"}/auth/callback?token=${token}&name=${encodeURIComponent(name)}&email=${encodeURIComponent(primaryEmail)}&provider=github`);
+    res.redirect(`${process.env.FRONTEND_URL || "http://localhost:5173"}/app/auth?token=${token}&name=${encodeURIComponent(name)}&email=${encodeURIComponent(primaryEmail)}&provider=github`);
 
   } catch (e) {
     console.error('GitHub OAuth error:', e.message);
-    res.redirect(`${process.env.FRONTEND_URL || 'http://localhost:5173'}/auth/callback?error=github_failed`);
+    res.redirect(`${process.env.FRONTEND_URL || 'http://localhost:5173'}/app/auth?error=github_failed`);
   }
 });
 
