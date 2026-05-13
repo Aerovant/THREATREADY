@@ -115,7 +115,7 @@ const HOME_CSS = `
 
 /* Main 2-col grid */
 .tr-home-grid{display:flex;flex-direction:column;gap:14px;margin-bottom:14px}
-.tr-home-card-leaderboard{max-width:720px;margin:0 auto;width:100%}
+.tr-home-card-leaderboard{width:100%}
 
 /* Full-width vertical stack (Launch Platform + Live Contests row) */
 .tr-home-stack{display:flex;flex-direction:column;gap:14px;margin-bottom:14px;width:100%}
