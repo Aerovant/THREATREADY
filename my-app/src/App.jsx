@@ -2214,7 +2214,10 @@ export default function ThreatReady() {
   .tr-dash-sidebar.collapsed { width: 64px; padding: 18px 8px; }
   .tr-dash-sidebar.collapsed .tr-dash-logo { justify-content: center; padding: 4px 0 16px; }
   .tr-dash-sidebar.collapsed .tr-dash-logo-text { display: none; }
-  .tr-dash-sidebar.collapsed .tr-dash-collapse-btn { display: none; }
+
+  .tr-dash-sidebar.collapsed .tr-dash-logo { flex-direction: column; gap: 12px; padding: 4px 0 12px; }
+  .tr-dash-sidebar.collapsed .tr-dash-collapse-btn { margin-left: 0; }
+  
   .tr-dash-sidebar.collapsed .tr-dash-nav-btn { justify-content: center; padding: 9px 8px; }
   .tr-dash-sidebar.collapsed .tr-dash-nav-btn span { display: none; }
   .tr-dash-sidebar.collapsed .tr-dash-premium { display: none; }
