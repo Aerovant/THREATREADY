@@ -293,6 +293,20 @@ export default function ThreatReady() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const openSidebar  = () => setSidebarOpen(true);
   const closeSidebar = () => setSidebarOpen(false);
+
+  // ── Desktop sidebar collapsed state (Claude-style) ──
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
+    try { return localStorage.getItem('cyberprep_sidebar_collapsed') === 'true'; }
+    catch { return false; }
+  });
+  const toggleSidebarCollapsed = () => {
+    setSidebarCollapsed(prev => {
+      const next = !prev;
+      try { localStorage.setItem('cyberprep_sidebar_collapsed', String(next)); } catch (_) {}
+      return next;
+    });
+  };
+
   // Auto-close drawer if viewport widens past tablet breakpoint
   useEffect(() => {
     const onResize = () => { if (window.innerWidth >= 980) setSidebarOpen(false); };
@@ -2191,6 +2205,70 @@ export default function ThreatReady() {
 }
 
 /* ── Sidebar ── */
+
+/* ── Sidebar collapse animation (Claude-style) ── */
+.tr-dash-sidebar { transition: width .22s ease; }
+
+@media (min-width: 980px) {
+  /* Collapsed state: narrow strip with just icons */
+  .tr-dash-sidebar.collapsed { width: 64px; padding: 18px 8px; }
+  .tr-dash-sidebar.collapsed .tr-dash-logo { justify-content: center; padding: 4px 0 16px; }
+  .tr-dash-sidebar.collapsed .tr-dash-logo-text { display: none; }
+  .tr-dash-sidebar.collapsed .tr-dash-collapse-btn { display: none; }
+  .tr-dash-sidebar.collapsed .tr-dash-nav-btn { justify-content: center; padding: 9px 8px; }
+  .tr-dash-sidebar.collapsed .tr-dash-nav-btn span { display: none; }
+  .tr-dash-sidebar.collapsed .tr-dash-premium { display: none; }
+
+  /* When collapsed, the main content pads less to the left */
+  .page:has(.tr-dash-sidebar.collapsed ~ *),
+  .app:has(.tr-dash-sidebar.collapsed) .page:has(.tr-dash-cnt) {
+    padding-left: 88px !important;
+  }
+}
+
+/* Collapse-toggle button (visible only in expanded state on desktop) */
+.tr-dash-collapse-btn {
+  margin-left: auto;
+  width: 28px; height: 28px;
+  display: inline-flex; align-items: center; justify-content: center;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 7px;
+  color: #6b6585;
+  cursor: pointer; font-family: inherit;
+  transition: all .15s ease;
+  flex-shrink: 0;
+}
+.tr-dash-collapse-btn:hover {
+  background: #faf8ff;
+  border-color: #e9e5f3;
+  color: #7c3aed;
+}
+.tr-dash-collapse-btn svg { width: 16px; height: 16px; }
+[data-theme="dark"] .tr-dash-collapse-btn { color: #b8b0d4; }
+[data-theme="dark"] .tr-dash-collapse-btn:hover {
+  background: rgba(167,139,250,0.08);
+  border-color: rgba(167,139,250,0.20);
+  color: #c4b5fd;
+}
+
+/* Hide collapse button on mobile (mobile has the burger menu instead) */
+@media (max-width: 979px) {
+  .tr-dash-collapse-btn { display: none; }
+}
+
+/* Make logo row a flexbox so collapse button can align right */
+.tr-dash-logo {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.tr-dash-logo-text {
+  flex: 1;
+  white-space: nowrap;
+  overflow: hidden;
+}
+
 .tr-dash-sidebar {
   position: fixed; left: 0; top: 0;
   width: 240px; height: 100vh; height: 100dvh;
@@ -2205,6 +2283,7 @@ export default function ThreatReady() {
   -webkit-overflow-scrolling: touch;
   font-family: 'Inter','Segoe UI',system-ui,sans-serif;
 }
+
 .tr-dash-sidebar::-webkit-scrollbar { width: 4px; }
 .tr-dash-sidebar::-webkit-scrollbar-thumb { background: #d4cce8; border-radius: 2px; }
 [data-theme="dark"] .tr-dash-sidebar { background: #14111f; border-right-color: #2a2440; }
@@ -2565,7 +2644,7 @@ export default function ThreatReady() {
           />
 
           {/* ── SIDEBAR ── */}
-          <aside className={`tr-dash-sidebar${sidebarOpen ? ' open' : ''}`}>
+          <aside className={`tr-dash-sidebar${sidebarOpen ? ' open' : ''}${sidebarCollapsed ? ' collapsed' : ''}`}>
             <div className="tr-dash-logo">
               <span className="tr-dash-logo-icon" aria-hidden="true">
                 <svg width="32" height="30" viewBox="0 0 48 46" fill="none">
@@ -2579,7 +2658,19 @@ export default function ThreatReady() {
                   <path d="M25.946 44.938c-.664.845-2.021.375-2.021-.698V33.937a2.26 2.26 0 0 0-2.262-2.262H10.287c-.92 0-1.456-1.04-.92-1.788l7.48-10.471c1.07-1.497 0-3.578-1.842-3.578H1.237c-.92 0-1.456-1.04-.92-1.788L10.013.474c.214-.297.556-.474.92-.474h28.894c.92 0 1.456 1.04.92 1.788l-7.48 10.471c-1.07 1.498 0 3.579 1.842 3.579h11.377c.943 0 1.473 1.088.89 1.83L25.947 44.94z" fill="url(#trBoltLogoGrad)"/>
                 </svg>
               </span>
-              <span>ThreatReady</span>
+              <span className="tr-dash-logo-text">ThreatReady</span>
+              <button
+                type="button"
+                className="tr-dash-collapse-btn"
+                onClick={toggleSidebarCollapsed}
+                aria-label={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+                title={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+              >
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <rect x="3" y="4" width="18" height="16" rx="2"/>
+                  <line x1="9" y1="4" x2="9" y2="20"/>
+                </svg>
+              </button>
             </div>
 
             <nav className="tr-dash-nav">
