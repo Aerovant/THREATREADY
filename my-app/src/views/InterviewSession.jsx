@@ -43,6 +43,10 @@ const readFileAsText = (file) => new Promise((resolve, reject) => {
 //     The app never requests an external image service or generated face.
 //   - To replace any panelist photo: just overwrite the file in
 //     public/panelists/ with a new image (same filename) and hard-refresh.
+
+// Resolve avatar URLs against Vite's base URL so they work in both dev (/) and prod (/app/).
+const A = (file) => `${import.meta.env.BASE_URL}panelists/${file}`.replace(/\/{2,}/g, '/');
+
 const PANELISTS = [
   {
     id: "maya",
@@ -52,7 +56,7 @@ const PANELISTS = [
     initials: "MC",
     color: "#14b8a6",
     gender: "female",
-    avatarUrl: "maya.jpg",
+    avatarUrl: A("maya.jpg"),
   },
   {
     id: "marcus",
@@ -62,7 +66,7 @@ const PANELISTS = [
     initials: "MR",
     color: "#f97316",
     gender: "male",
-    avatarUrl: "marcus.jpg",
+    avatarUrl: A("marcus.jpg"),
   },
   {
     id: "sarah",
@@ -72,7 +76,7 @@ const PANELISTS = [
     initials: "SO",
     color: "#a855f7",
     gender: "female",
-    avatarUrl: "sarah.jpg",
+    avatarUrl: A("sarah.jpg"),
   },
   {
     id: "aiden",
@@ -82,7 +86,7 @@ const PANELISTS = [
     initials: "AW",
     color: "#3b82f6",
     gender: "male",
-    avatarUrl: "aiden.jpg",
+    avatarUrl: A("aiden.jpg"),
   },
   {
     id: "priya",
@@ -92,7 +96,7 @@ const PANELISTS = [
     initials: "PS",
     color: "#22c55e",
     gender: "female",
-    avatarUrl: "priya.jpg",
+    avatarUrl: A("priya.jpg"),
   },
   {
     id: "raj",
@@ -102,13 +106,14 @@ const PANELISTS = [
     initials: "RP",
     color: "#06b6d4",
     gender: "male",
-    avatarUrl: "raj.jpg",
+    avatarUrl: A("raj.jpg"),
   },
 ];
 
 // Original simple picker: gender-matched English voice. This is the version
 // that was producing audio (British accent) before. Indian preference removed
 // per user request — they want audio working first, will revisit accent later.
+
 const pickVoiceForPanelist = (panelist, voices) => {
   if (!voices || voices.length === 0) return null;
   const isFemale = panelist.gender === "female";
