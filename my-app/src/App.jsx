@@ -1869,6 +1869,9 @@ export default function ThreatReady() {
     localStorage.removeItem('cyberprep_completed_scenarios');
     localStorage.removeItem('cyberprep_local_sessions');
     localStorage.removeItem('cyberprep_hr_paid');
+    localStorage.removeItem('isPaid');
+    localStorage.removeItem('cyberprep_nav_history');
+
     setUser(null); setUserType('b2c'); setSettingsName('');
     setResumeText(''); setTargetRole(''); setExperienceLevel('');
     setResumeAiData(null); setReadiness(null);
@@ -1883,6 +1886,7 @@ export default function ThreatReady() {
     setAuthError(''); setOtpCode(''); setOtpError('');
     setAuthMode('login'); setAuthStep('form');
     setView("landing");
+    window.history.replaceState({}, "", "/app/");
   };
 
   const logout = () => showConfirm('Are you sure you want to logout?', doLogout);
