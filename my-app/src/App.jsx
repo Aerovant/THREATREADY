@@ -1835,7 +1835,12 @@ export default function ThreatReady() {
     localStorage.removeItem('cyberprep_streak');
     localStorage.removeItem('cyberprep_completed_scenarios');
     localStorage.removeItem('cyberprep_local_sessions');
+   
     localStorage.removeItem('cyberprep_hr_paid');
+    localStorage.removeItem('isPaid');
+    localStorage.removeItem('cyberprep_nav_history');
+
+
     setUser(null); setUserType('b2c'); setSettingsName('');
     setResumeText(''); setTargetRole(''); setExperienceLevel('');
     setResumeAiData(null); setReadiness(null);
@@ -1848,10 +1853,16 @@ export default function ThreatReady() {
     // Clear all login form fields so next user doesn't see previous credentials
     setAuthEmail(''); setAuthPassword(''); setAuthName('');
     setAuthError(''); setOtpCode(''); setOtpError('');
+
     setAuthMode('login'); setAuthStep('form');
     setView("landing");
+    // CRITICAL: clear the URL so refresh/theme-toggle doesn't bounce back to /dashboard.
+    // setView writes localStorage + React state, but the browser URL still says
+    // /app/dashboard. Any subsequent re-render that runs the URL-sync useEffect
+    // reads that stale URL and routes us back. Force the URL to /app/ now.
+    window.history.replaceState({}, "", "/app/");
   };
-
+  
   const logout = () => showConfirm('Are you sure you want to logout?', doLogout);
 
   // ═══════════════════════════════════════════════════════════════
