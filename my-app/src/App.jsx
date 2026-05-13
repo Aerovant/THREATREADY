@@ -115,6 +115,9 @@ function pathToDashTab(pathname) {
 }
 
 // Extract b2b sub-tab from URL
+
+
+
 function pathToB2bTab(pathname) {
   const m = pathname.match(/^\/hr\/([^/]+)/);
   return m ? m[1] : 'overview';
@@ -2157,11 +2160,12 @@ export default function ThreatReady() {
   if (view === "dashboard") {
     const tabs = [
       { id: "home", label: "🏠 Home", icon: "🏠" },
+     { id: "interview", label: "💎 Interview", icon: "💎" },
+
       { id: "scores", label: "📊 Scores", icon: "📊" },
       { id: "badges", label: "🏆 Badges", icon: "🏆" },
       { id: "profile", label: "👤 Profile", icon: "👤" },
 
-     { id: "interview", label: "💎 Interview", icon: "💎" },
 
       { id: "billing", label: "💳 Billing", icon: "💳" },
       { id: "settings", label: "⚙️ Settings", icon: "⚙️" },

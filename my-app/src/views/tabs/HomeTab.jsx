@@ -114,7 +114,8 @@ const HOME_CSS = `
 .tr-home-daily-btn.complete{background:linear-gradient(135deg,#10b981,#059669);box-shadow:0 6px 18px rgba(16,185,129,.3)}
 
 /* Main 2-col grid */
-.tr-home-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px}
+.tr-home-grid{display:flex;flex-direction:column;gap:14px;margin-bottom:14px}
+.tr-home-card-leaderboard{max-width:720px;margin:0 auto;width:100%}
 
 /* Full-width vertical stack (Launch Platform + Live Contests row) */
 .tr-home-stack{display:flex;flex-direction:column;gap:14px;margin-bottom:14px;width:100%}
@@ -424,7 +425,7 @@ const HOME_CSS = `
 /* Tablet (existing breakpoint, expanded) */
 @media (max-width: 980px){
   .tr-home-stats{grid-template-columns:repeat(2,1fr)}
-  .tr-home-grid{grid-template-columns:1fr}
+  
   .tr-home-daily{grid-template-columns:auto 1fr;gap:12px}
   .tr-home-daily-timer{grid-column:1 / -1;justify-content:center}
   .tr-home-daily-btn{grid-column:1 / -1;justify-content:center}
@@ -704,7 +705,8 @@ export default function HomeTab({
         <div className="tr-home-grid">
 
           {/* Learning Paths */}
-          <div className="tr-home-card fadeUp" style={{ minHeight: 280 }}>
+          <div className="tr-home-card fadeUp" style={{ minHeight: 360 }}>
+
             <div className="tr-home-card-head">
               <span className="tr-home-card-title">Learning Paths</span>
             </div>
@@ -753,7 +755,8 @@ export default function HomeTab({
           </div>
 
           {/* Weekly Leaderboard */}
-          <div className="tr-home-card fadeUp" style={{ minHeight: 280 }}>
+          <div className="tr-home-card tr-home-card-leaderboard fadeUp" style={{ minHeight: 240 }}>
+
             <div className="tr-home-card-head">
               <span className="tr-home-card-title">Weekly Leaderboard</span>
               <button className="tr-home-link" onClick={() => { setDashTab("scores"); localStorage.setItem('cyberprep_tab', 'scores'); }}>
@@ -830,38 +833,6 @@ export default function HomeTab({
                 )}
               </div>
             )}
-          </div>
-        </div>
-
-        {/* ─────────── Launch Platform + Live Contests (full-width stacked) ─────────── */}
-        <div className="tr-home-stack">
-
-         
-          {/* Live Contests */}
-          <div className="tr-home-card fadeUp" style={{ padding: 14 }}>
-            <div className="tr-home-card-head" style={{ marginBottom: 10 }}>
-              <span className="tr-home-card-title">Live Contests</span>
-              <button className="tr-home-link" onClick={() => showToast("More contests coming soon!", "info")}>
-                View All Contests →
-              </button>
-            </div>
-            <div className="tr-home-contest-card">
-              <div className="tr-home-contest-icon">{I.trophy}</div>
-              <div>
-                <div className="tr-home-contest-title">
-                  SOC Showdown
-                  <span className="tr-home-contest-live">Live</span>
-                </div>
-                <div className="tr-home-contest-sub">Ends in 2d 14h 30m</div>
-              </div>
-              <div className="tr-home-contest-count">
-                {I.users} 342
-              </div>
-              <button className="tr-home-contest-btn"
-                onClick={() => showToast("Contest registration opening soon!", "info")}>
-                Join Now
-              </button>
-            </div>
           </div>
         </div>
 
