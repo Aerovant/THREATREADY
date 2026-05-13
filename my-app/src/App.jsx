@@ -2436,9 +2436,9 @@ export default function ThreatReady() {
 
 /* ── Topbar ── */
 .tr-dash-topbar {
-  position: absolute;
-  top: 0;
-  right: 0;
+  position: fixed;
+  top: 18px;
+  right: 24px;
   display: flex; align-items: center; justify-content: flex-end;
   gap: 10px;
   z-index: 50;
