@@ -4460,8 +4460,35 @@ BADGE TIER MAPPING (determines badge from overall.score):
 - Not Ready: 0-44 (does not meet bar — gibberish, echoed questions, no real answers)
 
 RULES:
-- Be honest. If candidate gave gibberish, echoed the questions, or didn't answer, score under 30.
-- Reference specific phrases the candidate said in evaluatorNote.
+
+ZERO-SCORE TRIGGERS (apply STRICTLY — overall.score and ALL category scores MUST be 0 if any of these apply to ALL questions, not just some):
+- Candidate's answer is gibberish, random characters, or nonsense
+- Candidate echoed/repeated the question back instead of answering
+- Candidate said "I don't know" or "no idea" or equivalent for every question
+- Candidate left answers blank or wrote only a few unrelated words (e.g. "test", "hi", "asdf")
+- Candidate's response is entirely off-topic (not related to cybersecurity)
+
+When zero-score triggers apply:
+- overall.score = 0 to 5
+- ALL categoryScores entries: score = 0 (including Communication Quality — gibberish IS NOT acceptable communication)
+- ALL skillsRadar entries: score = 0
+- ALL question scores (Tech and Comm): score = 0.0
+- Set verdict to: "Candidate did not provide meaningful responses to any question."
+- Set badge to: "Not Ready"
+
+PARTIAL CREDIT (only if the candidate gave at least ONE real attempted answer):
+- 0-9 = junk answers
+- 10-29 = vague, no specifics, mostly wrong, or only one real attempt out of many questions
+- 30-44 = some on-topic content but major gaps, incorrect facts
+- 45-59 = partial understanding, missing key details
+- 60-74 = solid foundation, minor gaps
+- 75-89 = strong, accurate, well-structured
+- 90-100 = exceptional depth and accuracy
+
+CRITICAL: Communication Quality is NOT a free 50-point gift. Gibberish has 0 communication quality. Even nicely-worded nonsense is 0 because nothing was communicated.
+
+OTHER RULES:
+- Be honest. Reference specific phrases the candidate said in evaluatorNote.
 - If candidate did not answer a question or gave only a few words, set candidateAnswer to their exact words (even if blank).
 - Include ALL questions asked in the questions array (even unanswered ones).
 - Output VALID JSON only. NO markdown code fences. NO preamble or postamble.`;
