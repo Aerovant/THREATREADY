@@ -1,11 +1,8 @@
 // ═══════════════════════════════════════════════════════════════
 // INTERVIEW REPORT — Full session report viewer
 // Displays scores, breakdown, radar chart, strengths/growth, Q&A
-// FEATURES: print-friendly, history panel with sort, score normalization
 // ═══════════════════════════════════════════════════════════════
-import { useState, useEffect } from "react";
-
-const API_BASE = "https://threatready-db.onrender.com";
+import { useState } from "react";
 
 const formatDuration = (totalSeconds) => {
   const min = Math.floor(totalSeconds / 60);
@@ -19,19 +16,6 @@ const formatDateTime = (iso) => {
     return d.toLocaleString("en-US", {
       month: "short", day: "numeric", year: "numeric",
       hour: "2-digit", minute: "2-digit", second: "2-digit",
-      hour12: false,
-    });
-  } catch (_) {
-    return iso || "—";
-  }
-};
-
-const formatDateShort = (iso) => {
-  try {
-    const d = new Date(iso);
-    return d.toLocaleString("en-US", {
-      month: "short", day: "numeric", year: "numeric",
-      hour: "2-digit", minute: "2-digit",
       hour12: false,
     });
   } catch (_) {
@@ -54,30 +38,8 @@ const scoreColor = (score, outOf = 10) => {
   return "#ef4444";
 };
 
-// Normalize scores to 0–10 scale.
-// Backend may return categoryScores & skillsRadar as 0-100 OR 0-10.
-// If the value is > 10, we treat it as 0-100 and divide by 10.
-const normalizeToTen = (score) => {
-  const n = Number(score) || 0;
-  return n > 10 ? n / 10 : n;
-};
-
-const getAuthToken = () => {
-  try {
-    return (
-      localStorage.getItem("token") ||
-      sessionStorage.getItem("token") ||
-      localStorage.getItem("authToken") ||
-      sessionStorage.getItem("authToken") ||
-      ""
-    );
-  } catch (_) {
-    return "";
-  }
-};
-
 // ───────────────────────────────────────────────────────────────
-// SVG Radar chart — expects data scores already normalized to 0–10
+// SVG Radar chart
 // ───────────────────────────────────────────────────────────────
 function RadarChart({ data, size = 300 }) {
   if (!data || data.length === 0) return null;
@@ -98,8 +60,7 @@ function RadarChart({ data, size = 300 }) {
 
   const dataPoints = data.map((d, i) => {
     const angle = -Math.PI / 2 + i * angleStep;
-    const s = Math.max(0, Math.min(maxScore, Number(d.score) || 0));
-    const r = (s / maxScore) * radius;
+    const r = (Math.min(d.score, maxScore) / maxScore) * radius;
     return {
       x: cx + r * Math.cos(angle),
       y: cy + r * Math.sin(angle),
@@ -141,7 +102,7 @@ function RadarChart({ data, size = 300 }) {
         return (
           <text key={i} x={x} y={y} fontSize="11" fill="var(--tx1)"
             textAnchor="middle" dominantBaseline="middle" fontWeight="600">
-            {d.skill || d.axis}
+            {d.skill}
           </text>
         );
       })}
@@ -150,332 +111,14 @@ function RadarChart({ data, size = 300 }) {
 }
 
 // ───────────────────────────────────────────────────────────────
-// History panel — slides in from the right; sort + select
-// ───────────────────────────────────────────────────────────────
-function InterviewHistoryPanel({ open, onClose, onSelect }) {
-  const [reports, setReports] = useState([]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(null);
-  const [sortOrder, setSortOrder] = useState("desc"); // desc = newest first
-  const [loadingId, setLoadingId] = useState(null);
-
-  // Fetch list when opened
-  useEffect(() => {
-    if (!open) return;
-    let cancelled = false;
-
-    const fetchReports = async () => {
-      setLoading(true);
-      setError(null);
-      try {
-        const token = getAuthToken();
-        const res = await fetch(`${API_BASE}/api/interview/reports`, {
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: token ? `Bearer ${token}` : "",
-          },
-        });
-        if (!res.ok) {
-          const msg = res.status === 401
-            ? "Please log in again to view your history."
-            : `Server returned ${res.status}`;
-          throw new Error(msg);
-        }
-        const data = await res.json();
-        if (!cancelled) setReports(Array.isArray(data.reports) ? data.reports : []);
-      } catch (e) {
-        if (!cancelled) setError(e.message);
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    };
-    fetchReports();
-    return () => { cancelled = true; };
-  }, [open]);
-
-  // ESC to close
-  useEffect(() => {
-    if (!open) return;
-    const onKey = (e) => { if (e.key === "Escape") onClose(); };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [open, onClose]);
-
-  if (!open) return null;
-
-  const sorted = [...reports].sort((a, b) => {
-    const da = new Date(a.created_at || 0).getTime();
-    const db = new Date(b.created_at || 0).getTime();
-    return sortOrder === "desc" ? db - da : da - db;
-  });
-
-  const handleRowClick = async (row) => {
-    setLoadingId(row.id);
-    try {
-      const token = getAuthToken();
-      const res = await fetch(`${API_BASE}/api/interview/reports/${row.id}`, {
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: token ? `Bearer ${token}` : "",
-        },
-      });
-      if (!res.ok) throw new Error(`Server returned ${res.status}`);
-      const data = await res.json();
-      if (data.report) {
-        onSelect(data.report, row.id);
-        onClose();
-      } else {
-        throw new Error("Empty report payload");
-      }
-    } catch (e) {
-      alert("Failed to load report: " + e.message);
-    } finally {
-      setLoadingId(null);
-    }
-  };
-
-  return (
-    <div className="no-print" style={{
-      position: "fixed", inset: 0, zIndex: 9999,
-      display: "flex", justifyContent: "flex-end",
-    }}>
-      {/* Backdrop */}
-      <div
-        onClick={onClose}
-        style={{
-          position: "absolute", inset: 0,
-          background: "rgba(8, 8, 16, 0.65)",
-          backdropFilter: "blur(4px)",
-        }}
-      />
-
-      {/* Panel */}
-      <div style={{
-        position: "relative",
-        width: "min(460px, 95vw)",
-        height: "100%",
-        background: "var(--bg, #0f0a1f)",
-        borderLeft: "1px solid rgba(139,92,246,0.25)",
-        boxShadow: "-12px 0 32px rgba(0,0,0,0.4)",
-        display: "flex", flexDirection: "column",
-        animation: "slideInRight 0.25s ease-out",
-      }}>
-        <style>{`
-          @keyframes slideInRight {
-            from { transform: translateX(100%); opacity: 0.5; }
-            to { transform: translateX(0); opacity: 1; }
-          }
-        `}</style>
-
-        {/* Header */}
-        <div style={{
-          padding: "18px 20px",
-          borderBottom: "1px solid rgba(139,92,246,0.15)",
-          display: "flex", justifyContent: "space-between", alignItems: "center",
-        }}>
-          <div>
-            <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: 1, color: "var(--ac, #a78bfa)" }}>
-              📋 INTERVIEW HISTORY
-            </div>
-            <div style={{ fontSize: 18, fontWeight: 800, color: "var(--tx1)", marginTop: 2 }}>
-              Past Reports
-            </div>
-          </div>
-          <button
-            onClick={onClose}
-            style={{
-              background: "rgba(255,255,255,0.06)",
-              border: "1px solid rgba(255,255,255,0.1)",
-              color: "var(--tx1)",
-              fontSize: 18, lineHeight: 1, cursor: "pointer",
-              width: 32, height: 32, borderRadius: 8,
-            }}
-            aria-label="Close"
-          >
-            ×
-          </button>
-        </div>
-
-        {/* Toolbar — sort + count */}
-        <div style={{
-          padding: "12px 20px",
-          borderBottom: "1px solid rgba(139,92,246,0.10)",
-          display: "flex", justifyContent: "space-between", alignItems: "center",
-          gap: 8, flexWrap: "wrap",
-        }}>
-          <div style={{ fontSize: 12, color: "var(--tx2)" }}>
-            {loading ? "Loading…" : `${reports.length} report${reports.length === 1 ? "" : "s"}`}
-          </div>
-          <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-            <span style={{ fontSize: 11, color: "var(--tx2)" }}>Sort:</span>
-            <button
-              onClick={() => setSortOrder("desc")}
-              style={{
-                fontSize: 11, fontWeight: 600,
-                padding: "5px 10px", borderRadius: 6, cursor: "pointer",
-                background: sortOrder === "desc" ? "rgba(139,92,246,0.18)" : "rgba(255,255,255,0.03)",
-                border: sortOrder === "desc" ? "1px solid rgba(139,92,246,0.4)" : "1px solid rgba(255,255,255,0.08)",
-                color: sortOrder === "desc" ? "#c4b5fd" : "var(--tx2)",
-              }}
-            >
-              ↓ Newest
-            </button>
-            <button
-              onClick={() => setSortOrder("asc")}
-              style={{
-                fontSize: 11, fontWeight: 600,
-                padding: "5px 10px", borderRadius: 6, cursor: "pointer",
-                background: sortOrder === "asc" ? "rgba(139,92,246,0.18)" : "rgba(255,255,255,0.03)",
-                border: sortOrder === "asc" ? "1px solid rgba(139,92,246,0.4)" : "1px solid rgba(255,255,255,0.08)",
-                color: sortOrder === "asc" ? "#c4b5fd" : "var(--tx2)",
-              }}
-            >
-              ↑ Oldest
-            </button>
-          </div>
-        </div>
-
-        {/* List */}
-        <div style={{
-          flex: 1, overflowY: "auto",
-          padding: "12px 14px",
-        }}>
-          {loading && (
-            <div style={{ textAlign: "center", padding: 30, color: "var(--tx2)", fontSize: 13 }}>
-              Loading reports…
-            </div>
-          )}
-
-          {error && !loading && (
-            <div style={{
-              padding: 16, borderRadius: 8,
-              background: "rgba(239,68,68,0.08)",
-              border: "1px solid rgba(239,68,68,0.3)",
-              color: "#fca5a5", fontSize: 13,
-            }}>
-              {error}
-            </div>
-          )}
-
-          {!loading && !error && sorted.length === 0 && (
-            <div style={{ textAlign: "center", padding: 30, color: "var(--tx2)", fontSize: 13 }}>
-              No previous interviews yet.
-              <div style={{ fontSize: 11, marginTop: 6, opacity: 0.7 }}>
-                Reports you complete will appear here.
-              </div>
-            </div>
-          )}
-
-          {!loading && !error && sorted.map((row) => {
-            const score = Number(row.overall_score) || 0;
-            const color = scoreColor(score, 100);
-            const badge = row.badge || "Bronze";
-            const bColor = badgeColorFor(badge);
-            const isLoading = loadingId === row.id;
-            return (
-              <div
-                key={row.id}
-                onClick={() => !isLoading && handleRowClick(row)}
-                style={{
-                  padding: "12px 14px", marginBottom: 8,
-                  borderRadius: 10,
-                  background: "rgba(255,255,255,0.025)",
-                  border: "1px solid rgba(139,92,246,0.15)",
-                  borderLeft: `3px solid ${color}`,
-                  cursor: isLoading ? "wait" : "pointer",
-                  opacity: isLoading ? 0.55 : 1,
-                  transition: "background 0.15s, transform 0.15s",
-                }}
-                onMouseEnter={(e) => { if (!isLoading) e.currentTarget.style.background = "rgba(139,92,246,0.06)"; }}
-                onMouseLeave={(e) => { e.currentTarget.style.background = "rgba(255,255,255,0.025)"; }}
-              >
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10 }}>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{
-                      fontSize: 12, color: "var(--tx2)", fontFamily: "monospace",
-                      whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis",
-                    }}>
-                      {formatDateShort(row.created_at)}
-                    </div>
-                    <div style={{ display: "flex", gap: 6, marginTop: 6, flexWrap: "wrap" }}>
-                      <span style={{
-                        fontSize: 10, fontWeight: 700, letterSpacing: 0.5,
-                        padding: "2px 7px", borderRadius: 4,
-                        background: `${bColor}22`,
-                        color: bColor,
-                        border: `1px solid ${bColor}55`,
-                      }}>
-                        {badge.toUpperCase()}
-                      </span>
-                      <span style={{
-                        fontSize: 10, fontWeight: 600,
-                        padding: "2px 7px", borderRadius: 4,
-                        background: "rgba(255,255,255,0.04)",
-                        color: "var(--tx2)",
-                        border: "1px solid rgba(255,255,255,0.08)",
-                      }}>
-                        {row.questions_answered || 0} Q{(row.questions_answered || 0) === 1 ? "" : "s"}
-                      </span>
-                      {row.duration_seconds > 0 && (
-                        <span style={{
-                          fontSize: 10, fontWeight: 600,
-                          padding: "2px 7px", borderRadius: 4,
-                          background: "rgba(255,255,255,0.04)",
-                          color: "var(--tx2)",
-                          border: "1px solid rgba(255,255,255,0.08)",
-                        }}>
-                          {formatDuration(row.duration_seconds)}
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                  <div style={{ textAlign: "right" }}>
-                    <div style={{ fontSize: 22, fontWeight: 900, color, lineHeight: 1, fontFamily: "monospace" }}>
-                      {score}
-                      <span style={{ fontSize: 11, color: "var(--tx2)", fontWeight: 600 }}>/100</span>
-                    </div>
-                    <div style={{ fontSize: 10, color: "var(--tx2)", marginTop: 2, letterSpacing: 0.5 }}>
-                      {isLoading ? "loading…" : "view →"}
-                    </div>
-                  </div>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// ───────────────────────────────────────────────────────────────
 // MAIN — InterviewReport
 // ───────────────────────────────────────────────────────────────
 export default function InterviewReport({ report, onRestart, onHome }) {
   const [expandedQ, setExpandedQ] = useState(null);
-  const [historyOpen, setHistoryOpen] = useState(false);
-  const [historicalReport, setHistoricalReport] = useState(null);
-  const [historicalId, setHistoricalId] = useState(null);
 
-  // Use the historical report if user picked one, otherwise the prop
-  const activeReport = historicalReport || report;
-
-  const handleSelectHistorical = (selectedReport, id) => {
-    setHistoricalReport(selectedReport);
-    setHistoricalId(id);
-    setExpandedQ(null);
-    try { window.scrollTo({ top: 0, behavior: "smooth" }); } catch (_) {}
-  };
-
-  const handleBackToCurrent = () => {
-    setHistoricalReport(null);
-    setHistoricalId(null);
-    setExpandedQ(null);
-  };
-
-  if (!activeReport) {
+  if (!report) {
     return (
-      <div className="fadeUp" style={{ maxWidth: 700, margin: "20px auto", padding: 20 }}>
+      <div className="fadeUp" style={{ maxWidth: 700, margin: "76px auto 40px", padding: 20 }}>
         <div className="card" style={{ padding: 30, textAlign: "center" }}>
           <div style={{ fontSize: 14, color: "var(--tx2)" }}>No report data available.</div>
         </div>
@@ -495,50 +138,15 @@ export default function InterviewReport({ report, onRestart, onHome }) {
     suggestedFocus = "",
     topicsToStudy = [],
     questions = [],
-  } = activeReport;
+  } = report;
 
   const badge = overall.badge || "Bronze";
   const badgeColor = overall.badgeColor || badgeColorFor(badge);
   const overallScore = overall.score ?? 0;
   const verdict = overall.verdict || "Session evaluated";
 
-  // Normalize skillsRadar to 0-10 for the chart (backend returns 0-100)
-  const skillsRadarNormalized = (skillsRadar || []).map((s) => ({
-    ...s,
-    skill: s.skill || s.axis,
-    score: normalizeToTen(s.score),
-  }));
-
   return (
-    <div className="interview-report-print fadeUp" style={{ maxWidth: 1100, margin: "0 auto", padding: "20px 16px 80px" }}>
-
-      {/* ═══ "Viewing previous" banner (only when historical) ═══ */}
-      {historicalId && (
-        <div className="no-print" style={{
-          marginBottom: 14, padding: "10px 14px",
-          background: "rgba(99,102,241,0.10)",
-          border: "1px solid rgba(99,102,241,0.3)",
-          borderRadius: 8,
-          display: "flex", justifyContent: "space-between", alignItems: "center",
-          gap: 10, flexWrap: "wrap",
-        }}>
-          <div style={{ fontSize: 12, color: "var(--tx1)" }}>
-            ⏪ Viewing a previous report from your history
-          </div>
-          <button
-            onClick={handleBackToCurrent}
-            style={{
-              fontSize: 11, fontWeight: 700,
-              padding: "6px 12px", borderRadius: 6, cursor: "pointer",
-              background: "rgba(139,92,246,0.2)",
-              border: "1px solid rgba(139,92,246,0.4)",
-              color: "#c4b5fd",
-            }}
-          >
-            ← Back to current session
-          </button>
-        </div>
-      )}
+    <div className="fadeUp" style={{ maxWidth: 1100, margin: "0 auto", padding: "76px 16px 80px" }}>
 
       {/* ═══ Top bar with action buttons ═══ */}
       <div style={{
@@ -548,18 +156,10 @@ export default function InterviewReport({ report, onRestart, onHome }) {
         <div>
           <div className="lbl" style={{ marginBottom: 2 }}>INTERVIEW REPORT</div>
           <div style={{ fontSize: 13, color: "var(--tx2)" }}>
-            Generated on {formatDateTime(session.completedAt || new Date().toISOString())}
+            Generated on {formatDateTime(new Date().toISOString())}
           </div>
         </div>
-        <div className="no-print" style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-          <button
-            className="btn bs"
-            onClick={() => setHistoryOpen(true)}
-            style={{ fontSize: 12, padding: "8px 14px" }}
-            title="View all your previous interview reports"
-          >
-            📋 All Reports
-          </button>
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
           <button className="btn bs" onClick={() => window.print()} style={{ fontSize: 12, padding: "8px 14px" }}>
             🖨️ Print / PDF
           </button>
@@ -659,7 +259,7 @@ export default function InterviewReport({ report, onRestart, onHome }) {
             </div>
           </div>
 
-          {/* Category bars — normalized to /10 display */}
+          {/* Category bars */}
           <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
             {categoryScores.length === 0 && (
               <div style={{ fontSize: 12, color: "var(--tx2)", fontStyle: "italic" }}>
@@ -667,9 +267,8 @@ export default function InterviewReport({ report, onRestart, onHome }) {
               </div>
             )}
             {categoryScores.map((cat, i) => {
-              const normalized = normalizeToTen(cat.score); // 0–10
-              const pct = (normalized / 10) * 100;
-              const color = scoreColor(normalized, 10);
+              const pct = (cat.score / (cat.outOf || 10)) * 100;
+              const color = scoreColor(cat.score, cat.outOf || 10);
               return (
                 <div key={i}>
                   <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
@@ -680,7 +279,7 @@ export default function InterviewReport({ report, onRestart, onHome }) {
                       <div style={{ fontSize: 10, color: "var(--tx2)" }}>Weighted across questions</div>
                     </div>
                     <div style={{ fontSize: 15, fontWeight: 800, color: color, fontFamily: "monospace" }}>
-                      {normalized.toFixed(1)}<span style={{ color: "var(--tx2)", fontSize: 11 }}>/10</span>
+                      {cat.score.toFixed(1)}<span style={{ color: "var(--tx2)", fontSize: 11 }}>/{cat.outOf || 10}</span>
                     </div>
                   </div>
                   <div style={{
@@ -689,7 +288,7 @@ export default function InterviewReport({ report, onRestart, onHome }) {
                     overflow: "hidden",
                   }}>
                     <div style={{
-                      width: `${Math.min(100, pct)}%`, height: "100%",
+                      width: `${pct}%`, height: "100%",
                       background: `linear-gradient(90deg, ${color}, ${color}cc)`,
                       borderRadius: 4,
                       transition: "width 0.6s ease",
@@ -836,8 +435,8 @@ export default function InterviewReport({ report, onRestart, onHome }) {
         </div>
       )}
 
-      {/* ═══ Skills radar chart — normalized 0-10 ═══ */}
-      {skillsRadarNormalized.length > 0 && (
+      {/* ═══ Skills radar chart ═══ */}
+      {skillsRadar.length > 0 && (
         <div className="card" style={{ padding: 24, marginBottom: 14 }}>
           <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: 1, color: "var(--ac)", marginBottom: 14 }}>
             SKILLS RADAR · WHERE YOU ARE STRONG AND WHERE YOU CAN GROW
@@ -848,10 +447,10 @@ export default function InterviewReport({ report, onRestart, onHome }) {
             gap: 24, alignItems: "center",
           }}>
             <div style={{ display: "flex", justifyContent: "center" }}>
-              <RadarChart data={skillsRadarNormalized} size={300} />
+              <RadarChart data={skillsRadar} size={300} />
             </div>
             <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-              {skillsRadarNormalized.map((s, i) => {
+              {skillsRadar.map((s, i) => {
                 const color = scoreColor(s.score, 10);
                 return (
                   <div key={i} style={{
@@ -909,7 +508,7 @@ export default function InterviewReport({ report, onRestart, onHome }) {
             {questions.map((q, i) => {
               const isOpen = expandedQ === i;
               const avgScore = q.scores && q.scores.length > 0
-                ? q.scores.reduce((a, b) => a + (Number(b.score) || 0), 0) / q.scores.length
+                ? q.scores.reduce((a, b) => a + (b.score || 0), 0) / q.scores.length
                 : 0;
               const qColor = scoreColor(avgScore, 10);
               return (
@@ -959,21 +558,18 @@ export default function InterviewReport({ report, onRestart, onHome }) {
                       </div>
                     </div>
                     <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
-                      {q.scores && q.scores.map((s, si) => {
-                        const sNum = Number(s.score) || 0;
-                        return (
-                          <span key={si} style={{
-                            fontSize: 11, fontWeight: 700,
-                            padding: "3px 8px", borderRadius: 4,
-                            background: `${scoreColor(sNum, 10)}1a`,
-                            color: scoreColor(sNum, 10),
-                            border: `1px solid ${scoreColor(sNum, 10)}55`,
-                            fontFamily: "monospace",
-                          }}>
-                            {s.label || s.key} {sNum.toFixed(1)}
-                          </span>
-                        );
-                      })}
+                      {q.scores && q.scores.map((s, si) => (
+                        <span key={si} style={{
+                          fontSize: 11, fontWeight: 700,
+                          padding: "3px 8px", borderRadius: 4,
+                          background: `${scoreColor(s.score, 10)}1a`,
+                          color: scoreColor(s.score, 10),
+                          border: `1px solid ${scoreColor(s.score, 10)}55`,
+                          fontFamily: "monospace",
+                        }}>
+                          {s.label || s.key} {s.score.toFixed(1)}
+                        </span>
+                      ))}
                       <span style={{ fontSize: 14, color: "var(--tx2)", marginLeft: 4 }}>
                         {isOpen ? "▲" : "▼"}
                       </span>
@@ -1089,7 +685,7 @@ export default function InterviewReport({ report, onRestart, onHome }) {
       )}
 
       {/* ═══ Final action buttons ═══ */}
-      <div className="no-print" style={{
+      <div style={{
         display: "flex", gap: 12, justifyContent: "center",
         marginTop: 24, flexWrap: "wrap",
       }}>
@@ -1109,63 +705,9 @@ export default function InterviewReport({ report, onRestart, onHome }) {
         </button>
       </div>
 
-      {/* History panel */}
-      <InterviewHistoryPanel
-        open={historyOpen}
-        onClose={() => setHistoryOpen(false)}
-        onSelect={handleSelectHistorical}
-      />
-
-      {/* ═══ PRINT STYLES — strip app chrome, show only the report ═══ */}
       <style>{`
         @media print {
-          /* Hide everything on the page */
-          body * { visibility: hidden !important; }
-
-          /* Show the report and all of its descendants */
-          .interview-report-print,
-          .interview-report-print * { visibility: visible !important; }
-
-          /* Pull the report to the top of the print page */
-          .interview-report-print {
-            position: absolute !important;
-            left: 0 !important;
-            top: 0 !important;
-            right: 0 !important;
-            width: 100% !important;
-            max-width: none !important;
-            padding: 6mm 8mm !important;
-            margin: 0 !important;
-            color: #111 !important;
-            background: #fff !important;
-          }
-
-          /* Hide interactive controls (buttons + history panel + banner) */
-          .interview-report-print .btn,
-          .interview-report-print .no-print,
-          .no-print { display: none !important; }
-
-          /* Print-friendly card styling: light background, dark text */
-          .interview-report-print .card {
-            background: #ffffff !important;
-            border: 1px solid #d4d4d8 !important;
-            color: #111 !important;
-            box-shadow: none !important;
-            page-break-inside: avoid !important;
-            margin-bottom: 10px !important;
-          }
-
-          /* Force readable colors for print */
-          .interview-report-print,
-          .interview-report-print * {
-            text-shadow: none !important;
-          }
-
-          /* Reduce page margins so URL/headers can be removed by user */
-          @page {
-            size: A4 portrait;
-            margin: 10mm 8mm;
-          }
+          .btn { display: none !important; }
         }
       `}</style>
     </div>

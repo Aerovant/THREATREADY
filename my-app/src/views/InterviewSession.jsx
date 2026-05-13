@@ -25,10 +25,27 @@ const readFileAsText = (file) => new Promise((resolve, reject) => {
 // PANELISTS — 6 interviewers, one per cybersecurity module
 // ═══════════════════════════════════════════════════════════════
 
-// Unsplash professional business portraits (best-effort placeholder URLs).
-// IF any of these 404 in your browser, the fallback shows colored initials.
-// For production: swap these `avatarUrl` values to licensed photos you control,
-// or use a service like generated.photos (AI faces with "business attire" filter).
+// ─── Panelist directory ─────────────────────────────────────────────────
+// Each panelist's photo loads from your React app's public/panelists/ folder.
+//
+// TO MAKE THE PHOTOS APPEAR (one-time setup):
+//   1. Create the folder:        D:\cyberprep-api\my-app\public\panelists\
+//   2. Save each panelist photo into that folder with these EXACT filenames:
+//        maya.jpg      ← Maya Chen (Security Architect)
+//        marcus.jpg    ← Marcus Rodriguez (IR Lead)
+//        sarah.jpg     ← Sarah Okonkwo (CISO)
+//        aiden.jpg     ← Aiden Wright (Threat Hunter)
+//        priya.jpg     ← Priya Subramanian (AppSec Engineer)
+//        raj.jpg       ← Raj Patel (Red Team Lead)
+//   3. Refresh — the photos render exactly as saved (no resize, no recompress).
+//
+// Policy:
+//   - The app displays ONLY the literal image file at the URL — no proxying,
+//     no transformation, no AI regeneration, no placeholder substitution.
+//   - If a file is missing, the Avatar component falls back to colored
+//     initials. It will never request an AI portrait service or substitute
+//     a generated face.
+//   - Square (1:1) JPEG/PNG works best. ~400×400 minimum recommended.
 const PANELISTS = [
   {
     id: "maya",
@@ -38,7 +55,7 @@ const PANELISTS = [
     initials: "MC",
     color: "#14b8a6",
     gender: "female",
-    avatarUrl: "https://images.unsplash.com/photo-1573497019940-1c28c88b4f3e?w=400&h=400&fit=crop&crop=faces&q=80",
+    avatarUrl: "/panelists/maya.jpg",
   },
   {
     id: "marcus",
@@ -48,7 +65,7 @@ const PANELISTS = [
     initials: "MR",
     color: "#f97316",
     gender: "male",
-    avatarUrl: "https://images.unsplash.com/photo-1560250097-0b93528c311a?w=400&h=400&fit=crop&crop=faces&q=80",
+    avatarUrl: "/panelists/marcus.jpg",
   },
   {
     id: "sarah",
@@ -58,7 +75,7 @@ const PANELISTS = [
     initials: "SO",
     color: "#a855f7",
     gender: "female",
-    avatarUrl: "https://images.unsplash.com/photo-1580489944761-15a19d654956?w=400&h=400&fit=crop&crop=faces&q=80",
+    avatarUrl: "/panelists/sarah.jpg",
   },
   {
     id: "aiden",
@@ -68,7 +85,7 @@ const PANELISTS = [
     initials: "AW",
     color: "#3b82f6",
     gender: "male",
-    avatarUrl: "https://images.unsplash.com/photo-1519085360753-af0119f7cbe7?w=400&h=400&fit=crop&crop=faces&q=80",
+    avatarUrl: "/panelists/aiden.jpg",
   },
   {
     id: "priya",
@@ -78,7 +95,7 @@ const PANELISTS = [
     initials: "PS",
     color: "#22c55e",
     gender: "female",
-    avatarUrl: "https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=400&h=400&fit=crop&crop=faces&q=80",
+    avatarUrl: "/panelists/priya.jpg",
   },
   {
     id: "raj",
@@ -88,7 +105,7 @@ const PANELISTS = [
     initials: "RP",
     color: "#06b6d4",
     gender: "male",
-    avatarUrl: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=400&h=400&fit=crop&crop=faces&q=80",
+    avatarUrl: "/panelists/raj.jpg",
   },
 ];
 
@@ -545,6 +562,8 @@ export default function InterviewSession({
     if (isRecording) {
       try { recognitionRef.current?.stop(); } catch (_) {}
     }
+    // Notify the InterviewTab reports widget to refresh
+    try { window.dispatchEvent(new CustomEvent('threatready:interview-complete')); } catch (_) {}
     showToast(reason, "info");
   };
 
@@ -615,6 +634,43 @@ export default function InterviewSession({
 
       setReport(data.report);
       setStage("viewing-report");
+
+      // ─── Persist this real, completed interview to local history ───
+      // This is the ONLY place that writes to cyberprep_interview_history.
+      // The InterviewTab's "Interview History" widget reads from this store.
+      // No dummy/sample data — only entries written here, one per real completed interview.
+      try {
+        const r = data.report || {};
+        const historyEntry = {
+          id: `INT-${Date.now()}-${Math.random().toString(36).slice(2, 7).toUpperCase()}`,
+          completed_at: endedAt,
+          started_at: startedAt,
+          difficulty: level,
+          duration_minutes: durationMinutes,
+          duration_seconds: durationSeconds,
+          questions_answered: questionsAnswered,
+          panel_size: PANELISTS.length,
+          // Score & badge fields (mapped to common shapes the report may return)
+          overall_score: r.overall_score ?? r.overallScore ?? r.score ?? null,
+          skills_score: r.skills_score ?? r.skillsScore ?? null,
+          attack_score: r.attack_score ?? r.attackScore ?? r.communication_score ?? null,
+          badge: r.badge ?? r.badge_level ?? null,
+          earned_xp: r.earned_xp ?? r.earnedXp ?? r.xp ?? 0,
+          verdict: r.verdict ?? r.summary ?? r.overall_verdict ?? null,
+          // Full report payload preserved so the history "View Full Report" can re-render it later
+          report: r,
+        };
+        const stored = localStorage.getItem("cyberprep_interview_history");
+        const list = stored ? JSON.parse(stored) : [];
+        list.unshift(historyEntry); // newest first
+        // Cap at 100 entries
+        if (list.length > 100) list.length = 100;
+        localStorage.setItem("cyberprep_interview_history", JSON.stringify(list));
+        // Notify InterviewTab to refresh its widget
+        window.dispatchEvent(new CustomEvent("threatready:interview-complete", { detail: { entry: historyEntry } }));
+      } catch (storeErr) {
+        console.error("Failed to persist interview report:", storeErr);
+      }
     } catch (e) {
       console.error("Report generation error:", e);
       setReportError(e.message);
@@ -692,7 +748,7 @@ export default function InterviewSession({
   // ═══════════════════════════════════════════════════════════════
   if (stage === "loading-report") {
     return (
-      <div className="fadeUp" style={{ maxWidth: 700, margin: "60px auto", padding: 20 }}>
+      <div className="fadeUp" style={{ maxWidth: 700, margin: "76px auto 40px", padding: 20 }}>
         <div className="card" style={{ padding: 40, textAlign: "center" }}>
           <div className="loader" style={{ margin: "0 auto 20px", width: 40, height: 40 }} />
           <h2 style={{ fontSize: 20, fontWeight: 800, marginBottom: 10 }}>Generating your report…</h2>
@@ -714,7 +770,7 @@ export default function InterviewSession({
   // ═══════════════════════════════════════════════════════════════
   if (stage === "report-error") {
     return (
-      <div className="fadeUp" style={{ maxWidth: 700, margin: "40px auto", padding: 20 }}>
+      <div className="fadeUp" style={{ maxWidth: 700, margin: "76px auto 40px", padding: 20 }}>
         <div className="card" style={{ padding: 30, textAlign: "center" }}>
           <div style={{ fontSize: 48, marginBottom: 12 }}>⚠️</div>
           <h2 style={{ fontSize: 20, fontWeight: 800, marginBottom: 10 }}>Report could not be generated</h2>
@@ -752,7 +808,7 @@ export default function InterviewSession({
   if (stage === "completed") {
     const userAnswers = messages.filter((m) => m.role === "user").length;
     return (
-      <div className="fadeUp" style={{ maxWidth: 700, margin: "40px auto", padding: 20 }}>
+      <div className="fadeUp" style={{ maxWidth: 700, margin: "76px auto 40px", padding: 20 }}>
         <div className="card" style={{ padding: 40, textAlign: "center" }}>
           <div style={{ fontSize: 56, marginBottom: 12 }}>✅</div>
           <h2 style={{ fontSize: 24, fontWeight: 800, marginBottom: 10 }}>Session Complete</h2>
@@ -814,6 +870,11 @@ export default function InterviewSession({
 
   const Avatar = ({ panelist, isActive, size = 88 }) => {
     const errored = imgErrors[panelist.id];
+    // POLICY: only render an image when a real, explicit avatarUrl is provided
+    // (no AI-generated faces, no placeholder portrait services). If avatarUrl
+    // is null/empty OR a previously-set URL failed to load, we render the
+    // colored initials badge instead — never a generated face.
+    const hasRealImage = !!panelist.avatarUrl && !errored;
     return (
       <div style={{
         position: "relative",
@@ -821,15 +882,15 @@ export default function InterviewSession({
         borderRadius: "50%",
         overflow: "hidden",
         background: `${panelist.color}15`,
-        border: `3px solid ${isActive ? panelist.color : "rgba(255,255,255,0.15)"}`,
+        border: `3px solid ${isActive ? panelist.color : "rgba(0,0,0,0.05)"}`,
         boxShadow: isActive
-          ? `0 0 0 4px ${panelist.color}33, 0 8px 24px ${panelist.color}66`
-          : "0 2px 8px rgba(0,0,0,0.25)",
-        transform: isActive ? "scale(1.06)" : "scale(1)",
+          ? `0 0 0 4px ${panelist.color}25, 0 8px 20px ${panelist.color}40`
+          : "0 2px 8px rgba(0,0,0,0.08)",
+        transform: isActive ? "scale(1.04)" : "scale(1)",
         transition: "all 0.35s ease",
         display: "flex", alignItems: "center", justifyContent: "center",
       }}>
-        {!errored ? (
+        {hasRealImage ? (
           <img
             src={panelist.avatarUrl}
             alt={panelist.name}
@@ -864,178 +925,133 @@ export default function InterviewSession({
   };
 
   // ═══════════════════════════════════════════════════════════════
-  // STAGE: active → main interview UI
+  // STAGE: active → main interview UI (REDESIGNED — light theme, modern)
   // ═══════════════════════════════════════════════════════════════
+  const SI = {
+    replay: <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="1 4 1 10 7 10"/><polyline points="23 20 23 14 17 14"/><path d="M20.49 9A9 9 0 0 0 5.64 5.64L1 10m22 4l-4.64 4.36A9 9 0 0 1 3.51 15"/></svg>,
+    mic: <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>,
+    micBig: <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>,
+    micOff: <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="1" y1="1" x2="23" y2="23"/><path d="M9 9v3a3 3 0 0 0 5.12 2.12M15 9.34V4a3 3 0 0 0-5.94-.6"/><path d="M17 16.95A7 7 0 0 1 5 12v-2m14 0v2a7 7 0 0 1-.11 1.23"/><line x1="12" y1="19" x2="12" y2="23"/></svg>,
+    timer: <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="13" r="8"/><path d="M9 1h6"/><polyline points="12 9 12 13 14 14"/></svg>,
+    chevD: <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="6 9 12 15 18 9"/></svg>,
+    chat: <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>,
+    send: <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>,
+    alert: <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>,
+  };
+  const userAnsweredCount = messages.filter((m) => m.role === "user").length;
+  const timeIsLow = timeRemaining < 300;
+
   return (
-    <div className="fadeUp">
-      {/* Header */}
-      <div className="card" style={{
-        padding: 14, marginBottom: 12,
-        display: "flex", alignItems: "center", justifyContent: "space-between",
-        flexWrap: "wrap", gap: 10,
-      }}>
-        <div>
-          <div className="lbl" style={{ marginBottom: 2 }}>LIVE INTERVIEW · {PANELISTS.length}-PERSON PANEL</div>
-          <div style={{ fontSize: 12, color: "var(--tx2)" }}>
-            {messages.filter((m) => m.role === "user").length} answered · {level} level
+    <div className="tr-is-root">
+      {/* ─── Header ─── */}
+      <div className="tr-is-header">
+        <div className="tr-is-header-left">
+          <div className="tr-is-header-lbl">
+            LIVE INTERVIEW · {PANELISTS.length}-PERSON PANEL
+          </div>
+          <div className="tr-is-header-sub">
+            {userAnsweredCount} answered · {level} level
           </div>
         </div>
-        <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+        <div className="tr-is-header-right">
           {ttsAvailable && (
             <>
               <button
-                className="btn bs"
+                type="button"
+                className="tr-is-btn"
                 onClick={replayCurrentQuestion}
                 disabled={messages.length === 0 || isLoading}
                 title="Replay last question"
-                style={{ fontSize: 12, padding: "6px 10px" }}
               >
-                🔁 Replay
+                {SI.replay} Replay
               </button>
               <button
-                className="btn bs"
+                type="button"
+                className={`tr-is-btn${ttsMuted ? " muted" : ""}`}
                 onClick={toggleMute}
                 title={ttsMuted ? "Unmute panel voice" : "Mute panel voice"}
-                style={{
-                  fontSize: 12, padding: "6px 10px",
-                  background: ttsMuted ? "rgba(239,68,68,0.15)" : undefined,
-                  borderColor: ttsMuted ? "#ef4444" : undefined,
-                  color: ttsMuted ? "#ef4444" : undefined,
-                }}
               >
-                {ttsMuted ? "🔇 Muted" : "🔊 Voice"}
+                {ttsMuted ? SI.micOff : SI.mic} {ttsMuted ? "Muted" : "Voice"}
               </button>
             </>
           )}
-          <div style={{
-            padding: "8px 14px",
-            background: timeRemaining < 300 ? "rgba(239,68,68,0.1)" : "rgba(0,229,255,0.06)",
-            border: `1px solid ${timeRemaining < 300 ? "#ef4444" : "var(--ac)"}`,
-            borderRadius: 8,
-            fontSize: 18, fontWeight: 800, fontFamily: "monospace",
-            color: timeRemaining < 300 ? "#ef4444" : "var(--ac)",
-            minWidth: 90, textAlign: "center",
-          }}>
-            ⏱️ {formatTime(timeRemaining)}
+          <div className={`tr-is-timer${timeIsLow ? " low" : ""}`}>
+            {SI.timer} <span>{formatTime(timeRemaining)}</span>
           </div>
-          <button className="btn bs" style={{ fontSize: 12, padding: "6px 12px" }} onClick={handleExit}>
-            End & View Report
+          <button
+            type="button"
+            className="tr-is-btn end"
+            onClick={handleExit}
+          >
+            End &amp; View Report
           </button>
         </div>
       </div>
 
-      {/* PANEL */}
-      <div className="card" style={{
-        padding: 0, marginBottom: 12, overflow: "hidden",
-      }}>
-        <div style={{
-          padding: "24px 20px 16px",
-        }}>
-          <div style={{
-            display: "flex", justifyContent: "space-around", alignItems: "flex-start",
-            gap: 14, flexWrap: "wrap",
-          }}>
-            {PANELISTS.map((p, i) => {
-              const isActive = i === (activePanelistIdx % PANELISTS.length);
-              return (
-                <div key={p.id} style={{
-                  display: "flex", flexDirection: "column", alignItems: "center",
-                  gap: 8, flex: "1 1 110px", minWidth: 90, maxWidth: 160,
-                  opacity: isActive ? 1 : 0.55,
-                  transition: "opacity 0.35s ease",
-                }}>
-                  <Avatar panelist={p} isActive={isActive} size={76} />
-                  <div style={{ textAlign: "center" }}>
-                    <div style={{
-                      fontSize: 13, fontWeight: 700,
-                      color: isActive ? "var(--tx1)" : "var(--tx2)",
-                      marginBottom: 2,
-                    }}>{p.name}</div>
-                    <div style={{
-                      fontSize: 11, fontWeight: 600, letterSpacing: 0.3,
-                      color: isActive ? p.color : "var(--tx2)",
-                    }}>{p.title}</div>
-                    <div style={{
-                      fontSize: 9, marginTop: 3,
-                      color: "var(--tx2)", letterSpacing: 0.3, opacity: 0.7,
-                    }}>{p.specialty}</div>
-                  </div>
+      {/* ─── Panel Grid + Current Question (single card) ─── */}
+      <div className="tr-is-panel">
+        <div className="tr-is-panel-grid">
+          {PANELISTS.map((p, i) => {
+            const isActive = i === (activePanelistIdx % PANELISTS.length);
+            return (
+              <div
+                key={p.id}
+                className={`tr-is-pcard${isActive ? " active" : ""}`}
+              >
+                <div className="tr-is-pcard-top" style={{ background: p.color }} />
+                <div className="tr-is-pcard-photo">
+                  <Avatar panelist={p} isActive={isActive} size={120} />
+                  <span className="tr-is-pcard-dot" />
                 </div>
-              );
-            })}
-          </div>
+                <div className="tr-is-pcard-name">{p.name}</div>
+                <div className="tr-is-pcard-title" style={{ color: isActive ? p.color : "var(--tx2, #8890b0)" }}>
+                  {p.title}
+                </div>
+                <div className="tr-is-pcard-specialty">{p.specialty}</div>
+              </div>
+            );
+          })}
         </div>
 
-        <div style={{
-          height: 1,
-          background: `linear-gradient(90deg, transparent, ${questionPanelist.color}55, transparent)`,
-          margin: "0 24px",
-        }} />
-
-        <div style={{ padding: "18px 24px 22px" }}>
+        <div className="tr-is-question-zone">
           {!currentQuestion && isLoading && (
-            <div style={{ textAlign: "center", padding: 30, color: "var(--tx2)" }}>
-              <div className="loader" style={{ margin: "0 auto 12px" }} />
-              <div style={{ fontSize: 13 }}>The panel is preparing your first question…</div>
+            <div className="tr-is-preparing">
+              <div className="loader" />
+              <div>The panel is preparing your first question…</div>
             </div>
           )}
 
           {error && (
-            <div style={{
-              background: "rgba(239,68,68,0.08)",
-              border: "1px solid rgba(239,68,68,0.3)",
-              borderRadius: 8, padding: 12, color: "#ef4444",
-              fontSize: 12, marginBottom: 12,
-            }}>
-              ⚠️ {error}
+            <div className="tr-is-error">
+              {SI.alert} {error}
             </div>
           )}
 
           {currentQuestion && (
             <>
-              <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
-                <span style={{
-                  display: "inline-flex", alignItems: "center", gap: 6,
-                  padding: "4px 11px",
-                  background: "rgba(0,229,255,0.08)",
-                  border: "1px solid rgba(0,229,255,0.3)",
-                  borderRadius: 20,
-                  fontSize: 10, fontWeight: 700, letterSpacing: 0.5,
-                  color: "var(--ac)",
-                }}>
-                  {isSpeaking ? "🔊" : "💬"} ASKED BY {questionPanelist.name.toUpperCase()} · {questionPanelist.title.toUpperCase()}
+              <div className="tr-is-asked-row">
+                <span className="tr-is-asked-pill">
+                  {SI.chat} ASKED BY {questionPanelist.name.toUpperCase()} · {questionPanelist.title.toUpperCase()}
                 </span>
                 {currentQuestion.isTyping && (
-                  <span style={{ fontSize: 10, color: "var(--tx2)" }}>typing…</span>
+                  <span className="tr-is-typing">typing…</span>
                 )}
               </div>
-              <div style={{
-                background: "rgba(0,229,255,0.04)",
-                border: "1px solid rgba(0,229,255,0.15)",
-                borderLeft: `4px solid ${questionPanelist.color}`,
-                borderRadius: 10,
-                padding: "14px 18px",
-                fontSize: 14, lineHeight: 1.65,
-                color: "var(--tx1)", whiteSpace: "pre-wrap",
-              }}>
+              <div
+                className="tr-is-question"
+                style={{ borderLeftColor: questionPanelist.color }}
+              >
                 {currentQuestion.content}
                 {currentQuestion.isTyping && (
-                  <span style={{
-                    display: "inline-block", width: 6, height: 14,
-                    background: "var(--ac)",
-                    verticalAlign: "-2px", marginLeft: 3,
-                    animation: "blink 1s infinite",
-                  }} />
+                  <span className="tr-is-caret" />
                 )}
+                <span className="tr-is-question-decor" aria-hidden="true" />
               </div>
             </>
           )}
 
           {isLoading && messages.length > 0 && !typingText && (
-            <div style={{
-              marginTop: 12, display: "flex", gap: 10, alignItems: "center",
-              color: "var(--tx2)", fontSize: 12,
-            }}>
+            <div className="tr-is-loading-next">
               <div className="loader" style={{ width: 14, height: 14 }} />
               {activePanelist.name} is preparing the next question…
             </div>
@@ -1043,61 +1059,48 @@ export default function InterviewSession({
         </div>
       </div>
 
-      {/* History */}
+      {/* ─── Conversation History ─── */}
       {historyMessages.length > 0 && (
-        <div className="card" style={{ padding: 12, marginBottom: 12 }}>
+        <div className="tr-is-history">
           <div
+            className="tr-is-history-head"
             onClick={() => setHistoryExpanded((e) => !e)}
-            style={{
-              display: "flex", justifyContent: "space-between", alignItems: "center",
-              cursor: "pointer", padding: "4px 4px",
-            }}
+            role="button"
+            tabIndex={0}
+            onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setHistoryExpanded((x) => !x); } }}
           >
-            <div style={{ fontSize: 11, fontWeight: 700, color: "var(--tx2)", letterSpacing: 0.5 }}>
+            <div className="tr-is-history-lbl">
               CONVERSATION HISTORY · {historyMessages.length} MESSAGE{historyMessages.length === 1 ? "" : "S"}
             </div>
-            <div style={{ fontSize: 11, color: "var(--tx2)" }}>
-              {historyExpanded ? "▲ Hide" : "▼ Show"}
+            <div className={`tr-is-history-toggle${historyExpanded ? " open" : ""}`}>
+              {historyExpanded ? "Hide" : "Show"} {SI.chevD}
             </div>
           </div>
           {historyExpanded && (
-            <div style={{
-              marginTop: 12, maxHeight: "35vh", overflowY: "auto",
-              borderTop: "1px solid rgba(255,255,255,0.06)", paddingTop: 12,
-            }}>
+            <div className="tr-is-history-list">
               {historyMessages.map((msg, i) => {
                 const panelist = msg.role === "assistant"
                   ? PANELISTS[(msg.panelistIdx ?? 0) % PANELISTS.length]
                   : null;
+                const isUser = msg.role === "user";
                 return (
-                  <div key={i} style={{
-                    marginBottom: 12, display: "flex",
-                    flexDirection: msg.role === "user" ? "row-reverse" : "row",
-                    gap: 10,
-                  }}>
-                    {msg.role === "user" ? (
-                      <div style={{
-                        width: 30, height: 30, minWidth: 30, borderRadius: "50%",
-                        background: "rgba(34,197,94,0.15)", border: "1px solid #22c55e",
-                        display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14,
-                      }}>👤</div>
+                  <div
+                    key={i}
+                    className={`tr-is-msg-row ${isUser ? "user" : "assistant"}`}
+                  >
+                    {isUser ? (
+                      <div className="tr-is-msg-avatar user-av">YOU</div>
                     ) : (
-                      <Avatar panelist={panelist} isActive={false} size={30} />
+                      <Avatar panelist={panelist} isActive={false} size={36} />
                     )}
-                    <div style={{
-                      flex: 1, padding: "8px 12px",
-                      background: msg.role === "user" ? "rgba(34,197,94,0.05)" : "rgba(0,229,255,0.04)",
-                      border: `1px solid ${msg.role === "user" ? "rgba(34,197,94,0.2)" : "rgba(0,229,255,0.15)"}`,
-                      borderLeft: msg.role === "user" ? undefined : `3px solid ${panelist.color}`,
-                      borderRadius: 8, fontSize: 12, lineHeight: 1.55,
-                      whiteSpace: "pre-wrap", color: "var(--tx1)", maxWidth: "85%",
-                    }}>
-                      <div style={{
-                        fontSize: 9, fontWeight: 700, letterSpacing: 0.5,
-                        color: msg.role === "user" ? "#22c55e" : "var(--ac)",
-                        marginBottom: 3,
-                      }}>
-                        {msg.role === "user" ? "YOU" : `${panelist.name.toUpperCase()} · ${panelist.title.toUpperCase()}`}
+                    <div
+                      className={`tr-is-msg-bubble${isUser ? " user" : ""}`}
+                      style={!isUser ? { borderLeft: `3px solid ${panelist.color}` } : undefined}
+                    >
+                      <div className={`tr-is-msg-from${isUser ? " user" : ""}`}>
+                        {isUser
+                          ? "YOU"
+                          : `${panelist.name.toUpperCase()} · ${panelist.title.toUpperCase()}`}
                       </div>
                       {msg.content}
                     </div>
@@ -1110,12 +1113,23 @@ export default function InterviewSession({
         </div>
       )}
 
-      {/* Input */}
-      <div className="card" style={{ padding: 14 }}>
-        <div style={{ position: "relative", marginBottom: 10 }}>
+      {/* ─── Answer Input ─── */}
+      <div className="tr-is-input-card">
+        <div className="tr-is-textarea-wrap">
+          {voiceSupported && (
+            <button
+              type="button"
+              onClick={toggleRecording}
+              disabled={isLoading || stage !== "active"}
+              title={isRecording ? "Stop dictation" : "Start dictation"}
+              className={`tr-is-mic-btn${isRecording ? " active" : ""}`}
+            >
+              {SI.micBig}
+            </button>
+          )}
           <textarea
             ref={textareaRef}
-            className="input"
+            className="tr-is-textarea"
             value={currentAnswer}
             onChange={(e) => {
               setCurrentAnswer(e.target.value);
@@ -1124,142 +1138,369 @@ export default function InterviewSession({
             onKeyDown={(e) => {
               if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) submitAnswer();
             }}
-            placeholder="Type your answer to the panel… (Ctrl+Enter to submit) · or click 🎤 to dictate"
+            placeholder={`Type your answer to the panel… (Ctrl+Enter to submit)${voiceSupported ? " · or click 🎤 to dictate" : ""}`}
             disabled={isLoading || stage !== "active"}
-            style={{ width: "100%", minHeight: 100, fontSize: 13, resize: "vertical", paddingLeft: 56 }}
+            style={voiceSupported ? { paddingLeft: 56 } : undefined}
           />
-          {voiceSupported && (
-            <button
-              type="button"
-              onClick={toggleRecording}
-              disabled={isLoading || stage !== "active"}
-              title={isRecording ? "Stop dictation" : "Start dictation"}
-              style={{
-                position: "absolute", top: 8, left: 8,
-                width: 40, height: 40, borderRadius: "50%",
-                background: isRecording ? "rgba(239,68,68,0.15)" : "rgba(255,255,255,0.05)",
-                border: `1px solid ${isRecording ? "#ef4444" : "rgba(255,255,255,0.2)"}`,
-                color: isRecording ? "#ef4444" : "var(--tx1)",
-                cursor: "pointer", fontSize: 16,
-                display: "flex", alignItems: "center", justifyContent: "center",
-                animation: isRecording ? "pulse-red 1.2s infinite" : "none",
-              }}
-            >
-              🎤
-            </button>
-          )}
         </div>
-
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10 }}>
-          <div style={{ fontSize: 11, color: isRecording ? "#ef4444" : "var(--tx2)" }}>
+        <div className="tr-is-input-footer">
+          <div className={`tr-is-input-meta${isRecording ? " rec" : ""}`}>
             {isRecording ? (
               <>
-                <span style={{
-                  display: "inline-block", width: 8, height: 8, borderRadius: "50%",
-                  background: "#ef4444", marginRight: 6,
-                  animation: "pulse-red 1.2s infinite",
-                }} />
-                <strong>Recording…</strong> · click 🎤 to pause · text editable manually
+                <span className="tr-is-rec-dot" />
+                <strong>Recording…</strong> · click mic to pause · text editable manually
               </>
             ) : (
-              <>{currentAnswer.length} chars · Ctrl+Enter to submit{voiceSupported ? " · 🎤 for voice" : ""}</>
+              <>{currentAnswer.length} chars · Ctrl+Enter to submit{voiceSupported ? " · mic for voice" : ""}</>
             )}
           </div>
           <button
-            className="btn bp"
+            type="button"
+            className="tr-is-submit-btn"
             disabled={!currentAnswer.trim() || isLoading || stage !== "active"}
             onClick={submitAnswer}
-            style={{
-              padding: "10px 24px", fontSize: 13, fontWeight: 700,
-              opacity: !currentAnswer.trim() || isLoading || stage !== "active" ? 0.5 : 1,
-              cursor: !currentAnswer.trim() || isLoading || stage !== "active" ? "not-allowed" : "pointer",
-            }}
           >
-            {isLoading ? "Sending…" : "Submit Answer →"}
+            {isLoading ? "Sending…" : <>Submit Answer {SI.send}</>}
           </button>
         </div>
       </div>
 
       <style>{`
-        @keyframes blink {
-          0%, 50% { opacity: 1; }
-          51%, 100% { opacity: 0; }
-        }
-        @keyframes pulse-red {
-          0%, 100% { box-shadow: 0 0 0 0 rgba(239,68,68,0.5); }
-          50% { box-shadow: 0 0 0 6px rgba(239,68,68,0); }
-        }
-        @keyframes pulse-green {
-          0%, 100% { box-shadow: 0 0 0 0 rgba(34,197,94,0.6); }
-          50% { box-shadow: 0 0 0 5px rgba(34,197,94,0); }
-        }
+/* ─── Active Interview UI (light theme redesign) ─── */
+.tr-is-root{
+  font-family:'Inter','Segoe UI',sans-serif;
+  color:var(--tx1,#1a1a2e);
+  padding-top:56px;
+  display:flex;flex-direction:column;gap:16px;
+}
+.tr-is-root svg:not([width]){width:14px;height:14px;flex-shrink:0}
+
+/* ── Header ── */
+.tr-is-header{
+  background:var(--s1,#fff);
+  border:1px solid var(--bd,#e9e5f3);
+  border-radius:14px;
+  padding:18px 24px;
+  display:flex;justify-content:space-between;align-items:center;
+  gap:14px;flex-wrap:wrap;
+  box-shadow:0 1px 2px rgba(0,0,0,.02);
+}
+.tr-is-header-lbl{
+  font-size:13px;font-weight:800;color:#7c3aed;
+  letter-spacing:2px;text-transform:uppercase;margin-bottom:4px;
+}
+.tr-is-header-sub{font-size:12.5px;color:var(--tx2,#8890b0)}
+.tr-is-header-right{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+
+.tr-is-btn{
+  display:inline-flex;align-items:center;gap:7px;
+  padding:8px 14px;
+  background:#fff;border:1px solid var(--bd,#e9e5f3);
+  border-radius:9px;
+  font-size:12.5px;font-weight:600;color:var(--tx1,#1a1a2e);
+  cursor:pointer;font-family:inherit;
+  transition:all .15s ease;
+}
+.tr-is-btn:hover:not(:disabled){border-color:#7c3aed;color:#7c3aed;background:rgba(124,58,237,.04)}
+.tr-is-btn:disabled{opacity:.5;cursor:not-allowed}
+.tr-is-btn.muted{background:rgba(239,68,68,.08);border-color:#ef4444;color:#ef4444}
+.tr-is-btn.end{font-weight:700}
+.tr-is-btn.end:hover:not(:disabled){border-color:#dc2626;color:#dc2626;background:#fef2f2}
+
+.tr-is-timer{
+  display:inline-flex;align-items:center;gap:7px;
+  padding:8px 16px;
+  background:rgba(124,58,237,.08);border:1px solid rgba(124,58,237,.25);
+  border-radius:9px;
+  font-size:15px;font-weight:800;font-family:'Inter','SF Mono',monospace;
+  color:#7c3aed;letter-spacing:.5px;
+}
+.tr-is-timer.low{background:rgba(239,68,68,.10);border-color:rgba(239,68,68,.40);color:#dc2626}
+
+/* ── Panel card (panelist grid + question zone) ── */
+.tr-is-panel{
+  background:var(--s1,#fff);
+  border:1px solid var(--bd,#e9e5f3);
+  border-radius:14px;
+  overflow:hidden;
+  box-shadow:0 1px 2px rgba(0,0,0,.02);
+}
+.tr-is-panel-grid{
+  display:grid;
+  grid-template-columns:repeat(6,1fr);
+  gap:14px;
+  padding:22px 22px 14px;
+}
+@media (max-width:1200px){.tr-is-panel-grid{grid-template-columns:repeat(3,1fr)}}
+@media (max-width:600px){.tr-is-panel-grid{grid-template-columns:repeat(2,1fr)}}
+
+/* Panelist card */
+.tr-is-pcard{
+  background:#fff;
+  border:1px solid var(--bd,#e9e5f3);
+  border-radius:12px;
+  padding:0;
+  overflow:hidden;
+  text-align:center;
+  display:flex;flex-direction:column;
+  transition:opacity .35s ease, transform .35s ease, box-shadow .35s ease;
+  opacity:.55;
+}
+.tr-is-pcard.active{opacity:1;box-shadow:0 6px 18px rgba(124,58,237,.10);transform:translateY(-1px)}
+.tr-is-pcard-top{height:5px;width:100%}
+.tr-is-pcard-photo{
+  position:relative;padding:14px 14px 8px;
+  display:flex;justify-content:center;
+}
+.tr-is-pcard-photo > div{
+  border-radius:12px !important;
+  width:120px !important;height:120px !important;
+  min-width:120px !important;min-height:120px !important;
+  overflow:hidden;
+  border:none !important;
+  box-shadow:0 4px 10px rgba(0,0,0,.06);
+}
+.tr-is-pcard-photo > div img{
+  width:100% !important;height:100% !important;object-fit:cover !important;
+}
+.tr-is-pcard-dot{
+  position:absolute;right:22px;bottom:14px;
+  width:14px;height:14px;border-radius:50%;
+  background:#22c55e;border:2.5px solid #fff;
+  box-shadow:0 0 0 0 rgba(34,197,94,.6);
+  animation:trIsPulseDot 2.4s ease-in-out infinite;
+}
+@keyframes trIsPulseDot{
+  0%,100%{box-shadow:0 0 0 0 rgba(34,197,94,.5)}
+  50%{box-shadow:0 0 0 6px rgba(34,197,94,0)}
+}
+.tr-is-pcard-name{
+  font-size:14px;font-weight:800;color:var(--tx1,#1a1a2e);
+  margin:6px 10px 2px;letter-spacing:-.2px;
+}
+.tr-is-pcard-title{
+  font-size:12.5px;font-weight:700;
+  margin:0 10px 2px;
+}
+.tr-is-pcard-specialty{
+  font-size:11px;color:var(--tx2,#8890b0);
+  margin:0 10px 16px;line-height:1.4;
+}
+
+/* ── Question zone ── */
+.tr-is-question-zone{
+  padding:18px 24px 22px;
+  border-top:1px solid var(--bd,#e9e5f3);
+  background:linear-gradient(180deg,#fafafa 0%,#fff 100%);
+}
+.tr-is-preparing{
+  text-align:center;padding:30px;color:var(--tx2,#8890b0);font-size:13px;
+}
+.tr-is-preparing .loader{margin:0 auto 12px}
+.tr-is-error{
+  display:flex;align-items:center;gap:8px;
+  background:rgba(239,68,68,.06);
+  border:1px solid rgba(239,68,68,.25);
+  border-radius:9px;padding:11px 14px;
+  color:#dc2626;font-size:12.5px;margin-bottom:12px;
+}
+.tr-is-asked-row{display:flex;align-items:center;gap:10px;margin-bottom:12px;flex-wrap:wrap}
+.tr-is-asked-pill{
+  display:inline-flex;align-items:center;gap:6px;
+  padding:5px 12px;
+  background:rgba(124,58,237,.08);
+  border:1px solid rgba(124,58,237,.20);
+  border-radius:20px;
+  font-size:10.5px;font-weight:800;letter-spacing:.6px;
+  color:#7c3aed;
+}
+.tr-is-typing{font-size:11px;color:var(--tx2,#8890b0);font-style:italic}
+.tr-is-question{
+  position:relative;
+  background:rgba(124,58,237,.03);
+  border:1px solid rgba(124,58,237,.10);
+  border-left:4px solid;
+  border-radius:10px;
+  padding:18px 22px;
+  font-size:14.5px;line-height:1.7;
+  color:var(--tx1,#1a1a2e);
+  white-space:pre-wrap;
+  overflow:hidden;
+}
+.tr-is-question-decor{
+  position:absolute;top:14px;right:14px;
+  width:60px;height:60px;
+  background-image:radial-gradient(circle,#7c3aed 1px,transparent 1.5px);
+  background-size:8px 8px;
+  opacity:.15;
+  pointer-events:none;
+}
+.tr-is-caret{
+  display:inline-block;width:7px;height:16px;
+  background:#7c3aed;vertical-align:-3px;margin-left:3px;
+  animation:trIsBlink 1s infinite;
+}
+@keyframes trIsBlink{0%,50%{opacity:1}51%,100%{opacity:0}}
+.tr-is-loading-next{
+  margin-top:14px;display:flex;gap:10px;align-items:center;
+  color:var(--tx2,#8890b0);font-size:12.5px;
+}
+
+/* ── Conversation History ── */
+.tr-is-history{
+  background:var(--s1,#fff);
+  border:1px solid var(--bd,#e9e5f3);
+  border-radius:14px;
+  overflow:hidden;
+  box-shadow:0 1px 2px rgba(0,0,0,.02);
+}
+.tr-is-history-head{
+  padding:14px 22px;
+  display:flex;justify-content:space-between;align-items:center;
+  cursor:pointer;outline:none;
+  transition:background .15s ease;
+}
+.tr-is-history-head:hover{background:#fafafa}
+.tr-is-history-head:focus-visible{background:rgba(124,58,237,.04)}
+.tr-is-history-lbl{
+  font-size:11.5px;font-weight:800;color:#7c3aed;
+  letter-spacing:1.8px;
+}
+.tr-is-history-toggle{
+  display:inline-flex;align-items:center;gap:5px;
+  font-size:12px;font-weight:600;color:var(--tx2,#8890b0);
+  transition:color .15s ease;
+}
+.tr-is-history-head:hover .tr-is-history-toggle{color:#7c3aed}
+.tr-is-history-toggle svg{transition:transform .2s ease}
+.tr-is-history-toggle.open svg{transform:rotate(180deg)}
+.tr-is-history-list{
+  padding:0 22px 18px;
+  max-height:38vh;overflow-y:auto;
+  border-top:1px solid var(--bd,#e9e5f3);
+}
+.tr-is-history-list::-webkit-scrollbar{width:7px}
+.tr-is-history-list::-webkit-scrollbar-thumb{background:#d4ccea;border-radius:4px}
+.tr-is-msg-row{
+  display:flex;gap:11px;
+  margin-top:14px;
+}
+.tr-is-msg-row.user{flex-direction:row-reverse}
+.tr-is-msg-avatar.user-av{
+  width:36px;height:36px;flex-shrink:0;
+  border-radius:50%;
+  background:linear-gradient(135deg,#22c55e,#16a34a);
+  color:#fff;
+  display:flex;align-items:center;justify-content:center;
+  font-size:10.5px;font-weight:800;letter-spacing:.5px;
+  box-shadow:0 2px 6px rgba(34,197,94,.25);
+}
+.tr-is-msg-bubble{
+  flex:1;max-width:80%;
+  padding:11px 14px;
+  background:rgba(124,58,237,.03);
+  border:1px solid rgba(124,58,237,.12);
+  border-radius:11px;
+  font-size:13px;line-height:1.6;color:var(--tx1,#1a1a2e);
+  white-space:pre-wrap;
+}
+.tr-is-msg-bubble.user{
+  background:rgba(34,197,94,.06);
+  border-color:rgba(34,197,94,.22);
+}
+.tr-is-msg-from{
+  font-size:9.5px;font-weight:800;letter-spacing:.6px;
+  color:#7c3aed;margin-bottom:4px;
+}
+.tr-is-msg-from.user{color:#16a34a}
+
+/* ── Input ── */
+.tr-is-input-card{
+  background:var(--s1,#fff);
+  border:1px solid var(--bd,#e9e5f3);
+  border-radius:14px;
+  padding:18px 22px;
+  box-shadow:0 1px 2px rgba(0,0,0,.02);
+}
+.tr-is-textarea-wrap{position:relative;margin-bottom:14px}
+.tr-is-textarea{
+  width:100%;min-height:110px;
+  padding:14px 16px;
+  background:#fafafa;
+  border:1px solid var(--bd,#e9e5f3);
+  border-radius:11px;
+  font-size:13.5px;line-height:1.6;
+  color:var(--tx1,#1a1a2e);
+  font-family:inherit;
+  resize:vertical;outline:none;
+  transition:border-color .15s,box-shadow .15s;
+  box-sizing:border-box;
+}
+.tr-is-textarea:focus{
+  border-color:#7c3aed;
+  box-shadow:0 0 0 3px rgba(124,58,237,.08);
+  background:#fff;
+}
+.tr-is-textarea::placeholder{color:var(--tx2,#8890b0)}
+.tr-is-textarea:disabled{opacity:.6;cursor:not-allowed}
+
+.tr-is-mic-btn{
+  position:absolute;top:10px;left:10px;
+  width:42px;height:42px;
+  border-radius:50%;
+  background:rgba(124,58,237,.08);
+  border:1px solid rgba(124,58,237,.20);
+  color:#7c3aed;
+  cursor:pointer;
+  display:flex;align-items:center;justify-content:center;
+  transition:all .15s ease;
+  z-index:1;
+}
+.tr-is-mic-btn:hover:not(:disabled){background:rgba(124,58,237,.12);transform:scale(1.05)}
+.tr-is-mic-btn:disabled{opacity:.5;cursor:not-allowed}
+.tr-is-mic-btn.active{
+  background:#dc2626;border-color:#dc2626;color:#fff;
+  animation:trIsPulseRed 1.2s infinite;
+}
+@keyframes trIsPulseRed{
+  0%,100%{box-shadow:0 0 0 0 rgba(220,38,38,.5)}
+  50%{box-shadow:0 0 0 8px rgba(220,38,38,0)}
+}
+
+.tr-is-input-footer{
+  display:flex;justify-content:space-between;align-items:center;gap:12px;
+  flex-wrap:wrap;
+}
+.tr-is-input-meta{font-size:11.5px;color:var(--tx2,#8890b0)}
+.tr-is-input-meta.rec{color:#dc2626;font-weight:600}
+.tr-is-rec-dot{
+  display:inline-block;width:8px;height:8px;border-radius:50%;
+  background:#dc2626;margin-right:6px;
+  animation:trIsPulseRed 1.2s infinite;
+}
+
+.tr-is-submit-btn{
+  display:inline-flex;align-items:center;gap:8px;
+  padding:11px 24px;
+  background:#7c3aed;
+  border:none;
+  border-radius:9px;
+  color:#fff;
+  font-size:13.5px;font-weight:700;
+  cursor:pointer;font-family:inherit;
+  box-shadow:0 4px 12px rgba(124,58,237,.25);
+  transition:all .15s ease;
+}
+.tr-is-submit-btn:hover:not(:disabled){background:#6d28d9;transform:translateY(-1px);box-shadow:0 6px 18px rgba(124,58,237,.35)}
+.tr-is-submit-btn:disabled{opacity:.4;cursor:not-allowed;box-shadow:none;transform:none}
       `}</style>
 
-      {/* Scenario popup */}
+      {/* End Interview confirm — clean floating card, NO dark backdrop */}
       {showExitConfirm && (
-        <div
-          style={{
-            position: "fixed", inset: 0, zIndex: 9999,
-            background: "rgba(0,0,0,0.78)", backdropFilter: "blur(3px)",
-            display: "flex", alignItems: "center", justifyContent: "center", padding: 20,
-          }}
-          onClick={() => setShowExitConfirm(false)}
-        >
-          <div
-            onClick={(e) => e.stopPropagation()}
-            style={{
-              background: "#0f1420",
-              border: "1px solid var(--ac)",
-              borderRadius: 12,
-              maxWidth: 440, width: "100%",
-              padding: 28,
-              boxShadow: "0 20px 60px rgba(0,0,0,0.5)",
-            }}
-          >
-            <div style={{ marginBottom: 14 }}>
-              <span style={{
-                background: "rgba(168,85,247,0.15)",
-                color: "#a855f7",
-                padding: "4px 12px", borderRadius: 4,
-                fontSize: 10, fontWeight: 700, letterSpacing: 1.2,
-              }}>
-                END INTERVIEW
-              </span>
-            </div>
-            <h3 style={{
-              fontSize: 20, fontWeight: 800, color: "#fff",
-              margin: "0 0 10px", letterSpacing: -0.3,
-            }}>
-              End interview and view your report?
-            </h3>
-            <p style={{
-              fontSize: 13, color: "var(--tx2)",
-              lineHeight: 1.6, margin: "0 0 22px",
-            }}>
-              Your session will be wrapped up and your AI panel will compile your performance report. You won't be able to continue this interview after ending it.
-            </p>
-            <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
-              <button
-                className="btn bs"
-                onClick={() => setShowExitConfirm(false)}
-                style={{ padding: "10px 18px", fontSize: 13 }}
-              >
-                Cancel
-              </button>
-              <button
-                className="btn"
-                onClick={confirmExit}
-                style={{
-                  padding: "10px 20px", fontSize: 13, fontWeight: 700,
-                  background: "linear-gradient(135deg, #a855f7, #7c3aed)",
-                  color: "#fff", border: "none",
-                }}
-              >
-                End & View Report
-              </button>
-            </div>
-          </div>
-        </div>
+        <EndInterviewConfirm
+          onCancel={() => setShowExitConfirm(false)}
+          onConfirm={confirmExit}
+        />
       )}
 
       {showScenarioPopup && activeScenario && (
@@ -1342,6 +1583,151 @@ export default function InterviewSession({
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+/* ─────────────────────────────────────────────────────────────────
+ * End-Interview Confirm
+ * Clean floating card, no dark backdrop, no scroll lock.
+ * Esc key cancels. Matches the redesigned light UI.
+ * ───────────────────────────────────────────────────────────────── */
+function EndInterviewConfirm({ onCancel, onConfirm }) {
+  useEffect(() => {
+    const onKey = (e) => {
+      if (e.key === "Escape") { e.stopPropagation(); onCancel(); }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onCancel]);
+
+  return (
+    <div
+      role="dialog"
+      aria-modal="false"
+      aria-labelledby="tr-end-interview-title"
+      style={{
+        position: "fixed",
+        top: "50%",
+        left: "50%",
+        transform: "translate(-50%, -50%)",
+        zIndex: 9999,
+        background: "#ffffff",
+        border: "1px solid #e9e5f3",
+        borderRadius: 14,
+        maxWidth: 440,
+        width: "calc(100% - 40px)",
+        padding: 26,
+        boxShadow:
+          "0 24px 64px rgba(20, 14, 50, 0.18), 0 6px 20px rgba(124,58,237,0.10)",
+        animation: "trEndPopIn .25s cubic-bezier(0.16, 1, 0.3, 1) both",
+        fontFamily: "'Inter','Segoe UI',sans-serif",
+        color: "#1a1a2e",
+      }}
+    >
+      <style>{`
+        @keyframes trEndPopIn {
+          from { opacity: 0; transform: translate(-50%, -48%) scale(0.96); }
+          to   { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+        }
+      `}</style>
+      <div style={{ marginBottom: 14 }}>
+        <span
+          style={{
+            display: "inline-block",
+            background: "rgba(124,58,237,0.10)",
+            color: "#7c3aed",
+            padding: "5px 12px",
+            borderRadius: 8,
+            fontSize: 10.5,
+            fontWeight: 700,
+            letterSpacing: 1.2,
+          }}
+        >
+          END INTERVIEW
+        </span>
+      </div>
+      <h3
+        id="tr-end-interview-title"
+        style={{
+          fontSize: 19,
+          fontWeight: 800,
+          color: "#1a1a2e",
+          margin: "0 0 10px",
+          letterSpacing: -0.2,
+        }}
+      >
+        End interview and view your report?
+      </h3>
+      <p
+        style={{
+          fontSize: 13,
+          color: "#8890b0",
+          lineHeight: 1.6,
+          margin: "0 0 22px",
+        }}
+      >
+        Your session will be wrapped up and your AI panel will compile your
+        performance report. You won't be able to continue this interview after
+        ending it.
+      </p>
+      <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", flexWrap: "wrap" }}>
+        <button
+          type="button"
+          onClick={onCancel}
+          style={{
+            padding: "9px 18px",
+            fontSize: 13,
+            fontWeight: 600,
+            background: "transparent",
+            border: "1px solid #e9e5f3",
+            color: "#1a1a2e",
+            borderRadius: 9,
+            cursor: "pointer",
+            fontFamily: "inherit",
+            transition: "all .15s ease",
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.borderColor = "#7c3aed";
+            e.currentTarget.style.color = "#7c3aed";
+            e.currentTarget.style.background = "rgba(124,58,237,0.04)";
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.borderColor = "#e9e5f3";
+            e.currentTarget.style.color = "#1a1a2e";
+            e.currentTarget.style.background = "transparent";
+          }}
+        >
+          Cancel
+        </button>
+        <button
+          type="button"
+          onClick={onConfirm}
+          style={{
+            padding: "9px 20px",
+            fontSize: 13,
+            fontWeight: 700,
+            background: "#7c3aed",
+            color: "#fff",
+            border: "none",
+            borderRadius: 9,
+            cursor: "pointer",
+            fontFamily: "inherit",
+            boxShadow: "0 4px 12px rgba(124,58,237,0.25)",
+            transition: "all .15s ease",
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.background = "#6d28d9";
+            e.currentTarget.style.transform = "translateY(-1px)";
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.background = "#7c3aed";
+            e.currentTarget.style.transform = "translateY(0)";
+          }}
+        >
+          End & View Report
+        </button>
+      </div>
     </div>
   );
 }
