@@ -76,14 +76,6 @@ import B2BHelpTab from "./views/tabs/B2BHelpTab.jsx";
 
 // Convert URL pathname → view name
 function pathToView(pathname) {
-
- const hadAppPrefix = pathname.startsWith('/app');
-  if (hadAppPrefix) {
-    pathname = pathname.slice(4) || '/';
-  }
-  // If user is at /app/ root, let saved-view logic decide (don't force landing)
-  if (hadAppPrefix && (pathname === '/' || pathname === '')) return null;
-
   if (pathname === '/' || pathname === '') return 'landing';
   if (pathname.startsWith('/auth')) return 'auth';
   if (pathname === '/trial') return 'trial-role-select';
@@ -387,6 +379,7 @@ export default function ThreatReady() {
   const [notifications, setNotifications] = useState([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [showNotifs, setShowNotifs] = useState(false);
+  const [showUserMenu, setShowUserMenu] = useState(false);
   const [scenarioHistory, setScenarioHistory] = useState([]);
   // Local in-memory session history (works for free trial users who have no backend account)
   // Persisted to localStorage so data survives refresh
@@ -1006,8 +999,7 @@ export default function ThreatReady() {
     if (error) {
       setAuthError("Google sign in failed. Please try again.");
       setView("auth");
-      // Clean URL first — stay in the dashboard app
-      window.history.replaceState({}, "", "/app/dashboard");      
+      window.history.replaceState({}, "", "/");
       return;
     }
 
@@ -1024,8 +1016,8 @@ export default function ThreatReady() {
       localStorage.setItem('cyberprep_usertype', type);
       localStorage.setItem('cyberprep_user', JSON.stringify({ name, email }));
 
-      // Clean URL first — stay in the dashboard app
-      window.history.replaceState({}, "", "/app/dashboard");
+      // Clean URL first
+      window.history.replaceState({}, "", "/");
 
       // Show toast
       const toast = document.createElement("div");
@@ -2144,74 +2136,514 @@ export default function ThreatReady() {
         <ToastContainer />
         <div className="page">
           <Breadcrumb view={view} setView={setView} setDashTab={setDashTab} setB2bTab={setB2bTab} goHome={goHome} dashTab={dashTab} b2bTab={b2bTab} activeRole={activeRole} activeDifficulty={activeDifficulty} scenario={scenario} userType={userType} />
-          <div className="cnt">
-          {/* Header */}
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }} className="fadeUp">
-            <div>
-              <h2 style={{ fontSize: 22, fontWeight: 800 }}>Welcome, {user?.name || "Agent"}</h2>
-              <div style={{ fontSize: 14, color: "var(--tx2)", marginTop: 4, fontWeight: 500 }}>
-                {isPaid ? `${subscribedRoles.length} tracks` : `Free trial · ${Math.max(0, 2 - getTotalUsedAttempts())} attempts left`} · {completedScenarios.length} completed · {streak} day streak
-              </div>
+          <div className="cnt tr-dash-cnt">
+          {/* ═══════════ TR DASHBOARD CHROME — Sidebar + Topbar ═══════════ */}
+          <style>{`
+/* ── Push .page right to clear fixed sidebar ── */
+@media (min-width: 980px) {
+  .page:has(.tr-dash-cnt) {
+    padding-left: 264px;
+    padding-top: 14px;
+    box-sizing: border-box;
+    max-width: 100%;
+  }
+}
+
+/* ── Sidebar ── */
+.tr-dash-sidebar {
+  position: fixed; left: 0; top: 0;
+  width: 240px; height: 100vh; height: 100dvh;
+  background: #ffffff;
+  border-right: 1px solid #e9e5f3;
+  padding: 18px 12px;
+  display: flex; flex-direction: column;
+  z-index: 200;
+  overflow-y: auto; overflow-x: hidden;
+  scrollbar-gutter: stable;
+  scroll-behavior: smooth;
+  -webkit-overflow-scrolling: touch;
+  font-family: 'Inter','Segoe UI',system-ui,sans-serif;
+}
+.tr-dash-sidebar::-webkit-scrollbar { width: 4px; }
+.tr-dash-sidebar::-webkit-scrollbar-thumb { background: #d4cce8; border-radius: 2px; }
+[data-theme="dark"] .tr-dash-sidebar { background: #14111f; border-right-color: #2a2440; }
+
+/* Logo */
+.tr-dash-logo {
+  display: flex; align-items: center; gap: 10px;
+  padding: 4px 8px 16px;
+  font-size: 17px; font-weight: 800; letter-spacing: -.3px;
+  color: #1a1530;
+}
+[data-theme="dark"] .tr-dash-logo { color: #f3f0ff; }
+.tr-dash-logo-icon {
+  display: inline-flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
+  filter: drop-shadow(0 4px 12px rgba(124,58,237,.3));
+}
+
+/* Nav */
+.tr-dash-nav { display: flex; flex-direction: column; gap: 2px; flex: 1; }
+.tr-dash-nav-btn {
+  display: flex; align-items: center; gap: 11px;
+  width: 100%;
+  padding: 9px 12px;
+  background: transparent;
+  color: #6b6585;
+  border: none; border-radius: 10px;
+  font-size: 13.5px; font-weight: 500;
+  cursor: pointer; font-family: inherit; text-align: left;
+  transition: all .15s ease;
+}
+.tr-dash-nav-btn:hover { background: #faf8ff; color: #1a1530; }
+.tr-dash-nav-btn.active { background: #ede9fe; color: #7c3aed; font-weight: 600; }
+.tr-dash-nav-btn svg { width: 18px; height: 18px; flex-shrink: 0; }
+[data-theme="dark"] .tr-dash-nav-btn { color: #b8b0d4; }
+[data-theme="dark"] .tr-dash-nav-btn:hover { background: rgba(167,139,250,.08); color: #f3f0ff; }
+[data-theme="dark"] .tr-dash-nav-btn.active { background: rgba(167,139,250,.18); color: #c4b5fd; }
+
+/* Premium card */
+.tr-dash-premium {
+  margin-top: 10px;
+  padding: 14px 14px;
+  background: linear-gradient(180deg, #8b5cf6 0%, #6d28d9 100%);
+  border-radius: 13px;
+  color: #fff;
+  position: relative; overflow: hidden;
+  box-shadow: 0 14px 30px rgba(124,58,237,.28);
+  flex-shrink: 0;
+}
+.tr-dash-premium::before {
+  content: ""; position: absolute; top: -36px; right: -36px;
+  width: 110px; height: 110px;
+  background: radial-gradient(circle, rgba(255,255,255,.14), transparent 70%);
+  pointer-events: none;
+}
+.tr-dash-premium-crown {
+  width: 30px; height: 30px;
+  display: grid; place-items: center;
+  background: rgba(255,255,255,.18);
+  border-radius: 8px; margin-bottom: 8px;
+}
+.tr-dash-premium-crown svg { width: 18px; height: 18px; }
+.tr-dash-premium-title { font-size: 13px; font-weight: 700; margin: 0 0 8px; letter-spacing: -.2px; }
+.tr-dash-premium-head {
+  display: flex; justify-content: space-between; align-items: center;
+  margin: 0 0 8px;
+}
+.tr-dash-premium-head .tr-dash-premium-title { margin: 0; }
+.tr-dash-premium-count {
+  display: inline-flex; align-items: center; justify-content: center;
+  min-width: 22px; height: 19px; padding: 0 7px;
+  background: rgba(255,255,255,.22);
+  border-radius: 5px;
+  font-size: 10.5px; font-weight: 800;
+  letter-spacing: .3px;
+  color: #fff;
+  flex-shrink: 0;
+}
+.tr-dash-premium-list { list-style: none; padding: 0; margin: 0 0 10px; display: flex; flex-direction: column; gap: 4px; }
+.tr-dash-premium-list li { font-size: 11.5px; opacity: .94; display: flex; align-items: center; gap: 6px; }
+.tr-dash-premium-list li::before { content: "✓"; font-weight: 700; flex-shrink: 0; }
+/* ── Scrollable list (used when access items exist) ── */
+.tr-dash-premium-scroll {
+  max-height: 132px;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255,255,255,.35) transparent;
+  padding-right: 6px;
+  margin-right: -2px;
+}
+.tr-dash-premium-scroll::-webkit-scrollbar { width: 5px; }
+.tr-dash-premium-scroll::-webkit-scrollbar-track { background: transparent; }
+.tr-dash-premium-scroll::-webkit-scrollbar-thumb {
+  background: rgba(255,255,255,.30);
+  border-radius: 3px;
+}
+.tr-dash-premium-scroll::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,.50); }
+.tr-dash-premium-li {
+  font-size: 11.5px; opacity: .96;
+  display: flex; align-items: center; gap: 6px;
+  padding: 3px 0;
+  line-height: 1.4;
+}
+.tr-dash-premium-li::before { content: "✓"; font-weight: 700; flex-shrink: 0; color: #fde68a; }
+.tr-dash-premium-li.role::before { content: "★"; color: #fde68a; }
+.tr-dash-premium-li.feature::before { content: "✓"; color: #fde68a; }
+.tr-dash-premium-li-text {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+.tr-dash-premium-btn {
+  width: 100%; padding: 8px 12px;
+  background: #fff; color: #6d28d9;
+  border: none; border-radius: 9px;
+  font-size: 12.5px; font-weight: 700;
+  cursor: pointer; font-family: inherit;
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+  transition: all .2s ease;
+}
+.tr-dash-premium-btn:hover { transform: translateY(-1px); box-shadow: 0 8px 18px rgba(0,0,0,.18); }
+
+/* Push content right on desktop */
+@media (min-width: 980px) {
+  .tr-dash-cnt { padding-left: 0; }
+}
+.tr-dash-cnt { position: relative; }
+
+/* ── Topbar ── */
+.tr-dash-topbar {
+  position: absolute;
+  top: 0;
+  right: 0;
+  display: flex; align-items: center; justify-content: flex-end;
+  gap: 10px;
+  z-index: 50;
+  padding: 0;
+  margin: 0;
+  flex-wrap: wrap;
+}
+
+.tr-dash-xp {
+  display: inline-flex; align-items: center; gap: 7px;
+  padding: 8px 16px;
+  background: #fff;
+  border: 1px solid #e9e5f3;
+  border-radius: 100px;
+  font-size: 13.5px; font-weight: 600;
+  color: #1a1530;
+}
+.tr-dash-xp svg { width: 14px; height: 14px; color: #7c3aed; }
+[data-theme="dark"] .tr-dash-xp { background: #14111f; border-color: #2a2440; color: #f3f0ff; }
+[data-theme="dark"] .tr-dash-xp svg { color: #c4b5fd; }
+
+.tr-dash-iconbtn-wrap { position: relative; }
+.tr-dash-iconbtn {
+  width: 40px; height: 40px;
+  display: grid; place-items: center;
+  background: #fff;
+  border: 1px solid #e9e5f3;
+  border-radius: 50%;
+  color: #6b6585;
+  cursor: pointer; font-family: inherit;
+  transition: all .15s ease;
+  position: relative;
+}
+.tr-dash-iconbtn:hover { border-color: #c4b5fd; color: #7c3aed; transform: translateY(-1px); }
+.tr-dash-iconbtn svg { width: 18px; height: 18px; }
+[data-theme="dark"] .tr-dash-iconbtn { background: #14111f; border-color: #2a2440; color: #b8b0d4; }
+[data-theme="dark"] .tr-dash-iconbtn:hover { border-color: #a78bfa; color: #c4b5fd; }
+.tr-dash-iconbtn-badge {
+  position: absolute; top: -2px; right: -2px;
+  min-width: 17px; height: 17px;
+  background: #dc2626; color: #fff;
+  font-size: 10px; font-weight: 700;
+  border-radius: 100px;
+  display: grid; place-items: center;
+  padding: 0 4px;
+  border: 2px solid #fff;
+}
+
+/* Avatar pill */
+.tr-dash-avatar-wrap { position: relative; }
+.tr-dash-avatar-btn {
+  display: inline-flex; align-items: center; gap: 10px;
+  padding: 4px 14px 4px 4px;
+  background: #fff;
+  border: 1px solid #e9e5f3;
+  border-radius: 100px;
+  cursor: pointer; font-family: inherit;
+  transition: all .15s ease;
+}
+.tr-dash-avatar-btn:hover { border-color: #c4b5fd; }
+[data-theme="dark"] .tr-dash-avatar-btn { background: #14111f; border-color: #2a2440; }
+.tr-dash-avatar {
+  width: 32px; height: 32px; border-radius: 50%;
+  display: grid; place-items: center;
+  background: linear-gradient(135deg, #a78bfa, #7c3aed);
+  color: #fff;
+  font-size: 12px; font-weight: 700; letter-spacing: .5px;
+}
+.tr-dash-avatar-name { font-size: 13.5px; font-weight: 600; color: #1a1530; }
+[data-theme="dark"] .tr-dash-avatar-name { color: #f3f0ff; }
+.tr-dash-avatar-chevron { width: 14px; height: 14px; color: #9c95bf; transition: transform .2s; }
+.tr-dash-avatar-btn[aria-expanded="true"] .tr-dash-avatar-chevron { transform: rotate(180deg); }
+
+/* User dropdown */
+.tr-dash-menu-overlay { position: fixed; inset: 0; z-index: 998; background: transparent; }
+.tr-dash-user-menu {
+  position: absolute; top: calc(100% + 8px); right: 0;
+  width: 224px;
+  background: #fff;
+  border: 1px solid #e9e5f3;
+  border-radius: 13px;
+  padding: 6px;
+  z-index: 999;
+  box-shadow: 0 18px 44px rgba(20,14,38,.1), 0 0 0 1px rgba(124,58,237,.04);
+  animation: tr-menu-in .15s ease-out;
+}
+[data-theme="dark"] .tr-dash-user-menu { background: #14111f; border-color: #2a2440; }
+@keyframes tr-menu-in { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: translateY(0); } }
+.tr-dash-menu-item {
+  display: flex; align-items: center; gap: 11px;
+  width: 100%;
+  padding: 10px 12px;
+  background: transparent;
+  border: none; border-radius: 9px;
+  color: #1a1530;
+  font-size: 13.5px; font-weight: 500;
+  cursor: pointer; text-align: left; font-family: inherit;
+  transition: background .12s;
+}
+.tr-dash-menu-item:hover { background: #faf8ff; }
+.tr-dash-menu-item svg { width: 17px; height: 17px; color: #6b6585; flex-shrink: 0; }
+[data-theme="dark"] .tr-dash-menu-item { color: #f3f0ff; }
+[data-theme="dark"] .tr-dash-menu-item svg { color: #b8b0d4; }
+[data-theme="dark"] .tr-dash-menu-item:hover { background: rgba(167,139,250,.08); }
+.tr-dash-menu-item.tr-dash-menu-logout { color: #dc2626; }
+.tr-dash-menu-item.tr-dash-menu-logout svg { color: #dc2626; }
+.tr-dash-menu-sep { height: 1px; background: #e9e5f3; margin: 4px 8px; }
+[data-theme="dark"] .tr-dash-menu-sep { background: #2a2440; }
+
+/* Mobile: hide sidebar by default; keep topbar */
+@media (max-width: 979px) {
+  .tr-dash-sidebar { transform: translateX(-100%); transition: transform .25s ease; }
+  .tr-dash-sidebar.open { transform: translateX(0); }
+  .tr-dash-avatar-name { display: none; }
+  .tr-dash-avatar-btn { padding: 4px; }
+}
+
+/* Hide the OLD horizontal nav-tabs entirely on this dashboard render */
+.tr-dash-cnt .nav-tabs { display: none !important; }
+          `}</style>
+
+          {/* ── SIDEBAR ── */}
+          <aside className="tr-dash-sidebar">
+            <div className="tr-dash-logo">
+              <span className="tr-dash-logo-icon" aria-hidden="true">
+                <svg width="32" height="30" viewBox="0 0 48 46" fill="none">
+                  <defs>
+                    <linearGradient id="trBoltLogoGrad" x1="0" y1="0" x2="48" y2="46" gradientUnits="userSpaceOnUse">
+                      <stop offset="0%" stopColor="#c4b5fd"/>
+                      <stop offset="55%" stopColor="#8b5cf6"/>
+                      <stop offset="100%" stopColor="#6d28d9"/>
+                    </linearGradient>
+                  </defs>
+                  <path d="M25.946 44.938c-.664.845-2.021.375-2.021-.698V33.937a2.26 2.26 0 0 0-2.262-2.262H10.287c-.92 0-1.456-1.04-.92-1.788l7.48-10.471c1.07-1.497 0-3.578-1.842-3.578H1.237c-.92 0-1.456-1.04-.92-1.788L10.013.474c.214-.297.556-.474.92-.474h28.894c.92 0 1.456 1.04.92 1.788l-7.48 10.471c-1.07 1.498 0 3.579 1.842 3.579h11.377c.943 0 1.473 1.088.89 1.83L25.947 44.94z" fill="url(#trBoltLogoGrad)"/>
+                </svg>
+              </span>
+              <span>ThreatReady.io</span>
             </div>
-            <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
-              <span className="tag" style={{ padding: "5px 12px" }}>⚡ {xp} XP</span>
 
-              {/* Notification Bell */}
+            <nav className="tr-dash-nav">
+              {tabs.map(t => {
+                const id = t.id;
+                const ico = id === "home" ? (
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 9.5L12 3l9 6.5V21a1 1 0 0 1-1 1h-5v-7h-6v7H4a1 1 0 0 1-1-1z"/></svg>
+                ) : id === "scores" ? (
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="12" width="4" height="9" rx="1"/><rect x="10" y="6" width="4" height="15" rx="1"/><rect x="17" y="3" width="4" height="18" rx="1"/></svg>
+                ) : id === "badges" ? (
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M6 9V3h12v6a6 6 0 1 1-12 0z"/><path d="M9 18v2h6v-2"/><path d="M4 4h2M18 4h2"/></svg>
+                ) : id === "profile" ? (
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 21v-1a7 7 0 0 1 14 0v1"/></svg>
+                ) : id === "interview" ? (
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2l4 5-4 14-4-14z"/><path d="M8 7h8"/></svg>
+                ) : id === "billing" ? (
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg>
+                ) : id === "settings" ? (
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09a1.65 1.65 0 0 0 1.51-1 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33h.01a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82v.01a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+                ) : (
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+                );
+                const label = id.charAt(0).toUpperCase() + id.slice(1);
+                return (
+                  <button key={id} type="button"
+                    className={"tr-dash-nav-btn " + (dashTab === id ? "active" : "")}
+                    onClick={() => { setDashTab(id); localStorage.setItem('cyberprep_tab', id); }}>
+                    {ico}<span>{label}</span>
+                  </button>
+                );
+              })}
+            </nav>
 
-              <div style={{ position: "relative" }}>
-                <button className="btn bs" style={{ padding: "5px 10px", fontSize: 13 }}
-                  onClick={async () => {
-                    setShowNotifs(p => !p);
-                    if (unreadCount > 0) {
-                      const token = localStorage.getItem('token');
-                      await fetch('https://threatready-db.onrender.com/api/notifications/read', { method: 'POST', headers: { 'Authorization': `Bearer ${token}` } });
-                      setUnreadCount(0);
-                      setNotifications(p => p.map(n => ({ ...n, is_read: true })));
-                    }
-                  }}>
+            <div className="tr-dash-premium">
+              <div className="tr-dash-premium-crown" aria-hidden="true">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fde68a" strokeWidth="1.8" strokeLinejoin="round"><path d="M3 8l3 10h12l3-10-5 3-4-6-4 6-5-3z" fill="#fbbf24"/><circle cx="3" cy="8" r="1.4" fill="#fde68a"/><circle cx="21" cy="8" r="1.4" fill="#fde68a"/><circle cx="12" cy="5" r="1.4" fill="#fde68a"/></svg>
+              </div>
+              {(() => {
+                // ─── Build the user's actual Premium Access items ───
+                const items = [];
+                if (Array.isArray(subscribedRoles)) {
+                  subscribedRoles.forEach((roleId) => {
+                    if (!roleId) return;
+                    const label = String(roleId)
+                      .split(/[-_\s]+/)
+                      .filter(Boolean)
+                      .map((w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
+                      .join(' ');
+                    items.push({ label: label + ' Role', kind: 'role' });
+                  });
+                }
+                if (isPaid) {
+                  items.push(
+                    { label: 'Unlimited Labs', kind: 'feature' },
+                    { label: 'Advanced Paths', kind: 'feature' },
+                    { label: 'Premium Practice Sessions', kind: 'feature' },
+                    { label: 'Advanced Interview Access', kind: 'feature' },
+                    { label: 'Exclusive Badge Access', kind: 'feature' },
+                    { label: 'Premium Support', kind: 'feature' },
+                  );
+                }
+                const hasAccess = items.length > 0;
 
-                  🔔{unreadCount > 0 && <span style={{ background: "var(--dn)", color: "#fff", fontSize: 8, fontWeight: 700, borderRadius: "50%", padding: "1px 4px", marginLeft: 3 }}>{unreadCount}</span>}
-                </button>
+                if (!hasAccess) {
+                  // ─── Empty state — original upgrade promo (same shell) ───
+                  return (
+                    <>
+                      <h4 className="tr-dash-premium-title">Upgrade to Premium</h4>
+                      <ul className="tr-dash-premium-list">
+                        <li>Unlimited Labs</li>
+                        <li>Advanced Paths</li>
+                        <li>Premium Support</li>
+                        <li>Exclusive Badges</li>
+                      </ul>
+                      <button type="button" className="tr-dash-premium-btn"
+                        onClick={() => { setDashTab("billing"); localStorage.setItem('cyberprep_tab', 'billing'); }}>
+                        Upgrade Now →
+                      </button>
+                    </>
+                  );
+                }
 
-                {showNotifs && createPortal(
+                // ─── Premium Access dashboard — user has unlocks ───
+                return (
                   <>
-                    <div style={{ position: "fixed", inset: 0, zIndex: 9998, background: "rgba(0,0,0,0.5)", backdropFilter: "blur(2px)" }} onClick={() => setShowNotifs(false)} />
-                    
-                      <div style={{ position: "fixed", zIndex: 9999, right: 24, top: 80, width: 320, maxHeight: "70vh", overflowY: "auto", background: "var(--s1)", border: "1px solid var(--bd)", borderRadius: 12, boxShadow: "var(--shadow-lg)" }}>
-                      <div style={{ padding: "12px 16px", borderBottom: "1px solid var(--bd)", fontSize: 13, fontWeight: 700, color: "var(--ac)", letterSpacing: 1, display: "flex", justifyContent: "space-between", alignItems: "center", background: "var(--s2)", position: "sticky", top: 0 }}>
-                        <span>NOTIFICATIONS</span>
-                        <span style={{ cursor: "pointer", fontSize: 16, color: "var(--tx2)" }} onClick={() => setShowNotifs(false)}>×</span>
-                      </div>
-                      {notifications.length === 0
-                        ? <div style={{ padding: 20, fontSize: 13, color: "var(--tx2)", textAlign: "center" }}>No notifications yet</div>
-                        : notifications.map((n, i) => (
-                          <div key={n.id || i} style={{ padding: "12px 16px", borderBottom: i < notifications.length - 1 ? "1px solid var(--bd)" : "none", background: n.is_read ? "transparent" : "rgba(124,58,237,.06)" }}>
-                     
-                            <div style={{ fontSize: 12, fontWeight: 600, color: "var(--tx1)", lineHeight: 1.4 }}>{n.title}</div>
-                            <div style={{ fontSize: 12, color: "var(--tx2)", marginTop: 4, lineHeight: 1.4 }}>{n.message}</div>
-                            <div style={{ fontSize: 11, color: "var(--tx2)", marginTop: 5 }}>{new Date(n.created_at).toLocaleDateString()}</div>
-                          </div>
-                        ))
-                      }
+                    <div className="tr-dash-premium-head">
+                      <h4 className="tr-dash-premium-title">Premium Access</h4>
+                      <span className="tr-dash-premium-count" title={`${items.length} active`}>
+                        {items.length}
+                      </span>
                     </div>
-                  </>,
-                  document.body
-                )}
-                
-              </div>
-
-              <button className="btn bs" style={{ padding: "5px 10px", fontSize: 12, marginRight: 8 }} onClick={() => {
-                const cur = document.documentElement.getAttribute('data-theme') === 'dark' ? 'dark' : 'light';
-                const next = cur === 'dark' ? 'light' : 'dark';
-                document.documentElement.setAttribute('data-theme', next);
-                localStorage.setItem('cyberprep_theme', next);
-              }} title="Toggle theme">{document.documentElement.getAttribute('data-theme') === 'dark' ? '☀' : '🌙'}</button>
-              <button className="btn bs" style={{ padding: "5px 10px", fontSize: 12 }} onClick={logout}>Logout</button>
-            
+                    <ul className={`tr-dash-premium-list tr-dash-premium-scroll${items.length > 4 ? ' has-more' : ''}`}>
+                      {items.map((it, i) => (
+                        <li key={i} className={`tr-dash-premium-li ${it.kind}`}>
+                          <span className="tr-dash-premium-li-text">{it.label}</span>
+                        </li>
+                      ))}
+                    </ul>
+                    <button type="button" className="tr-dash-premium-btn"
+                      onClick={() => { setDashTab("billing"); localStorage.setItem('cyberprep_tab', 'billing'); }}>
+                      Manage Access →
+                    </button>
+                  </>
+                );
+              })()}
             </div>
-          </div>
+          </aside>
 
-          {/* Nav Tabs */}
+          {/* ── TOPBAR ── */}
+          <header className="tr-dash-topbar">
+            <div className="tr-dash-xp">
+              <svg viewBox="0 0 24 24" fill="currentColor"><path d="M13 2L3 14h7l-1 8 11-12h-7l1-8z"/></svg>
+              {xp} XP
+            </div>
+
+            {/* Notification Bell */}
+            <div className="tr-dash-iconbtn-wrap">
+              <button type="button" className="tr-dash-iconbtn"
+                onClick={async () => {
+                  setShowNotifs(p => !p);
+                  if (unreadCount > 0) {
+                    const token = localStorage.getItem('token');
+                    await fetch('https://threatready-db.onrender.com/api/notifications/read', { method: 'POST', headers: { 'Authorization': `Bearer ${token}` } });
+                    setUnreadCount(0);
+                    setNotifications(p => p.map(n => ({ ...n, is_read: true })));
+                  }
+                }} title="Notifications">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+                {unreadCount > 0 && <span className="tr-dash-iconbtn-badge">{unreadCount}</span>}
+              </button>
+
+              {showNotifs && createPortal(
+                <>
+                  <div style={{ position: "fixed", inset: 0, zIndex: 9998, background: "rgba(20,14,38,0.35)", backdropFilter: "blur(3px)" }} onClick={() => setShowNotifs(false)} />
+                  <div style={{ position: "fixed", zIndex: 9999, right: 24, top: 76, width: 340, maxHeight: "72vh", overflowY: "auto", background: "#fff", border: "1px solid #e9e5f3", borderRadius: 14, boxShadow: "0 24px 60px rgba(20,14,38,.18), 0 0 0 1px rgba(124,58,237,.04)" }}>
+                    <div style={{ padding: "14px 16px", borderBottom: "1px solid #f3eeff", fontSize: 12, fontWeight: 700, color: "#7c3aed", letterSpacing: 1.5, textTransform: "uppercase", display: "flex", justifyContent: "space-between", alignItems: "center", background: "#fff", position: "sticky", top: 0 }}>
+                      <span>Notifications</span>
+                      <span style={{ cursor: "pointer", fontSize: 18, color: "#9c95bf", lineHeight: 1 }} onClick={() => setShowNotifs(false)}>×</span>
+                    </div>
+                    {notifications.length === 0
+                      ? <div style={{ padding: 24, fontSize: 13, color: "#6b6585", textAlign: "center" }}>No notifications yet</div>
+                      : notifications.map((n, i) => (
+                        <div key={n.id || i} style={{ padding: "12px 16px", borderBottom: i < notifications.length - 1 ? "1px solid #f3eeff" : "none", background: n.is_read ? "transparent" : "#faf8ff" }}>
+                          <div style={{ fontSize: 13, fontWeight: 600, color: "#1a1530", lineHeight: 1.4 }}>{n.title}</div>
+                          <div style={{ fontSize: 12.5, color: "#6b6585", marginTop: 4, lineHeight: 1.45 }}>{n.message}</div>
+                          <div style={{ fontSize: 11, color: "#9c95bf", marginTop: 6 }}>{new Date(n.created_at).toLocaleDateString()}</div>
+                        </div>
+                      ))
+                    }
+                  </div>
+                </>,
+                document.body
+              )}
+            </div>
+
+            {/* Theme toggle */}
+            <button type="button" className="tr-dash-iconbtn" onClick={() => {
+              const cur = document.documentElement.getAttribute('data-theme') === 'dark' ? 'dark' : 'light';
+              const next = cur === 'dark' ? 'light' : 'dark';
+              document.documentElement.setAttribute('data-theme', next);
+              localStorage.setItem('cyberprep_theme', next);
+            }} title="Toggle theme">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+            </button>
+
+            {/* Avatar + Dropdown */}
+            <div className="tr-dash-avatar-wrap">
+              <button type="button" className="tr-dash-avatar-btn"
+                aria-expanded={showUserMenu}
+                onClick={() => setShowUserMenu(p => !p)}>
+                <span className="tr-dash-avatar">
+                  {((user?.name || "User").trim().split(/\s+/).slice(0,2).map(s => s[0]?.toUpperCase() || "").join("") || "U")}
+                </span>
+                <span className="tr-dash-avatar-name">{user?.name || "User"}</span>
+                <svg className="tr-dash-avatar-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+              </button>
+
+              {showUserMenu && (
+                <>
+                  <div className="tr-dash-menu-overlay" onClick={() => setShowUserMenu(false)} />
+                  <div className="tr-dash-user-menu" role="menu">
+                    <button type="button" className="tr-dash-menu-item" onClick={() => { setShowUserMenu(false); setDashTab("profile"); localStorage.setItem('cyberprep_tab', 'profile'); }}>
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 21v-1a7 7 0 0 1 14 0v1"/></svg>
+                      My Profile
+                    </button>
+                    <button type="button" className="tr-dash-menu-item" onClick={() => { setShowUserMenu(false); setDashTab("scores"); localStorage.setItem('cyberprep_tab', 'scores'); }}>
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/></svg>
+                      Performance
+                    </button>
+                    <button type="button" className="tr-dash-menu-item" onClick={() => { setShowUserMenu(false); setDashTab("billing"); localStorage.setItem('cyberprep_tab', 'billing'); }}>
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg>
+                      Subscription
+                    </button>
+                    <button type="button" className="tr-dash-menu-item" onClick={() => { setShowUserMenu(false); setDashTab("profile"); localStorage.setItem('cyberprep_tab', 'profile'); }}>
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="10" r="3"/><path d="M6.5 19a6 6 0 0 1 11 0"/></svg>
+                      Public Profile
+                    </button>
+                    <div className="tr-dash-menu-sep" />
+                    <button type="button" className="tr-dash-menu-item tr-dash-menu-logout" onClick={() => { setShowUserMenu(false); logout(); }}>
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+                      Logout
+                    </button>
+                  </div>
+                </>
+              )}
+            </div>
+          </header>
+
+          {/* Nav Tabs — hidden via CSS (.tr-dash-cnt .nav-tabs { display: none }) but kept for safety */}
           <div className="nav-tabs">
             {tabs.map(t => (
               <div key={t.id}
@@ -2414,9 +2846,9 @@ export default function ThreatReady() {
             <div style={{ position: "fixed", inset: 0, zIndex: 9998, background: "rgba(0,0,0,0.85)", backdropFilter: "blur(6px)", display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }}
               onClick={() => setReportModal(null)}>
               <div onClick={e => e.stopPropagation()}
-                style={{ width: "92%", maxWidth: 900, maxHeight: "92vh", overflow: "hidden", background: "var(--s1)", border: "1px solid var(--bd)", borderRadius: 16, boxShadow: "var(--shadow-xl)", display: "flex", flexDirection: "column" }}>
+                style={{ width: "92%", maxWidth: 900, maxHeight: "92vh", overflow: "hidden", background: "#0f1420", border: "1px solid var(--ac)", borderRadius: 16, boxShadow: "0 20px 60px rgba(0,0,0,.9), 0 0 40px rgba(0,229,255,0.25)", display: "flex", flexDirection: "column" }}>
 
-                <div style={{ padding: "20px 28px", borderBottom: "1px solid var(--bd)", background: "var(--s2)", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <div style={{ padding: "20px 28px", borderBottom: "1px solid #1e2536", background: "#0a0e1a", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                   <div>
                     <div style={{ fontSize: 13, color: "var(--ac)", fontWeight: 700, letterSpacing: 2, marginBottom: 4 }}>📊 ASSESSMENT RESULTS</div>
                     <div style={{ fontSize: 18, fontWeight: 800 }}>{reportModal.name}</div>
@@ -2427,7 +2859,7 @@ export default function ThreatReady() {
 
                 <div style={{ overflow: "auto", flex: 1 }}>
 
-                  <div style={{ padding: "32px 28px", textAlign: "center", borderBottom: "1px solid var(--bd)", background: "linear-gradient(180deg, rgba(124,58,237,0.06) 0%, transparent 100%)" }}>
+                  <div style={{ padding: "32px 28px", textAlign: "center", borderBottom: "1px solid #1e2536", background: "linear-gradient(180deg, rgba(0,229,255,0.04) 0%, transparent 100%)" }}>
                     <div style={{ fontSize: 13, color: "var(--tx2)", marginBottom: 8, letterSpacing: 2, fontWeight: 700 }}>OVERALL SCORE</div>
                     <div className="mono" style={{ fontSize: 72, fontWeight: 900, lineHeight: 1, color: verdictColor, marginBottom: 8 }}>
                       {score.toFixed(1)}<span style={{ fontSize: 28, color: "var(--tx2)" }}>/10</span>
@@ -2440,7 +2872,7 @@ export default function ThreatReady() {
                     </div>
                   </div>
 
-                  <div style={{ padding: "20px 28px", borderBottom: "1px solid var(--bd)", display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 12 }}>
+                  <div style={{ padding: "20px 28px", borderBottom: "1px solid #1e2536", display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 12 }}>
                     <div style={{ textAlign: "center", padding: 14, background: "var(--s2)", borderRadius: 10 }}>
                       <div style={{ fontSize: 11, color: "var(--tx2)", marginBottom: 4, letterSpacing: 1 }}>ROLE</div>
                       <div style={{ fontSize: 13, fontWeight: 700 }}>{ROLES.find(r => r.id === reportModal.role_id)?.icon} {ROLES.find(r => r.id === reportModal.role_id)?.name || reportModal.role_id}</div>
@@ -2459,7 +2891,7 @@ export default function ThreatReady() {
                     </div>
                   </div>
 
-                  <div style={{ padding: "20px 28px", borderBottom: "1px solid var(--bd)", display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+                  <div style={{ padding: "20px 28px", borderBottom: "1px solid #1e2536", display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
                     <div style={{ padding: 14, background: "rgba(0,224,150,.05)", border: "1px solid rgba(0,224,150,.25)", borderRadius: 10 }}>
                       <div style={{ fontSize: 12, color: "var(--ok)", fontWeight: 700, marginBottom: 6, letterSpacing: 1 }}>✓ STRONG ANSWERS</div>
                       <div style={{ fontSize: 24, fontWeight: 900, color: "var(--ok)" }}>{avgStrength}</div>
@@ -2560,15 +2992,15 @@ export default function ThreatReady() {
                 {showNotifs && createPortal(
                   <>
                     <div style={{ position: "fixed", inset: 0, zIndex: 9998, background: "rgba(0,0,0,0.5)", backdropFilter: "blur(2px)" }} onClick={() => setShowNotifs(false)} />
-                    <div style={{ position: "fixed", zIndex: 9999, right: 24, top: 80, width: 320, maxHeight: "70vh", overflowY: "auto", background: "var(--s1)", border: "1px solid var(--bd)", borderRadius: 12, boxShadow: "var(--shadow-lg)" }}>
-                      <div style={{ padding: "12px 16px", borderBottom: "1px solid var(--bd)", fontSize: 13, fontWeight: 700, color: "var(--ac)", letterSpacing: 1, display: "flex", justifyContent: "space-between", alignItems: "center", background: "var(--s2)", position: "sticky", top: 0 }}>
+                    <div style={{ position: "fixed", zIndex: 9999, right: 24, top: 80, width: 320, maxHeight: "70vh", overflowY: "auto", background: "#0f1420", border: "1px solid var(--ac)", borderRadius: 12, boxShadow: "0 20px 60px rgba(0,0,0,.9), 0 0 30px rgba(0,229,255,0.15)" }}>
+                      <div style={{ padding: "12px 16px", borderBottom: "1px solid #1e2536", fontSize: 13, fontWeight: 700, color: "var(--ac)", letterSpacing: 1, display: "flex", justifyContent: "space-between", alignItems: "center", background: "#0a0e1a", position: "sticky", top: 0 }}>
                         <span>NOTIFICATIONS ({notifications.length})</span>
                         <span style={{ cursor: "pointer", fontSize: 16, color: "var(--tx2)" }} onClick={() => setShowNotifs(false)}>×</span>
                       </div>
                       {notifications.length === 0
                         ? <div style={{ padding: 20, fontSize: 13, color: "var(--tx2)", textAlign: "center" }}>No notifications yet</div>
                         : notifications.map((n, i) => (
-                          <div key={n.id || i} style={{ padding: "12px 16px", borderBottom: i < notifications.length - 1 ? "1px solid var(--bd)" : "none", background: n.is_read ? "transparent" : "rgba(124,58,237,.06)" }}>
+                          <div key={n.id || i} style={{ padding: "12px 16px", borderBottom: i < notifications.length - 1 ? "1px solid #1e2536" : "none", background: n.is_read ? "transparent" : "rgba(0,229,255,.04)" }}>
                             <div style={{ fontSize: 12, fontWeight: 600, color: "var(--tx1)", lineHeight: 1.4 }}>{n.title || n.type}</div>
                             <div style={{ fontSize: 12, color: "var(--tx2)", marginTop: 4, lineHeight: 1.4 }}>{n.message}</div>
                             <div style={{ fontSize: 11, color: "var(--tx2)", marginTop: 5 }}>{n.created_at?.substring(0, 16).replace('T', ' ')}</div>
@@ -2778,7 +3210,7 @@ export default function ThreatReady() {
               backdropFilter: "blur(6px)", padding: 16
             }} onClick={() => setShowHrSubscribeModal(false)}>
               <div onClick={e => e.stopPropagation()} style={{
-                background: "var(--s1)", border: "1px solid var(--bd)", borderRadius: 14,
+                background: "#0f1420", border: "1px solid var(--ac)", borderRadius: 14,
                 padding: "20px 24px", maxWidth: 480, width: "100%",
                 boxShadow: "0 20px 60px rgba(0,0,0,.9), 0 0 40px rgba(0,229,255,0.2)"
               }}>
