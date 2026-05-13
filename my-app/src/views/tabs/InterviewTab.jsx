@@ -127,15 +127,41 @@ const IV_CSS = `
 }
 .tr-iv-analyze-btn:hover:not(:disabled){border-color:#a78bfa;background:var(--s2);transform:translateY(-1px)}
 .tr-iv-analyze-btn:disabled{opacity:.5;cursor:not-allowed}
+
 .tr-iv-analyze-result{
-  margin:0 0 22px;padding:14px 16px;
+  position:relative;
+  margin:0 0 22px;padding:14px 40px 14px 16px;
   background:linear-gradient(135deg,#faf8ff,#f3eeff);
   border:1px solid #c4b5fd;border-radius:10px;
   font-size:12.5px;color:var(--tx1);line-height:1.55;white-space:pre-wrap;
 }
+[data-theme="dark"] .tr-iv-analyze-result{
+  background:linear-gradient(135deg,rgba(167,139,250,0.10),rgba(124,58,237,0.10));
+  border-color:rgba(167,139,250,0.30);
+  color:var(--tx1);
+}
 .tr-iv-analyze-result-label{
   font-size:11px;font-weight:700;color:#7c3aed;
   text-transform:uppercase;letter-spacing:1.5px;margin-bottom:6px;
+}
+[data-theme="dark"] .tr-iv-analyze-result-label{color:#c4b5fd;}
+.tr-iv-analyze-close{
+  position:absolute;top:8px;right:8px;
+  width:26px;height:26px;
+  display:inline-flex;align-items:center;justify-content:center;
+  background:transparent;border:1px solid transparent;border-radius:6px;
+  color:#7c3aed;font-size:18px;line-height:1;font-weight:700;
+  cursor:pointer;font-family:inherit;
+  transition:all .15s ease;
+}
+.tr-iv-analyze-close:hover{
+  background:rgba(124,58,237,0.10);
+  border-color:rgba(124,58,237,0.25);
+}
+[data-theme="dark"] .tr-iv-analyze-close{color:#c4b5fd;}
+[data-theme="dark"] .tr-iv-analyze-close:hover{
+  background:rgba(167,139,250,0.15);
+  border-color:rgba(167,139,250,0.30);
 }
 
 /* Section blocks (duration, difficulty, modules) */
@@ -1433,6 +1459,15 @@ export default function InterviewTab({
               {/* Analysis result */}
               {analysisResult && (
                 <div className="tr-iv-analyze-result">
+                  <button
+                    type="button"
+                    className="tr-iv-analyze-close"
+                    onClick={() => setAnalysisResult(null)}
+                    aria-label="Close analysis"
+                    title="Close"
+                  >
+                    ×
+                  </button>
                   <div className="tr-iv-analyze-result-label">AI Analysis</div>
                   {analysisResult}
                 </div>
@@ -1531,7 +1566,6 @@ export default function InterviewTab({
               <div className="tr-iv-gauge"><ReadinessGauge value={null} /></div>
               <div className="tr-iv-gauge-label">Not Assessed</div>
               <div className="tr-iv-gauge-desc">Complete interviews to get your readiness score.</div>
-              <button type="button" className="tr-iv-side-btn" onClick={handleStartSession}>Start Interview</button>
             </div>
 
             {/* Recent Activity */}
