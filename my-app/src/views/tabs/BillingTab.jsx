@@ -26,7 +26,7 @@ import { showToast } from "../../components/helpers.js";
 
 // ── Scoped CSS ──
 const BILL_CSS = `
-.tr-bill-root{font-family:'Inter','Segoe UI',system-ui,sans-serif;color:var(--tx1)}
+.tr-bill-root{font-family:'Inter','Segoe UI',system-ui,sans-serif;color:var(--tx1);padding-top:72px}
 .tr-bill-root svg:not([width]){width:16px;height:16px;flex-shrink:0}
 
 /* Header */
@@ -381,6 +381,7 @@ const BILL_CSS = `
 .tr-bill-help-link-left{display:inline-flex;align-items:center;gap:8px}
 .tr-bill-help-link-left svg{color:#7c3aed}
 .tr-bill-help-link-right svg{color:var(--tx2);width:13px;height:13px}
+
 .tr-bill-help-note{
   margin-top:12px;
   padding:12px;
@@ -390,10 +391,18 @@ const BILL_CSS = `
   font-size:12px;color:var(--tx1);line-height:1.5;
   display:flex;align-items:flex-start;gap:9px;
 }
+[data-theme="dark"] .tr-bill-help-note{
+  background:linear-gradient(135deg, rgba(167,139,250,0.10), rgba(124,58,237,0.12));
+  border-color:rgba(167,139,250,0.30);
+}
 .tr-bill-help-note-icon{
   width:24px;height:24px;flex-shrink:0;
   display:grid;place-items:center;
   background:#fff;border-radius:7px;color:#7c3aed;
+}
+[data-theme="dark"] .tr-bill-help-note-icon{
+  background:rgba(167,139,250,0.18);
+  color:#c4b5fd;
 }
 .tr-bill-help-note-icon svg{width:14px;height:14px}
 `;
