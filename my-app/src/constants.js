@@ -18,7 +18,10 @@ export const ROLES = [
   { id: "soc", name: "SOC Analyst", icon: "📡", color: "#8b5cf6", desc: "SIEM triage, alert analysis, threat detection, log correlation", price: 399 },
   { id: "threat", name: "Threat Hunter", icon: "🎯", color: "#f97316", desc: "Proactive threat detection, hypothesis-driven hunting", price: 399 },
   { id: "red", name: "Red Team", icon: "🔴", color: "#dc2626", desc: "Adversary simulation, exploitation, privilege escalation", price: 399 },
-  { id: "blue", name: "Blue Team", icon: "🔵", color: "#2563eb", desc: "Detection engineering, SOAR, threat response automation", price: 399 }
+  { id: "blue", name: "Blue Team", icon: "🔵", color: "#2563eb", desc: "Detection engineering, SOAR, threat response automation", price: 399 },
+  { id: "iam", name: "IAM Security", icon: "🔐", color: "#0ea5e9", desc: "Identity & access management, RBAC/ABAC, OAuth/OIDC, federation, PAM, zero-standing-privilege", price: 399 },
+  { id: "data", name: "Data Security", icon: "🗄️", color: "#10b981", desc: "Data classification, DLP, encryption at rest/in transit, database security, privacy controls", price: 399 },
+  { id: "llm", name: "AI/LLM Security", icon: "🤖", color: "#a855f7", desc: "Prompt injection defense, RAG poisoning, model supply chain, jailbreak prevention, AI red teaming", price: 399 }
 ];
 
 export const DIFFICULTIES = [

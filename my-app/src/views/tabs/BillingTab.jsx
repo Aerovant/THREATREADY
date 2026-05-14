@@ -435,6 +435,9 @@ const ROLE_ICONS = {
   threat:    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#dc2626" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6" fill="#fee2e2"/><circle cx="12" cy="12" r="2.5" fill="#dc2626" stroke="none"/></svg>,
   red:       <svg width="28" height="28" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" fill="#dc2626"/><circle cx="9" cy="9" r="2.5" fill="#ef4444" opacity=".6"/></svg>,
   blue:      <svg width="28" height="28" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" fill="#2563eb"/><circle cx="9" cy="9" r="2.5" fill="#3b82f6" opacity=".6"/></svg>,
+  iam:       <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#0ea5e9" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"><circle cx="9" cy="14" r="6" fill="#e0f2fe"/><circle cx="9" cy="14" r="2.5" fill="#0ea5e9" stroke="none"/><path d="M14 11l7-7"/><path d="M19 4l2 2"/><path d="M16 7l2 2"/></svg>,
+  data:      <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#10b981" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><ellipse cx="12" cy="5" rx="9" ry="3" fill="#d1fae5"/><path d="M3 5v6c0 1.66 4.03 3 9 3s9-1.34 9-3V5"/><path d="M3 11v6c0 1.66 4.03 3 9 3s9-1.34 9-3v-6"/></svg>,
+  llm:       <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#a855f7" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2a4 4 0 0 0-4 4v1a3 3 0 0 0-3 3v3a3 3 0 0 0 1 2.24V18a3 3 0 0 0 3 3h6a3 3 0 0 0 3-3v-2.76A3 3 0 0 0 19 13v-3a3 3 0 0 0-3-3V6a4 4 0 0 0-4-4z" fill="#f3e8ff"/><circle cx="9" cy="11" r="1" fill="#a855f7" stroke="none"/><circle cx="15" cy="11" r="1" fill="#a855f7" stroke="none"/><path d="M9 15h6"/></svg>,
 };
 
 // ── Helpers ──
