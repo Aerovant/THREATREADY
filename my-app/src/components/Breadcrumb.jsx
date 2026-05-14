@@ -1,4 +1,11 @@
-export default function Breadcrumb({
+export default function Breadcrumb(_props) {
+  // Legacy breadcrumb disabled — replaced by the new fixed-header breadcrumb in App.jsx <header className="tr-dash-topbar">.
+  // All <Breadcrumb /> usages across App.jsx now render nothing; the new header handles all navigation crumb display.
+  return null;
+}
+
+// Keeping the original implementation below (unreachable) so it can be revived if needed.
+function _LegacyBreadcrumb({
   view,
   dashTab,
   b2bTab,
