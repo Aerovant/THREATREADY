@@ -2174,11 +2174,11 @@ export default function ThreatReady() {
   if (view === "dashboard") {
     const tabs = [
       { id: "home", label: "🏠 Home", icon: "🏠" },
-     { id: "interview", label: "💎 Interview", icon: "💎" },
+      { id: "interview", label: "💎 Interview", icon: "💎" },
 
       { id: "scores", label: "📊 Scores", icon: "📊" },
       { id: "badges", label: "🏆 Badges", icon: "🏆" },
-      { id: "profile", label: "👤 Profile", icon: "👤" },
+      // { id: "profile", label: "👤 Profile", icon: "👤" },
 
 
       { id: "billing", label: "💳 Billing", icon: "💳" },
@@ -2478,8 +2478,10 @@ export default function ThreatReady() {
 }
 
 /* ── Breadcrumb ── */
-.tr-dash-breadcrumb {
-  display: flex;
+.tr-dash-breadcrumb,
+nav.tr-dash-breadcrumb,
+[class*="breadcrumb"].tr-dash-breadcrumb {
+  display: flex !important;
   align-items: center;
   gap: 8px;
   font-size: 14px;
