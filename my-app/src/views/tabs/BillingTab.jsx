@@ -267,6 +267,15 @@ const BILL_CSS = `
 .tr-bill-btn.full{width:100%}
 .tr-bill-btn.outline{background:#fff;color:#7c3aed;border:1px solid #c4b5fd}
 .tr-bill-btn.outline:hover{background:#faf8ff;box-shadow:0 6px 16px rgba(124,58,237,.1)}
+[data-theme="dark"] .tr-bill-btn.outline{
+  background:rgba(167,139,250,0.10);
+  color:#c4b5fd;
+  border-color:rgba(167,139,250,0.30);
+}
+[data-theme="dark"] .tr-bill-btn.outline:hover{
+  background:rgba(167,139,250,0.18);
+  box-shadow:0 6px 16px rgba(124,58,237,.25);
+}
 .tr-bill-btn.small{padding:7px 13px;font-size:12px;border-radius:8px}
 
 /* Invoice table */
@@ -302,6 +311,8 @@ const BILL_CSS = `
 .tr-bill-inv-table td:last-child{text-align:right}
 .tr-bill-inv-table tr:last-child td{border-bottom:none}
 .tr-bill-inv-table tr:hover td{background:#faf8ff}
+[data-theme="dark"] .tr-bill-inv-table tr:hover td{background:rgba(167,139,250,0.08)}
+[data-theme="dark"] .tr-bill-inv-table th{background:rgba(255,255,255,0.03)}
 .tr-bill-inv-email{
   font-weight:600;color:#7c3aed;
   display:inline-block;padding:2px 8px;
