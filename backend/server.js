@@ -4280,10 +4280,35 @@ app.post('/api/interview/chat', auth, async (req, res) => {
     if (!apiKey) return res.status(500).json({ error: 'Anthropic API key not configured' });
 
     const levelGuidance = {
-      beginner: 'Ask BEGINNER questions: foundational concepts, definitions, basic scenarios. Use accessible language.',
-      intermediate: 'Ask INTERMEDIATE questions: multi-step problems, real-world tradeoffs, applied scenarios.',
-      expert: 'Ask EXPERT questions: advanced architecture, edge cases, deep technical depth, adversarial scenarios.',
-      collaborate: 'Mix BEGINNER, INTERMEDIATE, and EXPERT questions. Vary difficulty across the session.',
+      beginner: `BEGINNER difficulty. Ask SINGLE-CONCEPT, definition-level questions. The candidate is a student or junior analyst.
+- Pattern: "What is X? When would you use it? What does X protect against?"
+- Examples: "What's the difference between authentication and authorization?", "What is a SIEM and what does it do?", "Name 3 things in the OWASP Top 10 and briefly explain one."
+- Answers should be 30-60 seconds, 2-4 sentences. Test recall and basic comprehension.
+- DO NOT ask about real-world incidents, architecture design, or multi-step containment plans.
+- DO NOT use jargon without defining it.`,
+
+      intermediate: `INTERMEDIATE difficulty. Ask SCENARIO-BASED questions with ONE technical decision. The candidate is a working SOC analyst or junior engineer (1-3 yrs exp).
+- Pattern: "You see X. What's the most likely cause and your first response action?"
+- Examples: "50k failed logins from rotating IPs in 1 hour — credential stuffing or password spraying? How do you tell?", "A junior engineer hardcoded an AWS key in a public repo. What's your IR sequence?"
+- Answers should be 1-2 minutes. Test diagnostic reasoning and standard playbook knowledge.
+- Use realistic but textbook scenarios.
+- DO NOT ask design-from-scratch or edge-case questions.`,
+
+      advanced: `ADVANCED difficulty. Ask MULTI-STEP DESIGN questions involving trade-offs. The candidate is a senior engineer or security architect (3-7 yrs exp).
+- Pattern: "Design X for constraint Y. Walk through your trade-offs. What would you accept as residual risk?"
+- Examples: "Design end-to-end IAM for a 200-person SaaS handling PHI — auth flows, token strategy, break-glass access, audit trail. What do you push back on the CEO about?", "Your CTO wants to move from VPN to zero-trust in 6 months with 1 engineer. Sequence the migration. Where will you fail?"
+- Answers should be 2-4 minutes. Test architectural thinking, threat modeling, and ability to defend choices.
+- Require trade-off articulation — there's no single right answer.
+- DO NOT accept textbook answers; probe their reasoning.`,
+
+      expert: `EXPERT difficulty. Ask ADVERSARIAL, EDGE-CASE questions about non-obvious failure modes. The candidate is a principal engineer, red teamer, or security researcher (7+ yrs exp).
+- Pattern: "X is supposed to work like Y. Walk through how an attacker bypasses it via Z. What controls would actually catch this?"
+- Examples: "OAuth redirect_uri uses string matching. Walk through bypass via Unicode confusables, mixed-case TLDs, and path normalization — and which providers got it wrong in 2023-2024.", "An attacker compromises a single service account in your mesh. Trace the lateral movement path they take in <15 minutes, the SCPs and policies that should stop them at each hop, and the ONE detection signal you trust most.", "Walk through how Volt Typhoon achieved 8 months of dwell time in OT using living-off-the-land. What 3 detections would you have caught it with?"
+- Answers should be 3-5 minutes. Test deep technical depth, attacker mindset, and knowledge of recent real-world incidents.
+- Reference specific CVEs, threat actors, or named attack chains where relevant.
+- Push for non-obvious controls. Reject hand-wavy answers.`,
+
+      collaborate: `COLLABORATIVE difficulty. Vary across BEGINNER → INTERMEDIATE → ADVANCED → EXPERT as the session progresses, increasing as the candidate handles each level well. Start mid-INTERMEDIATE and escalate.`,
     };
 
     const systemPrompt = `You are a senior cybersecurity interviewer conducting a live interview. Cover topics across these 5 areas as the session progresses, mixing them naturally:
