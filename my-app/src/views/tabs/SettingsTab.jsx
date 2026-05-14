@@ -1336,8 +1336,9 @@ export default function SettingsTab({
             onClick={(e) => e.stopPropagation()}
             style={{
               width: '100%', maxWidth: 460,
-              background: 'var(--ta-card-bg, #15101f)',
-              border: '1px solid var(--ta-card-border, rgba(255,255,255,0.10))',
+              background: 'var(--s1)',
+              color: 'var(--tx1)',
+              border: '1px solid var(--bd)',
               borderRadius: 16, padding: 24,
               boxShadow: '0 24px 80px rgba(0,0,0,0.5)',
               animation: 'tr-set-pm-pop 0.22s cubic-bezier(0.34, 1.56, 0.64, 1)',
@@ -1345,7 +1346,7 @@ export default function SettingsTab({
             }}
           >
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
-              <h3 style={{ fontSize: 18, fontWeight: 700, margin: 0, letterSpacing: '-0.3px' }}>
+              <h3 style={{ fontSize: 18, fontWeight: 700, margin: 0, letterSpacing: '-0.3px', color: 'var(--tx1)' }}>
                 {savedPayment ? 'Replace Payment Method' : 'Add Payment Method'}
               </h3>
               <button
@@ -1360,7 +1361,7 @@ export default function SettingsTab({
                 aria-label="Close"
               >✕</button>
             </div>
-            <div style={{ fontSize: 13, opacity: 0.7, marginBottom: 18 }}>
+            <div style={{ fontSize: 13, color: 'var(--tx2)', marginBottom: 18 }}>
               Enter your card details below.
             </div>
 
@@ -1470,6 +1471,14 @@ export default function SettingsTab({
               from { opacity: 0; transform: scale(0.94) translateY(8px) }
               to { opacity: 1; transform: scale(1) translateY(0) }
             }
+            /* Ensure form labels and inputs follow the active theme inside the modal */
+            .tr-set-label { color: var(--tx2); }
+            .tr-set-input {
+              background: var(--s2) !important;
+              color: var(--tx1) !important;
+              border: 1px solid var(--bd) !important;
+            }
+            .tr-set-input::placeholder { color: var(--tx3); }
           `}</style>
         </div>
       )}
