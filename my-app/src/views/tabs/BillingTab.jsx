@@ -239,6 +239,14 @@ const BILL_CSS = `
   border-radius:14px;
   padding:22px;
 }
+[data-theme="dark"] .tr-bill-checkout{
+  background:linear-gradient(135deg, rgba(167,139,250,0.10), rgba(124,58,237,0.12));
+  border-color:rgba(167,139,250,0.30);
+}
+[data-theme="dark"] .tr-bill-checkout-price{
+  color:#c4b5fd;
+}
+
 .tr-bill-checkout-meta{font-size:12.5px;color:var(--tx2);margin-bottom:8px;font-weight:500}
 .tr-bill-checkout-price{
   font-size:34px;font-weight:800;color:#7c3aed;letter-spacing:-1px;
