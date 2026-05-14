@@ -17,8 +17,9 @@
 //
 // All new preferences persist to localStorage (no backend changes required).
 // ═══════════════════════════════════════════════════════════════
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { showToast } from "../../components/helpers.js";
+import { ROLES } from "../../constants.js";
 
 /* ── Inline SVG icons ── */
 const I = {
@@ -161,15 +162,33 @@ const detectDevice = () => {
   return { os, browser, icon };
 };
 
+// ── Billing helpers (mirrored from BillingTab so invoices look identical) ──
+const formatBillingDate = (d) => {
+  if (!d) return "—";
+  const dt = (d instanceof Date) ? d : new Date(d);
+  if (isNaN(dt.getTime())) return "—";
+  return dt.toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" });
+};
+const addMonths = (date, months) => {
+  const d = new Date(date);
+  d.setMonth(d.getMonth() + months);
+  return d;
+};
+
 export default function SettingsTab({
   user, setUser,
   settingsName, setSettingsName,
   profilePublic, setProfilePublic,
   inLeaderboard, setInLeaderboard,
   allowBenchmarking, setAllowBenchmarking,
+  // ── Billing props (passed through from App.jsx the same way BillingTab gets them) ──
+  subscribedRoles = [],
+  billingPeriod = "yearly",
   setView, showConfirm,
 }) {
   const [activeTab, setActiveTab] = useState('profile');
+  const [isEditingProfile, setIsEditingProfile] = useState(false);
+
   const [role, setRole] = useState(() => lsGet('cyberprep_role_pref', 'User'));
   const [timezone, setTimezone] = useState(() => {
     const stored = lsGet('cyberprep_tz_pref', null);
@@ -232,6 +251,136 @@ export default function SettingsTab({
   const lastLoginDate = sessionStart ? new Date(parseInt(sessionStart)) : new Date();
   const currentDevice = detectDevice();
 
+  // ── Derived: billing invoices (same logic as BillingTab so the two tabs stay in sync) ──
+  const invoices = useMemo(() => {
+    if (!Array.isArray(subscribedRoles) || subscribedRoles.length === 0) return [];
+    const today = new Date();
+    return subscribedRoles.map((rid, idx) => {
+      const role = ROLES.find(r => r.id === rid);
+      if (!role) return null;
+      const yearly = billingPeriod === "yearly";
+      const amount = yearly ? Math.round(role.price * 12 * 0.8) : role.price;
+      const stamp = today.getTime() - idx * 86400000;
+      const invoice_no = `INV-${today.getFullYear()}-${String(idx + 1).padStart(4, "0")}`;
+      return {
+        invoice_no,
+        description: `${role.name} · ${yearly ? "Annual" : "Monthly"} Plan`,
+        purchase_date: new Date(stamp),
+        amount,
+        status: isPaid ? "PAID" : "PENDING",
+      };
+    }).filter(Boolean);
+  }, [subscribedRoles, billingPeriod, isPaid]);
+
+  // ── Payment Method state (saved locally — wire to real gateway later) ──
+  const [savedPayment, setSavedPayment] = useState(() => {
+    try {
+      const raw = localStorage.getItem('cyberprep_payment_method');
+      return raw ? JSON.parse(raw) : null;
+    } catch { return null; }
+  });
+  const [showPaymentModal, setShowPaymentModal] = useState(false);
+  const [paymentForm, setPaymentForm] = useState({
+    cardholder: '',
+    cardNumber: '',
+    expiry: '',
+    cvv: '',
+  });
+  const [paymentError, setPaymentError] = useState('');
+
+  // ── Change Password modal state ──
+  const [showPasswordModal, setShowPasswordModal] = useState(false);
+  const [passwordForm, setPasswordForm] = useState({ current: '', next: '', confirm: '' });
+  const [passwordError, setPasswordError] = useState('');
+  const [passwordLoading, setPasswordLoading] = useState(false);
+  const [showPwd, setShowPwd] = useState({ current: false, next: false, confirm: false });
+
+  // ── 2FA Setup modal state ──
+  const [show2FAModal, setShow2FAModal] = useState(false);
+  const [twoFAStep, setTwoFAStep] = useState(1); // 1=intro, 2=verify, 3=backup, 4=disable
+  const [twoFACode, setTwoFACode] = useState('');
+  const [twoFAError, setTwoFAError] = useState('');
+  const [twoFABackupCodes, setTwoFABackupCodes] = useState([]);
+  // Stable demo secret per session (real app: comes from backend on setup)
+  const twoFASecret = useMemo(() => {
+    const stored = lsGet('cyberprep_security_2fa_secret', null);
+    if (stored) return stored;
+    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
+    let s = '';
+    for (let i = 0; i < 16; i++) s += chars[Math.floor(Math.random() * chars.length)];
+    return s;
+  }, []);
+
+  // Detect card brand from first digit
+  const detectCardBrand = (num) => {
+    const d = num.replace(/\s/g, '');
+    if (d.startsWith('4')) return 'Visa';
+    if (/^5[1-5]/.test(d) || /^2[2-7]/.test(d)) return 'Mastercard';
+    if (/^3[47]/.test(d)) return 'Amex';
+    if (/^6/.test(d)) return 'Discover';
+    if (/^35/.test(d)) return 'JCB';
+    return 'Card';
+  };
+  const formatCardNumber = (val) => {
+    // strip non-digits, group in 4s, max 19 digits (Amex is 15, Visa/MC 16, others up to 19)
+    const digits = val.replace(/\D/g, '').slice(0, 19);
+    return digits.replace(/(.{4})/g, '$1 ').trim();
+  };
+  const formatExpiry = (val) => {
+    const digits = val.replace(/\D/g, '').slice(0, 4);
+    if (digits.length <= 2) return digits;
+    return digits.slice(0, 2) + '/' + digits.slice(2);
+  };
+
+  const openPaymentModal = () => {
+    setPaymentForm({ cardholder: settingsName || user?.name || '', cardNumber: '', expiry: '', cvv: '' });
+    setPaymentError('');
+    setShowPaymentModal(true);
+  };
+  const closePaymentModal = () => {
+    setShowPaymentModal(false);
+    setPaymentError('');
+  };
+  const savePaymentMethod = () => {
+    const { cardholder, cardNumber, expiry, cvv } = paymentForm;
+    const digits = cardNumber.replace(/\s/g, '');
+    if (!cardholder.trim()) { setPaymentError('Cardholder name is required'); return; }
+    if (digits.length < 13 || digits.length > 19) { setPaymentError('Card number must be 13–19 digits'); return; }
+    if (!/^\d{2}\/\d{2}$/.test(expiry)) { setPaymentError('Expiry must be MM/YY format'); return; }
+    const [mm, yy] = expiry.split('/').map(s => parseInt(s, 10));
+    if (mm < 1 || mm > 12) { setPaymentError('Invalid expiry month'); return; }
+    const currentYY = new Date().getFullYear() % 100;
+    if (yy < currentYY) { setPaymentError('Card has expired'); return; }
+    if (!/^\d{3,4}$/.test(cvv)) { setPaymentError('CVV must be 3 or 4 digits'); return; }
+    // Store only safe metadata — never full PAN or CVV
+    const record = {
+      brand: detectCardBrand(digits),
+      last4: digits.slice(-4),
+      cardholder: cardholder.trim(),
+      expiry,
+      added_at: new Date().toISOString(),
+    };
+    try {
+      localStorage.setItem('cyberprep_payment_method', JSON.stringify(record));
+      setSavedPayment(record);
+      setShowPaymentModal(false);
+      showToast('Payment method added successfully', 'success');
+    } catch {
+      setPaymentError('Could not save — please try again');
+    }
+  };
+  const removePaymentMethod = () => {
+    showConfirm(
+      'Remove payment method?',
+      'Your card details will be removed from this device. You can add a new one anytime.',
+      () => {
+        try { localStorage.removeItem('cyberprep_payment_method'); } catch {}
+        setSavedPayment(null);
+        showToast('Payment method removed', 'info');
+      }
+    );
+  };
+
   /* ── Handlers ── */
   const saveProfile = async () => {
     const token = localStorage.getItem('token');
@@ -247,6 +396,7 @@ export default function SettingsTab({
         localStorage.setItem('cyberprep_user', JSON.stringify(updated));
         lsSet('cyberprep_role_pref', role);
         lsSet('cyberprep_tz_pref', timezone);
+        setIsEditingProfile(false);
         showToast('Profile updated successfully!', 'success');
       } else { showToast('Failed to update profile', 'error'); }
     } catch (e) { showToast('Error: ' + e.message, 'error'); }
@@ -313,8 +463,133 @@ export default function SettingsTab({
     });
   };
 
-  const changePassword = () => {
-    showToast('To change your password, sign out and use "Forgot Password" on the login page.', 'info');
+  // ── Change Password ──
+  const openPasswordModal = () => {
+    setPasswordForm({ current: '', next: '', confirm: '' });
+    setPasswordError('');
+    setShowPwd({ current: false, next: false, confirm: false });
+    setShowPasswordModal(true);
+  };
+  const closePasswordModal = () => {
+    if (passwordLoading) return;
+    setShowPasswordModal(false);
+    setPasswordError('');
+  };
+  // Password strength (0-4)
+  const pwdStrength = (pw) => {
+    let s = 0;
+    if (pw.length >= 8) s++;
+    if (pw.length >= 12) s++;
+    if (/[A-Z]/.test(pw) && /[a-z]/.test(pw)) s++;
+    if (/\d/.test(pw) && /[^A-Za-z0-9]/.test(pw)) s++;
+    return s;
+  };
+  const submitChangePassword = async () => {
+    const { current, next, confirm } = passwordForm;
+    if (!current) { setPasswordError('Enter your current password'); return; }
+    if (next.length < 8) { setPasswordError('New password must be at least 8 characters'); return; }
+    if (!/[A-Z]/.test(next) || !/[a-z]/.test(next) || !/\d/.test(next)) {
+      setPasswordError('New password must include uppercase, lowercase, and a number');
+      return;
+    }
+    if (next === current) { setPasswordError('New password must be different from current password'); return; }
+    if (next !== confirm) { setPasswordError('New password and confirmation do not match'); return; }
+
+    setPasswordLoading(true);
+    setPasswordError('');
+    try {
+      const token = localStorage.getItem('token');
+      const res = await fetch('https://threatready-db.onrender.com/api/settings/change-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+        body: JSON.stringify({ current_password: current, new_password: next }),
+      });
+      if (res.ok) {
+        showToast('Password changed successfully', 'success');
+        setShowPasswordModal(false);
+      } else if (res.status === 401 || res.status === 403) {
+        setPasswordError('Current password is incorrect');
+      } else if (res.status === 404 || res.status === 501) {
+        // Endpoint not implemented yet — graceful fallback
+        showToast('Password change endpoint not ready yet. Please use "Forgot Password" on the login page.', 'info');
+        setShowPasswordModal(false);
+      } else {
+        const data = await res.json().catch(() => ({}));
+        setPasswordError(data?.error || 'Could not change password. Please try again.');
+      }
+    } catch {
+      setPasswordError('Network error. Please check your connection and try again.');
+    } finally {
+      setPasswordLoading(false);
+    }
+  };
+
+  // ── 2FA Setup ──
+  const open2FAModal = () => {
+    if (twoFa) {
+      // Already enabled — go to disable flow
+      setTwoFAStep(4);
+    } else {
+      setTwoFAStep(1);
+    }
+    setTwoFACode('');
+    setTwoFAError('');
+    setShow2FAModal(true);
+  };
+  const close2FAModal = () => {
+    setShow2FAModal(false);
+    setTwoFAError('');
+    setTwoFACode('');
+  };
+  const generateBackupCodes = () => {
+    const codes = [];
+    for (let i = 0; i < 10; i++) {
+      const a = Math.random().toString(36).slice(2, 6).toUpperCase();
+      const b = Math.random().toString(36).slice(2, 6).toUpperCase();
+      codes.push(`${a}-${b}`);
+    }
+    return codes;
+  };
+  const verify2FACode = () => {
+    // Demo mode: accept any 6-digit numeric code (real TOTP would verify against twoFASecret)
+    if (!/^\d{6}$/.test(twoFACode)) {
+      setTwoFAError('Enter the 6-digit code from your authenticator app');
+      return;
+    }
+    // Generate + persist backup codes, mark 2FA on
+    const codes = generateBackupCodes();
+    setTwoFABackupCodes(codes);
+    setTwoFa(true);
+    lsSet('cyberprep_security_2fa', true);
+    lsSet('cyberprep_security_2fa_secret', twoFASecret);
+    lsSet('cyberprep_security_2fa_backup', codes);
+    setTwoFAError('');
+    setTwoFAStep(3);
+  };
+  const finalize2FA = () => {
+    setShow2FAModal(false);
+    showToast('Two-factor authentication enabled', 'success');
+  };
+  const disable2FA = () => {
+    if (!/^\d{6}$/.test(twoFACode)) {
+      setTwoFAError('Enter your current 6-digit code to confirm');
+      return;
+    }
+    setTwoFa(false);
+    lsSet('cyberprep_security_2fa', false);
+    try { localStorage.removeItem('cyberprep_security_2fa_secret'); } catch {}
+    try { localStorage.removeItem('cyberprep_security_2fa_backup'); } catch {}
+    setShow2FAModal(false);
+    showToast('Two-factor authentication disabled', 'info');
+  };
+  const copyBackupCodes = () => {
+    const text = twoFABackupCodes.join('\n');
+    try {
+      navigator.clipboard.writeText(text);
+      showToast('Backup codes copied to clipboard', 'success');
+    } catch {
+      showToast('Could not copy — please save these codes manually', 'warning');
+    }
   };
 
   const goToBilling = () => {
@@ -404,14 +679,27 @@ export default function SettingsTab({
         <div className="tr-set-card-body">
           <div className="tr-set-card-head">
             <h3 className="tr-set-card-title">Profile Settings</h3>
-            <button type="button" className="tr-set-btn outline small" onClick={() => document.getElementById('tr-set-name-input')?.focus()}>
-              {I.edit} Edit Profile
+            <button
+              type="button"
+              className="tr-set-btn outline small"
+              onClick={() => {
+                if (isEditingProfile) {
+                  // Cancel — revert any unsaved changes and lock
+                  setSettingsName(user?.name || '');
+                  setIsEditingProfile(false);
+                } else {
+                  setIsEditingProfile(true);
+                  setTimeout(() => document.getElementById('tr-set-name-input')?.focus(), 0);
+                }
+              }}
+            >
+              {isEditingProfile ? 'Cancel' : (<>{I.edit} Edit Profile</>)}
             </button>
           </div>
           <div className="tr-set-form">
             <div className="tr-set-field">
               <label className="tr-set-label" htmlFor="tr-set-name-input">Full Name</label>
-              <input id="tr-set-name-input" className="tr-set-input" value={settingsName || user?.name || ''} onChange={e => setSettingsName(e.target.value)} placeholder="Your full name" />
+              <input id="tr-set-name-input" className="tr-set-input" value={settingsName ?? user?.name ?? ''} onChange={e => setSettingsName(e.target.value)} placeholder="Your full name" readOnly={!isEditingProfile} style={!isEditingProfile ? { cursor: 'not-allowed', opacity: 0.7 } : undefined} />
             </div>
             <div className="tr-set-field">
               <label className="tr-set-label">Email Address</label>
@@ -419,18 +707,18 @@ export default function SettingsTab({
             </div>
             <div className="tr-set-field">
               <label className="tr-set-label">Role</label>
-              <select className="tr-set-select" value={role} onChange={e => setRole(e.target.value)}>
+              <select className="tr-set-select" value={role} onChange={e => setRole(e.target.value)} disabled={!isEditingProfile} style={!isEditingProfile ? { cursor: 'not-allowed', opacity: 0.7 } : undefined}>
                 {ROLE_OPTIONS.map(r => <option key={r} value={r}>{r}</option>)}
               </select>
             </div>
             <div className="tr-set-field">
               <label className="tr-set-label">Timezone</label>
-              <select className="tr-set-select" value={timezone} onChange={e => setTimezone(e.target.value)}>
+              <select className="tr-set-select" value={timezone} onChange={e => setTimezone(e.target.value)} disabled={!isEditingProfile} style={!isEditingProfile ? { cursor: 'not-allowed', opacity: 0.7 } : undefined}>
                 {TIMEZONES.map(t => <option key={t} value={t}>{t}</option>)}
               </select>
             </div>
           </div>
-          <button type="button" className="tr-set-btn" onClick={saveProfile} style={{ marginTop: 16 }}>Save Changes</button>
+          <button type="button" className="tr-set-btn" onClick={saveProfile} style={{ marginTop: 16, opacity: isEditingProfile ? 1 : 0.5, cursor: isEditingProfile ? 'pointer' : 'not-allowed' }} disabled={!isEditingProfile}>Save Changes</button>
         </div>
       </div>
 
@@ -474,12 +762,26 @@ export default function SettingsTab({
         <div className="tr-set-card-body">
           <div className="tr-set-card-head">
             <h3 className="tr-set-card-title">Account Details</h3>
-            <button type="button" className="tr-set-btn outline small" onClick={() => document.getElementById('tr-set-acct-name')?.focus()}>{I.edit} Edit Details</button>
+            <button
+              type="button"
+              className="tr-set-btn outline small"
+              onClick={() => {
+                if (isEditingProfile) {
+                  setSettingsName(user?.name || '');
+                  setIsEditingProfile(false);
+                } else {
+                  setIsEditingProfile(true);
+                  setTimeout(() => document.getElementById('tr-set-acct-name')?.focus(), 0);
+                }
+              }}
+            >
+              {isEditingProfile ? 'Cancel' : (<>{I.edit} Edit Details</>)}
+            </button>
           </div>
           <div className="tr-set-form">
             <div className="tr-set-field">
               <label className="tr-set-label">Full Name</label>
-              <input id="tr-set-acct-name" className="tr-set-input" value={settingsName || user?.name || ''} onChange={e => setSettingsName(e.target.value)} />
+              <input id="tr-set-acct-name" className="tr-set-input" value={settingsName ?? user?.name ?? ''} onChange={e => setSettingsName(e.target.value)} readOnly={!isEditingProfile} style={!isEditingProfile ? { cursor: 'not-allowed', opacity: 0.7 } : undefined} />
             </div>
             <div className="tr-set-field">
               <label className="tr-set-label">Account Type</label>
@@ -494,7 +796,7 @@ export default function SettingsTab({
               <div className="tr-set-acct-static">{fmtDate(user?.created_at)}</div>
             </div>
           </div>
-          <button type="button" className="tr-set-btn" onClick={saveProfile} style={{ marginTop: 16 }}>Save Changes</button>
+          <button type="button" className="tr-set-btn" onClick={saveProfile} style={{ marginTop: 16, opacity: isEditingProfile ? 1 : 0.5, cursor: isEditingProfile ? 'pointer' : 'not-allowed' }} disabled={!isEditingProfile}>Save Changes</button>
         </div>
       </div>
 
@@ -535,11 +837,34 @@ export default function SettingsTab({
             <table className="tr-set-table">
               <thead><tr><th>Date</th><th>Description</th><th>Amount</th><th>Status</th><th>Invoice</th></tr></thead>
               <tbody>
-                <tr><td colSpan="5" className="tr-set-empty-cell">
-                  <div className="tr-set-empty-icon">{I.receipt}</div>
-                  <div className="tr-set-empty-title">No billing history found.</div>
-                  <div className="tr-set-empty-sub">Your transactions will appear here.</div>
-                </td></tr>
+                {invoices.length === 0 ? (
+                  <tr><td colSpan="5" className="tr-set-empty-cell">
+                    <div className="tr-set-empty-icon">{I.receipt}</div>
+                    <div className="tr-set-empty-title">No billing history found.</div>
+                    <div className="tr-set-empty-sub">Your transactions will appear here.</div>
+                  </td></tr>
+                ) : (
+                  invoices.map(inv => (
+                    <tr key={inv.invoice_no}>
+                      <td>{formatBillingDate(inv.purchase_date)}</td>
+                      <td>{inv.description}</td>
+                      <td><strong>₹{inv.amount.toLocaleString("en-IN")}</strong></td>
+                      <td>
+                        <span style={{
+                          display: 'inline-block',
+                          padding: '3px 10px',
+                          borderRadius: 100,
+                          fontSize: 11,
+                          fontWeight: 700,
+                          letterSpacing: '.6px',
+                          background: inv.status === 'PAID' ? 'rgba(16,185,129,.15)' : 'rgba(245,158,11,.15)',
+                          color: inv.status === 'PAID' ? '#10b981' : '#f59e0b',
+                        }}>{inv.status}</span>
+                      </td>
+                      <td style={{ fontFamily: 'monospace', fontSize: 12 }}>{inv.invoice_no}</td>
+                    </tr>
+                  ))
+                )}
               </tbody>
             </table>
           </div>
@@ -551,13 +876,44 @@ export default function SettingsTab({
         <div className="tr-set-card-icon">{I.ccBig}</div>
         <div className="tr-set-card-body">
           <div className="tr-set-card-head"><h3 className="tr-set-card-title">Payment Method</h3></div>
-          <div className="tr-set-payment-empty">
-            <div>
-              <div className="tr-set-empty-title" style={{ textAlign: 'left' }}>No payment method added.</div>
-              <div className="tr-set-empty-sub" style={{ textAlign: 'left' }}>Add a payment method to subscribe to paid plans.</div>
+          {savedPayment ? (
+            <div style={{
+              display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+              gap: 14, flexWrap: 'wrap', padding: '14px 16px',
+              background: 'linear-gradient(135deg, rgba(124,58,237,0.12), rgba(124,58,237,0.04))',
+              border: '1px solid rgba(124,58,237,0.25)', borderRadius: 12,
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 14, minWidth: 0 }}>
+                <div style={{
+                  width: 50, height: 34, borderRadius: 6,
+                  background: '#7c3aed', color: '#fff',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  fontSize: 11, fontWeight: 800, letterSpacing: '.5px',
+                  flexShrink: 0,
+                }}>{savedPayment.brand}</div>
+                <div style={{ minWidth: 0 }}>
+                  <div style={{ fontFamily: 'monospace', fontSize: 15, fontWeight: 600, letterSpacing: '1.5px' }}>
+                    •••• •••• •••• {savedPayment.last4}
+                  </div>
+                  <div style={{ fontSize: 12, opacity: 0.7, marginTop: 2 }}>
+                    {savedPayment.cardholder} · Exp {savedPayment.expiry}
+                  </div>
+                </div>
+              </div>
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                <button type="button" className="tr-set-btn outline small" onClick={openPaymentModal}>Replace</button>
+                <button type="button" className="tr-set-btn outline small" onClick={removePaymentMethod} style={{ color: '#ef4444', borderColor: 'rgba(239,68,68,0.4)' }}>Remove</button>
+              </div>
             </div>
-            <button type="button" className="tr-set-btn outline small" onClick={goToBilling}>{I.plus} Add Payment Method</button>
-          </div>
+          ) : (
+            <div className="tr-set-payment-empty">
+              <div>
+                <div className="tr-set-empty-title" style={{ textAlign: 'left' }}>No payment method added.</div>
+                <div className="tr-set-empty-sub" style={{ textAlign: 'left' }}>Add a payment method to subscribe to paid plans.</div>
+              </div>
+              <button type="button" className="tr-set-btn outline small" onClick={openPaymentModal}>{I.plus} Add Payment Method</button>
+            </div>
+          )}
         </div>
       </div>
     </>
@@ -761,14 +1117,14 @@ export default function SettingsTab({
               <div className="tr-set-sec-row-title">Password</div>
               <div className="tr-set-sec-row-sub">Last changed on {fmtDate(user?.created_at)}</div>
             </div>
-            <button type="button" className="tr-set-btn outline small" onClick={changePassword}>Change Password</button>
+            <button type="button" className="tr-set-btn outline small" onClick={openPasswordModal}>Change Password</button>
           </div>
           <div className="tr-set-sec-row">
             <div>
               <div className="tr-set-sec-row-title">Two-Factor Authentication (2FA)</div>
               <div className="tr-set-sec-row-sub">Add an extra layer of security to your account by enabling two-factor authentication.</div>
             </div>
-            <button type="button" className={`tr-set-sec-toggle-pill${twoFa ? ' on' : ''}`} onClick={() => { const nv = !twoFa; setTwoFa(nv); lsSet('cyberprep_security_2fa', nv); showToast(nv ? '2FA enabled' : '2FA disabled', 'info'); }}>
+            <button type="button" className={`tr-set-sec-toggle-pill${twoFa ? ' on' : ''}`} onClick={open2FAModal}>
               {twoFa ? <>{I.check} Enabled</> : 'Enable'} {I.chevR}
             </button>
           </div>
@@ -823,7 +1179,7 @@ export default function SettingsTab({
             <div className="tr-set-session-time">{fmtDateTime(lastLoginDate)}</div>
           </div>
           <div className="tr-set-activity-footer">
-            Don't recognize an activity? <button type="button" className="tr-set-inline-link" onClick={changePassword}>Change your password</button> and secure your account.
+            Don't recognize an activity? <button type="button" className="tr-set-inline-link" onClick={openPasswordModal}>Change your password</button> and secure your account.
           </div>
         </div>
       </div>
@@ -893,12 +1249,12 @@ export default function SettingsTab({
             </div>
 
             {/* Tab content */}
-            {activeTab === 'profile' && <ProfileSettingsContent />}
-            {activeTab === 'account' && <AccountContent />}
-            {activeTab === 'preferences' && <PreferencesContent />}
-            {activeTab === 'notifications' && <NotificationsContent />}
-            {activeTab === 'security' && <SecurityContent />}
-            {activeTab === 'integrations' && <IntegrationsContent />}
+            {activeTab === 'profile' && ProfileSettingsContent()}
+            {activeTab === 'account' && AccountContent()}
+            {activeTab === 'preferences' && PreferencesContent()}
+            {activeTab === 'notifications' && NotificationsContent()}
+            {activeTab === 'security' && SecurityContent()}
+            {activeTab === 'integrations' && IntegrationsContent()}
           </div>
 
           {/* RIGHT SIDEBAR */}
@@ -925,7 +1281,7 @@ export default function SettingsTab({
             {/* Quick Actions */}
             <div className="tr-set-qa fadeUp">
               <h4 className="tr-set-side-title" style={{ padding: '0 14px' }}>Quick Actions</h4>
-              <button type="button" className="tr-set-qa-link" onClick={changePassword}>
+              <button type="button" className="tr-set-qa-link" onClick={openPasswordModal}>
                 <span className="tr-set-qa-link-left">{I.lock} Change Password</span>
                 <span className="tr-set-qa-link-right">{I.chevR}</span>
               </button>
@@ -963,6 +1319,460 @@ export default function SettingsTab({
           </aside>
         </div>
       </div>
+
+      {/* ══════ Add/Edit Payment Method Modal ══════ */}
+      {showPaymentModal && (
+        <div
+          onClick={closePaymentModal}
+          style={{
+            position: 'fixed', inset: 0, zIndex: 9999,
+            background: 'rgba(10, 7, 24, 0.72)',
+            backdropFilter: 'blur(6px)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            padding: 16, animation: 'tr-set-pm-fade 0.18s ease-out',
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              width: '100%', maxWidth: 460,
+              background: 'var(--ta-card-bg, #15101f)',
+              border: '1px solid var(--ta-card-border, rgba(255,255,255,0.10))',
+              borderRadius: 16, padding: 24,
+              boxShadow: '0 24px 80px rgba(0,0,0,0.5)',
+              animation: 'tr-set-pm-pop 0.22s cubic-bezier(0.34, 1.56, 0.64, 1)',
+              maxHeight: '90vh', overflowY: 'auto',
+            }}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+              <h3 style={{ fontSize: 18, fontWeight: 700, margin: 0, letterSpacing: '-0.3px' }}>
+                {savedPayment ? 'Replace Payment Method' : 'Add Payment Method'}
+              </h3>
+              <button
+                type="button"
+                onClick={closePaymentModal}
+                style={{
+                  width: 32, height: 32, borderRadius: 8,
+                  background: 'transparent', border: 'none',
+                  cursor: 'pointer', display: 'grid', placeItems: 'center',
+                  color: 'inherit', opacity: 0.6,
+                }}
+                aria-label="Close"
+              >✕</button>
+            </div>
+            <div style={{ fontSize: 13, opacity: 0.7, marginBottom: 18 }}>
+              Enter your card details below.
+            </div>
+
+            {/* Cardholder */}
+            <div className="tr-set-field" style={{ marginBottom: 12 }}>
+              <label className="tr-set-label" htmlFor="pm-cardholder">Cardholder Name</label>
+              <input
+                id="pm-cardholder"
+                className="tr-set-input"
+                value={paymentForm.cardholder}
+                onChange={(e) => setPaymentForm(p => ({ ...p, cardholder: e.target.value }))}
+                placeholder="Name on card"
+                autoComplete="cc-name"
+              />
+            </div>
+
+            {/* Card number */}
+            <div className="tr-set-field" style={{ marginBottom: 12 }}>
+              <label className="tr-set-label" htmlFor="pm-cardnumber">
+                Card Number
+                {paymentForm.cardNumber.replace(/\s/g, '').length >= 4 && (
+                  <span style={{
+                    marginLeft: 10, padding: '2px 8px', fontSize: 10, fontWeight: 700,
+                    background: '#7c3aed', color: '#fff', borderRadius: 4, letterSpacing: '.4px',
+                  }}>{detectCardBrand(paymentForm.cardNumber)}</span>
+                )}
+              </label>
+              <input
+                id="pm-cardnumber"
+                className="tr-set-input"
+                value={paymentForm.cardNumber}
+                onChange={(e) => setPaymentForm(p => ({ ...p, cardNumber: formatCardNumber(e.target.value) }))}
+                placeholder="1234 5678 9012 3456"
+                inputMode="numeric"
+                autoComplete="cc-number"
+                style={{ fontFamily: 'monospace', letterSpacing: '1px' }}
+              />
+            </div>
+
+            {/* Expiry + CVV */}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 12 }}>
+              <div className="tr-set-field" style={{ marginBottom: 0 }}>
+                <label className="tr-set-label" htmlFor="pm-expiry">Expiry (MM/YY)</label>
+                <input
+                  id="pm-expiry"
+                  className="tr-set-input"
+                  value={paymentForm.expiry}
+                  onChange={(e) => setPaymentForm(p => ({ ...p, expiry: formatExpiry(e.target.value) }))}
+                  placeholder="MM/YY"
+                  inputMode="numeric"
+                  autoComplete="cc-exp"
+                  maxLength={5}
+                />
+              </div>
+              <div className="tr-set-field" style={{ marginBottom: 0 }}>
+                <label className="tr-set-label" htmlFor="pm-cvv">CVV</label>
+                <input
+                  id="pm-cvv"
+                  className="tr-set-input"
+                  value={paymentForm.cvv}
+                  onChange={(e) => setPaymentForm(p => ({ ...p, cvv: e.target.value.replace(/\D/g, '').slice(0, 4) }))}
+                  placeholder="123"
+                  inputMode="numeric"
+                  autoComplete="cc-csc"
+                  type="password"
+                  maxLength={4}
+                />
+              </div>
+            </div>
+
+            {/* Inline error */}
+            {paymentError && (
+              <div style={{
+                padding: '9px 12px', borderRadius: 8, marginBottom: 12,
+                background: 'rgba(239,68,68,0.12)', color: '#f87171',
+                fontSize: 12.5, fontWeight: 500,
+                border: '1px solid rgba(239,68,68,0.25)',
+              }}>{paymentError}</div>
+            )}
+
+            {/* Demo notice */}
+            <div style={{
+              padding: '10px 12px', borderRadius: 8, marginBottom: 16,
+              background: 'rgba(124,58,237,0.10)', color: '#c4b5fd',
+              fontSize: 11.5, lineHeight: 1.5,
+              border: '1px solid rgba(124,58,237,0.22)',
+            }}>
+              <strong style={{ display: 'block', marginBottom: 2 }}>🔒 Demo Mode</strong>
+              Card details are saved locally on this device only. No real charges are processed.
+              Only your card brand and last 4 digits are stored — never the full number or CVV.
+            </div>
+
+            {/* Actions */}
+            <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
+              <button type="button" className="tr-set-btn outline small" onClick={closePaymentModal}>
+                Cancel
+              </button>
+              <button type="button" className="tr-set-btn" onClick={savePaymentMethod}>
+                {savedPayment ? 'Update Card' : 'Save Card'}
+              </button>
+            </div>
+          </div>
+
+          <style>{`
+            @keyframes tr-set-pm-fade { from { opacity: 0 } to { opacity: 1 } }
+            @keyframes tr-set-pm-pop {
+              from { opacity: 0; transform: scale(0.94) translateY(8px) }
+              to { opacity: 1; transform: scale(1) translateY(0) }
+            }
+          `}</style>
+        </div>
+      )}
+
+      {/* ══════ Change Password Modal ══════ */}
+      {showPasswordModal && (
+        <div
+          onClick={closePasswordModal}
+          style={{
+            position: 'fixed', inset: 0, zIndex: 9999,
+            background: 'rgba(10, 7, 24, 0.72)', backdropFilter: 'blur(6px)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            padding: 16, animation: 'tr-set-pm-fade 0.18s ease-out',
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              width: '100%', maxWidth: 460,
+              background: 'var(--ta-card-bg, #15101f)',
+              border: '1px solid var(--ta-card-border, rgba(255,255,255,0.10))',
+              borderRadius: 16, padding: 24,
+              boxShadow: '0 24px 80px rgba(0,0,0,0.5)',
+              animation: 'tr-set-pm-pop 0.22s cubic-bezier(0.34, 1.56, 0.64, 1)',
+              maxHeight: '90vh', overflowY: 'auto',
+            }}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+              <h3 style={{ fontSize: 18, fontWeight: 700, margin: 0, letterSpacing: '-0.3px' }}>Change Password</h3>
+              <button type="button" onClick={closePasswordModal} disabled={passwordLoading}
+                style={{ width: 32, height: 32, borderRadius: 8, background: 'transparent', border: 'none', cursor: passwordLoading ? 'not-allowed' : 'pointer', display: 'grid', placeItems: 'center', color: 'inherit', opacity: 0.6 }}
+                aria-label="Close">✕</button>
+            </div>
+            <div style={{ fontSize: 13, opacity: 0.7, marginBottom: 18 }}>
+              Choose a strong password with at least 8 characters, mixing letters, numbers, and symbols.
+            </div>
+
+            {[
+              { key: 'current', label: 'Current Password', placeholder: 'Enter current password', autoComplete: 'current-password' },
+              { key: 'next',    label: 'New Password',     placeholder: 'At least 8 characters',  autoComplete: 'new-password' },
+              { key: 'confirm', label: 'Confirm New Password', placeholder: 'Re-enter new password', autoComplete: 'new-password' },
+            ].map(field => (
+              <div key={field.key} className="tr-set-field" style={{ marginBottom: 12 }}>
+                <label className="tr-set-label" htmlFor={`pwd-${field.key}`}>{field.label}</label>
+                <div style={{ position: 'relative' }}>
+                  <input
+                    id={`pwd-${field.key}`}
+                    className="tr-set-input"
+                    type={showPwd[field.key] ? 'text' : 'password'}
+                    value={passwordForm[field.key]}
+                    onChange={(e) => setPasswordForm(p => ({ ...p, [field.key]: e.target.value }))}
+                    placeholder={field.placeholder}
+                    autoComplete={field.autoComplete}
+                    style={{ paddingRight: 40 }}
+                    disabled={passwordLoading}
+                  />
+                  <button type="button"
+                    onClick={() => setShowPwd(s => ({ ...s, [field.key]: !s[field.key] }))}
+                    style={{ position: 'absolute', right: 6, top: '50%', transform: 'translateY(-50%)', width: 30, height: 30, borderRadius: 6, background: 'transparent', border: 'none', cursor: 'pointer', display: 'grid', placeItems: 'center', color: 'inherit', opacity: 0.55 }}
+                    aria-label={showPwd[field.key] ? 'Hide password' : 'Show password'}
+                  >{showPwd[field.key] ? '🙈' : '👁'}</button>
+                </div>
+                {/* Strength bar — only under "New Password" */}
+                {field.key === 'next' && passwordForm.next && (() => {
+                  const s = pwdStrength(passwordForm.next);
+                  const labels = ['Too weak', 'Weak', 'Fair', 'Strong', 'Excellent'];
+                  const colors = ['#ef4444', '#f59e0b', '#eab308', '#10b981', '#059669'];
+                  return (
+                    <div style={{ marginTop: 6 }}>
+                      <div style={{ display: 'flex', gap: 4 }}>
+                        {[0,1,2,3].map(i => (
+                          <div key={i} style={{ flex: 1, height: 4, borderRadius: 2, background: i < s ? colors[s] : 'rgba(255,255,255,0.08)', transition: 'background 0.2s' }} />
+                        ))}
+                      </div>
+                      <div style={{ fontSize: 11, marginTop: 4, color: colors[s], fontWeight: 600 }}>{labels[s]}</div>
+                    </div>
+                  );
+                })()}
+              </div>
+            ))}
+
+            {passwordError && (
+              <div style={{ padding: '9px 12px', borderRadius: 8, marginBottom: 12, background: 'rgba(239,68,68,0.12)', color: '#f87171', fontSize: 12.5, fontWeight: 500, border: '1px solid rgba(239,68,68,0.25)' }}>
+                {passwordError}
+              </div>
+            )}
+
+            <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', marginTop: 8 }}>
+              <button type="button" className="tr-set-btn outline small" onClick={closePasswordModal} disabled={passwordLoading}>Cancel</button>
+              <button type="button" className="tr-set-btn" onClick={submitChangePassword} disabled={passwordLoading} style={{ opacity: passwordLoading ? 0.6 : 1 }}>
+                {passwordLoading ? 'Updating…' : 'Update Password'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ══════ 2FA Setup Modal ══════ */}
+      {show2FAModal && (
+        <div
+          onClick={close2FAModal}
+          style={{
+            position: 'fixed', inset: 0, zIndex: 9999,
+            background: 'rgba(10, 7, 24, 0.72)', backdropFilter: 'blur(6px)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            padding: 16, animation: 'tr-set-pm-fade 0.18s ease-out',
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              width: '100%', maxWidth: 480,
+              background: 'var(--ta-card-bg, #15101f)',
+              border: '1px solid var(--ta-card-border, rgba(255,255,255,0.10))',
+              borderRadius: 16, padding: 24,
+              boxShadow: '0 24px 80px rgba(0,0,0,0.5)',
+              animation: 'tr-set-pm-pop 0.22s cubic-bezier(0.34, 1.56, 0.64, 1)',
+              maxHeight: '90vh', overflowY: 'auto',
+            }}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+              <h3 style={{ fontSize: 18, fontWeight: 700, margin: 0, letterSpacing: '-0.3px' }}>
+                {twoFAStep === 4 ? 'Disable Two-Factor Authentication' : 'Set Up Two-Factor Authentication'}
+              </h3>
+              <button type="button" onClick={close2FAModal}
+                style={{ width: 32, height: 32, borderRadius: 8, background: 'transparent', border: 'none', cursor: 'pointer', display: 'grid', placeItems: 'center', color: 'inherit', opacity: 0.6 }}
+                aria-label="Close">✕</button>
+            </div>
+
+            {/* Step dots (only on enable flow, hide on disable step) */}
+            {twoFAStep !== 4 && (
+              <div style={{ display: 'flex', gap: 6, marginBottom: 18, marginTop: 12 }}>
+                {[1,2,3].map(s => (
+                  <div key={s} style={{
+                    flex: 1, height: 4, borderRadius: 2,
+                    background: s <= twoFAStep ? '#7c3aed' : 'rgba(255,255,255,0.08)',
+                    transition: 'background 0.25s',
+                  }} />
+                ))}
+              </div>
+            )}
+
+            {/* STEP 1: Intro */}
+            {twoFAStep === 1 && (
+              <>
+                <div style={{ fontSize: 13.5, lineHeight: 1.6, opacity: 0.85, marginBottom: 18 }}>
+                  Two-factor authentication adds an extra layer of security to your account. After enabling, you'll need both your password and a 6-digit code from an authenticator app (Google Authenticator, Authy, 1Password, etc.) to sign in.
+                </div>
+                <div style={{ padding: '12px 14px', background: 'rgba(124,58,237,0.10)', border: '1px solid rgba(124,58,237,0.22)', borderRadius: 10, fontSize: 12.5, lineHeight: 1.5, color: '#c4b5fd', marginBottom: 20 }}>
+                  <strong style={{ display: 'block', marginBottom: 4 }}>What you'll need:</strong>
+                  • An authenticator app installed on your phone<br />
+                  • A safe place to store your backup codes
+                </div>
+                <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
+                  <button type="button" className="tr-set-btn outline small" onClick={close2FAModal}>Cancel</button>
+                  <button type="button" className="tr-set-btn" onClick={() => setTwoFAStep(2)}>Continue</button>
+                </div>
+              </>
+            )}
+
+            {/* STEP 2: Verify */}
+            {twoFAStep === 2 && (
+              <>
+                <div style={{ fontSize: 13, opacity: 0.8, marginBottom: 14 }}>
+                  Scan this QR code with your authenticator app, or enter the setup key manually.
+                </div>
+
+                {/* QR code placeholder — deterministic visual */}
+                <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 14 }}>
+                  <div style={{
+                    width: 180, height: 180, padding: 12,
+                    background: '#fff', borderRadius: 10,
+                    display: 'grid', gridTemplateColumns: 'repeat(13, 1fr)', gap: 1,
+                  }}>
+                    {Array.from({ length: 169 }).map((_, i) => {
+                      // Deterministic pattern based on secret + position
+                      const seed = twoFASecret.charCodeAt(i % twoFASecret.length) + i;
+                      const filled = (seed * 7919) % 100 < 48;
+                      // Corner finder patterns
+                      const r = Math.floor(i / 13), c = i % 13;
+                      const inFinder = (r < 3 && c < 3) || (r < 3 && c >= 10) || (r >= 10 && c < 3);
+                      const finderBorder = (r === 0 || r === 2 || c === 0 || c === 2);
+                      const finderCenter = (r === 1 && c === 1);
+                      const inTopRight = (r < 3 && c >= 10) && ((r === 0 || r === 2 || c === 10 || c === 12) || (r === 1 && c === 11));
+                      const inBotLeft = (r >= 10 && c < 3) && ((r === 10 || r === 12 || c === 0 || c === 2) || (r === 11 && c === 1));
+                      let on = filled;
+                      if (inFinder) {
+                        if (r < 3 && c < 3) on = finderBorder || finderCenter;
+                        else on = inTopRight || inBotLeft;
+                      }
+                      return <div key={i} style={{ background: on ? '#0f0a1f' : '#fff', aspectRatio: '1/1' }} />;
+                    })}
+                  </div>
+                </div>
+
+                <div className="tr-set-field" style={{ marginBottom: 14 }}>
+                  <label className="tr-set-label">Or enter this setup key manually</label>
+                  <div style={{
+                    padding: '10px 12px', background: 'rgba(255,255,255,0.04)',
+                    border: '1px dashed rgba(255,255,255,0.18)', borderRadius: 8,
+                    fontFamily: 'monospace', fontSize: 14, letterSpacing: '1.5px',
+                    textAlign: 'center', userSelect: 'all',
+                  }}>{twoFASecret.match(/.{1,4}/g).join(' ')}</div>
+                </div>
+
+                <div className="tr-set-field" style={{ marginBottom: 14 }}>
+                  <label className="tr-set-label" htmlFor="tfa-code">Enter the 6-digit code from your app</label>
+                  <input
+                    id="tfa-code"
+                    className="tr-set-input"
+                    value={twoFACode}
+                    onChange={(e) => setTwoFACode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                    placeholder="000000"
+                    inputMode="numeric"
+                    autoComplete="one-time-code"
+                    maxLength={6}
+                    style={{ fontFamily: 'monospace', fontSize: 18, letterSpacing: '6px', textAlign: 'center' }}
+                  />
+                </div>
+
+                {twoFAError && (
+                  <div style={{ padding: '9px 12px', borderRadius: 8, marginBottom: 12, background: 'rgba(239,68,68,0.12)', color: '#f87171', fontSize: 12.5, fontWeight: 500, border: '1px solid rgba(239,68,68,0.25)' }}>
+                    {twoFAError}
+                  </div>
+                )}
+
+                <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
+                  <button type="button" className="tr-set-btn outline small" onClick={() => setTwoFAStep(1)}>Back</button>
+                  <button type="button" className="tr-set-btn" onClick={verify2FACode}>Verify &amp; Enable</button>
+                </div>
+              </>
+            )}
+
+            {/* STEP 3: Backup codes */}
+            {twoFAStep === 3 && (
+              <>
+                <div style={{
+                  padding: '12px 14px', marginBottom: 16,
+                  background: 'rgba(16,185,129,0.10)', border: '1px solid rgba(16,185,129,0.25)',
+                  borderRadius: 10, fontSize: 13, color: '#10b981',
+                }}>
+                  <strong>✓ 2FA Enabled.</strong> Save these backup codes somewhere safe — they're your only way to sign in if you lose your phone.
+                </div>
+                <div style={{
+                  padding: 16, background: 'rgba(255,255,255,0.04)',
+                  border: '1px solid rgba(255,255,255,0.10)', borderRadius: 10,
+                  marginBottom: 14, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8,
+                }}>
+                  {twoFABackupCodes.map((c) => (
+                    <div key={c} style={{
+                      fontFamily: 'monospace', fontSize: 13, padding: '6px 8px',
+                      background: 'rgba(255,255,255,0.04)', borderRadius: 6, textAlign: 'center',
+                      letterSpacing: '1px',
+                    }}>{c}</div>
+                  ))}
+                </div>
+                <div style={{ display: 'flex', gap: 10, justifyContent: 'space-between' }}>
+                  <button type="button" className="tr-set-btn outline small" onClick={copyBackupCodes}>📋 Copy Codes</button>
+                  <button type="button" className="tr-set-btn" onClick={finalize2FA}>Done</button>
+                </div>
+              </>
+            )}
+
+            {/* STEP 4: Disable */}
+            {twoFAStep === 4 && (
+              <>
+                <div style={{ fontSize: 13.5, lineHeight: 1.6, marginBottom: 14, marginTop: 8 }}>
+                  Disabling 2FA reduces your account security. You'll only need your password to sign in.
+                </div>
+                <div style={{
+                  padding: '10px 12px', marginBottom: 16,
+                  background: 'rgba(245,158,11,0.10)', border: '1px solid rgba(245,158,11,0.25)',
+                  borderRadius: 8, fontSize: 12.5, color: '#fbbf24',
+                }}>
+                  ⚠ For safety, confirm by entering your current 6-digit code from your authenticator app.
+                </div>
+                <div className="tr-set-field" style={{ marginBottom: 14 }}>
+                  <label className="tr-set-label" htmlFor="tfa-disable-code">Current 6-digit code</label>
+                  <input
+                    id="tfa-disable-code"
+                    className="tr-set-input"
+                    value={twoFACode}
+                    onChange={(e) => setTwoFACode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                    placeholder="000000"
+                    inputMode="numeric"
+                    maxLength={6}
+                    style={{ fontFamily: 'monospace', fontSize: 18, letterSpacing: '6px', textAlign: 'center' }}
+                  />
+                </div>
+                {twoFAError && (
+                  <div style={{ padding: '9px 12px', borderRadius: 8, marginBottom: 12, background: 'rgba(239,68,68,0.12)', color: '#f87171', fontSize: 12.5, fontWeight: 500, border: '1px solid rgba(239,68,68,0.25)' }}>
+                    {twoFAError}
+                  </div>
+                )}
+                <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
+                  <button type="button" className="tr-set-btn outline small" onClick={close2FAModal}>Cancel</button>
+                  <button type="button" className="tr-set-btn" onClick={disable2FA} style={{ background: '#dc2626' }}>Disable 2FA</button>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* ══════ Scoped styles ══════ */}
       <style>{`
