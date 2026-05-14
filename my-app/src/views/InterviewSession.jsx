@@ -787,7 +787,7 @@ export default function InterviewSession({
   // ═══════════════════════════════════════════════════════════════
   if (stage === "report-error") {
     return (
-      <div className="fadeUp" style={{ maxWidth: 700, margin: "100px auto 40px", padding: 20, paddingTop: 0 }}>
+      <div className="fadeUp" style={{ maxWidth: 700, margin: "20px auto 40px", padding: 20 }}>
         <div className="card" style={{ padding: 30, textAlign: "center" }}>
           <div style={{ fontSize: 48, marginBottom: 12 }}>⚠️</div>
           <h2 style={{ fontSize: 20, fontWeight: 800, marginBottom: 10 }}>Report could not be generated</h2>
@@ -825,7 +825,7 @@ export default function InterviewSession({
   if (stage === "completed") {
     const userAnswers = messages.filter((m) => m.role === "user").length;
     return (
-      <div className="fadeUp" style={{ maxWidth: 700, margin: "100px auto 40px", padding: 20, paddingTop: 0 }}>
+      <div className="fadeUp" style={{ maxWidth: 700, margin: "20px auto 40px", padding: 20 }}>
         <div className="card" style={{ padding: 40, textAlign: "center" }}>
           <div style={{ fontSize: 56, marginBottom: 12 }}>✅</div>
           <h2 style={{ fontSize: 24, fontWeight: 800, marginBottom: 10 }}>Session Complete</h2>

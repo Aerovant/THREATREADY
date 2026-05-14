@@ -146,7 +146,7 @@ export default function InterviewReport({ report, onRestart, onHome, hideActions
   const verdict = overall.verdict || "Session evaluated";
 
   return (
-    <div className="fadeUp" style={{ maxWidth: 1100, margin: "0 auto", padding: "100px 16px 80px" }}>
+    <div className="fadeUp" style={{ maxWidth: 1100, margin: "0 auto", padding: "20px 16px 80px" }}>
 
       {/* ═══ Top bar with action buttons ═══ */}
       <div style={{

@@ -26,7 +26,7 @@ import { showToast } from "../../components/helpers.js";
 
 // ── Scoped CSS ──
 const BILL_CSS = `
-.tr-bill-root{font-family:'Inter','Segoe UI',system-ui,sans-serif;color:var(--tx1);padding-top:72px}
+.tr-bill-root{font-family:'Inter','Segoe UI',system-ui,sans-serif;color:var(--tx1)}
 .tr-bill-root svg:not([width]){width:16px;height:16px;flex-shrink:0}
 
 /* Header */

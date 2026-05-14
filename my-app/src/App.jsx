@@ -2432,19 +2432,89 @@ export default function ThreatReady() {
 @media (min-width: 980px) {
   .tr-dash-cnt { padding-left: 0; }
 }
-.tr-dash-cnt { position: relative; }
+.tr-dash-cnt { position: relative; padding-top: 64px; }
+@media (max-width: 979px) {
+  .tr-dash-cnt { padding-top: 60px; }
+}
 
-/* ── Topbar ── */
+/* ── Topbar (proper fixed header bar) ── */
 .tr-dash-topbar {
   position: fixed;
-  top: 18px;
-  right: 24px;
-  display: flex; align-items: center; justify-content: flex-end;
-  gap: 10px;
+  top: 0;
+  left: 240px;
+  right: 0;
+  height: 64px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 0 24px;
+  background: var(--s1);
+  border-bottom: 1px solid var(--bd, #e9e5f3);
   z-index: 50;
+  transition: left .22s ease;
+}
+[data-theme="dark"] .tr-dash-topbar {
+  background: var(--s1);
+  border-bottom-color: rgba(255,255,255,0.08);
+}
+.tr-dash-topbar-left,
+.tr-dash-topbar-right {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: nowrap;
+}
+.tr-dash-topbar-left { min-width: 0; flex: 1 1 auto; }
+.tr-dash-topbar-right { flex: 0 0 auto; }
+
+/* When sidebar is collapsed → header starts at 64px from left */
+.app:has(.tr-dash-sidebar.collapsed) .tr-dash-topbar { left: 64px; }
+
+/* Mobile: full width */
+@media (max-width: 979px) {
+  .tr-dash-topbar { left: 0; padding: 0 14px; height: 60px; }
+  .app:has(.tr-dash-sidebar.collapsed) .tr-dash-topbar { left: 0; }
+}
+
+/* ── Breadcrumb ── */
+.tr-dash-breadcrumb {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  color: var(--tx2);
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+}
+.tr-dash-breadcrumb button {
+  background: none;
+  border: none;
   padding: 0;
-  margin: 0;
-  flex-wrap: wrap;
+  color: var(--tx2);
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 600;
+  font-family: inherit;
+  transition: color .15s ease;
+}
+.tr-dash-breadcrumb button:hover { color: #7c3aed; }
+.tr-dash-breadcrumb .sep {
+  color: var(--tx3, #9c95bf);
+  font-weight: 400;
+  font-size: 14px;
+}
+.tr-dash-breadcrumb .current {
+  color: var(--tx1);
+  font-weight: 700;
+  font-size: 14px;
+}
+@media (max-width: 600px) {
+  .tr-dash-breadcrumb { font-size: 13px; gap: 6px; }
+  .tr-dash-breadcrumb button,
+  .tr-dash-breadcrumb .current,
+  .tr-dash-breadcrumb .sep { font-size: 13px; }
 }
 
 .tr-dash-xp {
@@ -2784,6 +2854,7 @@ export default function ThreatReady() {
 
           {/* ── TOPBAR ── */}
           <header className="tr-dash-topbar">
+            <div className="tr-dash-topbar-left">
             {/* Hamburger — mobile only, opens sidebar drawer */}
             <button
               type="button"
@@ -2792,6 +2863,7 @@ export default function ThreatReady() {
               aria-label="Open navigation menu"
               aria-expanded={sidebarOpen}
             >
+
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                 <line x1="3" y1="6"  x2="21" y2="6"/>
                 <line x1="3" y1="12" x2="21" y2="12"/>
@@ -2799,6 +2871,21 @@ export default function ThreatReady() {
               </svg>
             </button>
 
+            {/* Breadcrumb */}
+            <nav className="tr-dash-breadcrumb" aria-label="Breadcrumb">
+              <button type="button" onClick={() => { setDashTab('home'); localStorage.setItem('cyberprep_tab', 'home'); }}>Home</button>
+              {dashTab && dashTab !== 'home' && (
+                <>
+                  <span className="sep">›</span>
+                  <span className="current">
+                    {({ interview: 'Interview', scores: 'Scores', badges: 'Badges', profile: 'Profile', billing: 'Billing', settings: 'Settings', help: 'Help' })[dashTab] || (dashTab.charAt(0).toUpperCase() + dashTab.slice(1))}
+                  </span>
+                </>
+              )}
+            </nav>
+            </div>
+
+            <div className="tr-dash-topbar-right">
             <div className="tr-dash-xp">
               <svg viewBox="0 0 24 24" fill="currentColor"><path d="M13 2L3 14h7l-1 8 11-12h-7l1-8z"/></svg>
               {xp} XP
@@ -2895,6 +2982,7 @@ export default function ThreatReady() {
                   </div>
                 </>
               )}
+            </div>
             </div>
           </header>
 
