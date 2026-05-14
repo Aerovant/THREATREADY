@@ -40,7 +40,7 @@ const MODULE_INFO = [
 
 // ── Scoped CSS ──
 const IV_CSS = `
-.tr-iv-root{font-family:'Inter','Segoe UI',system-ui,sans-serif;color:var(--tx1);padding-top:56px}
+.tr-iv-root{font-family:'Inter','Segoe UI',system-ui,sans-serif;color:var(--tx1)}
 
 /* Defensive: any svg without explicit dimensions stays small (prevents 300x150 balloon) */
 .tr-iv-root svg:not([width]){width:16px;height:16px;flex-shrink:0}
