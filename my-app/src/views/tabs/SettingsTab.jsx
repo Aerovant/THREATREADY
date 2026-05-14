@@ -1443,13 +1443,13 @@ export default function SettingsTab({
             )}
 
             {/* Demo notice */}
-            <div style={{
+            <div className="tr-set-demo-notice" style={{
               padding: '10px 12px', borderRadius: 8, marginBottom: 16,
-              background: 'rgba(124,58,237,0.10)', color: '#c4b5fd',
+              background: 'rgba(124,58,237,0.10)',
               fontSize: 11.5, lineHeight: 1.5,
               border: '1px solid rgba(124,58,237,0.22)',
             }}>
-              <strong style={{ display: 'block', marginBottom: 2 }}>🔒 Demo Mode</strong>
+              <strong style={{ display: 'block', marginBottom: 2, color: '#7c3aed' }}>🔒 Demo Mode</strong>
               Card details are saved locally on this device only. No real charges are processed.
               Only your card brand and last 4 digits are stored — never the full number or CVV.
             </div>
@@ -1479,6 +1479,10 @@ export default function SettingsTab({
               border: 1px solid var(--bd) !important;
             }
             .tr-set-input::placeholder { color: var(--tx3); }
+            /* Demo notice — theme-aware text colors */
+            .tr-set-demo-notice { color: #5b21b6; }
+            [data-theme="dark"] .tr-set-demo-notice { color: #c4b5fd; }
+            [data-theme="dark"] .tr-set-demo-notice strong { color: #c4b5fd !important; }
           `}</style>
         </div>
       )}
