@@ -569,8 +569,9 @@ export default function ThreatReady() {
     setDashTabState(newTab);
     localStorage.setItem('cyberprep_tab', newTab);
     // Sync URL only if we're currently on a dashboard route
-    if (location.pathname.startsWith('/dashboard')) {
-      const newPath = newTab === 'home' ? '/dashboard' : `/dashboard/${newTab}`;
+    // App is served at /app/ so paths look like /app/dashboard/* or /app/dashboard
+    if (location.pathname.startsWith('/app/dashboard') || location.pathname.startsWith('/dashboard')) {
+      const newPath = newTab === 'home' ? '/app/dashboard' : `/app/dashboard/${newTab}`;
       if (newPath !== location.pathname) navigate(newPath);
     }
   };
@@ -579,8 +580,8 @@ export default function ThreatReady() {
   const setB2bTab = (newTab) => {
     setB2bTabState(newTab);
     localStorage.setItem('cyberprep_b2btab', newTab);
-    if (location.pathname.startsWith('/hr')) {
-      const newPath = newTab === 'overview' ? '/hr' : `/hr/${newTab}`;
+    if (location.pathname.startsWith('/app/hr') || location.pathname.startsWith('/hr')) {
+      const newPath = newTab === 'overview' ? '/app/hr' : `/app/hr/${newTab}`;
       if (newPath !== location.pathname) navigate(newPath);
     }
   };
