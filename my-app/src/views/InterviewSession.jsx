@@ -912,8 +912,8 @@ export default function InterviewSession({
             src={panelist.avatarUrl}
             alt={panelist.name}
             onError={() => setImgErrors((p) => ({ ...p, [panelist.id]: true }))}
-            style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
-          />
+            style={{ width: "100%", height: "100%", minWidth: "100%", minHeight: "100%", objectFit: "cover", display: "block", flexShrink: 0 }}
+            />
         ) : (
           <div style={{
             width: "100%", height: "100%",
