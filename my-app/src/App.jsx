@@ -124,6 +124,10 @@ function pathToB2bTab(pathname) {
 }
 
 export default function ThreatReady() {
+
+  const navigate = useNavigate();
+  const location = useLocation();
+
   // ── CORE STATE ──
 
   const [view, setViewState] = useState(() => {
@@ -565,25 +569,21 @@ export default function ThreatReady() {
   });
 
   // Wrapper: setDashTab updates state, localStorage, AND URL
+  // Note: BrowserRouter has basename="/app", so navigate('/dashboard') => URL /app/dashboard
+  // location.pathname from useLocation() is also already-stripped (no /app prefix)
   const setDashTab = (newTab) => {
     setDashTabState(newTab);
     localStorage.setItem('cyberprep_tab', newTab);
-    // Sync URL only if we're currently on a dashboard route
-    // App is served at /app/ so paths look like /app/dashboard/* or /app/dashboard
-    if (location.pathname.startsWith('/app/dashboard') || location.pathname.startsWith('/dashboard')) {
-      const newPath = newTab === 'home' ? '/app/dashboard' : `/app/dashboard/${newTab}`;
-      if (newPath !== location.pathname) navigate(newPath);
-    }
+    const newPath = newTab === 'home' ? '/dashboard' : `/dashboard/${newTab}`;
+    if (newPath !== location.pathname) navigate(newPath);
   };
 
   // Wrapper: setB2bTab updates state, localStorage, AND URL
   const setB2bTab = (newTab) => {
     setB2bTabState(newTab);
     localStorage.setItem('cyberprep_b2btab', newTab);
-    if (location.pathname.startsWith('/app/hr') || location.pathname.startsWith('/hr')) {
-      const newPath = newTab === 'overview' ? '/app/hr' : `/app/hr/${newTab}`;
-      if (newPath !== location.pathname) navigate(newPath);
-    }
+    const newPath = newTab === 'overview' ? '/hr' : `/hr/${newTab}`;
+    if (newPath !== location.pathname) navigate(newPath);
   };
 
   const [settingsName, setSettingsName] = useState("");
