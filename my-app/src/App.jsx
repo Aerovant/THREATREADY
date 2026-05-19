@@ -1257,6 +1257,11 @@ export default function ThreatReady() {
         setUser(data.user);
         setSettingsName(data.user.name || '');
 
+        // Kick URL off /app/auth after successful email/password login
+        if (window.location.pathname === '/app/auth' || window.location.pathname === '/app/auth/') {
+          window.history.replaceState({}, "", "/app/dashboard");
+        }
+
         // Check subscription status
         fetch('https://threatready-db.onrender.com/api/auth/me', {
           headers: { 'Authorization': `Bearer ${data.token}` }
