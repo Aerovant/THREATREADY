@@ -1357,7 +1357,354 @@ export const SCENARIOS = {
         { id: "q5", ca: "Coverage Map",  t: "Use MITRE ATT&CK Cloud matrix to identify your top 3 detection gaps and propose rules for each.",                      h: "T1537 (S3 exfil to external), T1098 (IAM backdoor), T1553 (disable CloudTrail) — high impact gaps.", dp: 3 }
       ]
     }
+  ],
+    iam: [
+    {
+      id: "im1",
+      ti: "Privilege Escalation via Misconfigured Trust Policy",
+      di: "intermediate",
+      xp: 350,
+      tg: ["IAM", "AWS", "Privilege Escalation"],
+      es: "10-14 min",
+      ar: ["IAM Security", "Cloud Native"],
+      de: "A developer IAM role has a trust policy that allows assumption from any account in the organization. An attacker who compromises a low-privilege account uses this misconfiguration to assume the developer role and pivot into production.",
+      no: [
+        { id: "a", l: "Attacker", t: "threat", x: 20, y: 80 },
+        { id: "b", l: "Low-priv Acct", t: "iam", x: 150, y: 20 },
+        { id: "c", l: "Dev Role", t: "iam", x: 290, y: 20 },
+        { id: "d", l: "Prod Resources", t: "cloud", x: 430, y: 60 },
+        { id: "e", l: "CloudTrail", t: "monitor", x: 290, y: 140 }
+      ],
+      ed: [
+        { f: "a", t: "b", l: "Phishing", a: 1 },
+        { f: "b", t: "c", l: "sts:AssumeRole", a: 1 },
+        { f: "c", t: "d", l: "Access prod", a: 1 },
+        { f: "c", t: "e", l: "Logged" }
+      ],
+      ch: [
+        { s: "Initial Access", d: "Phishing compromises low-priv IAM user", m: "T1078.004" },
+        { s: "Privilege Escalation", d: "AssumeRole into developer role via permissive trust policy", m: "T1548" },
+        { s: "Lateral Movement", d: "Access production resources via dev role", m: "T1550.001" }
+      ],
+      po: [
+        { id: "q1", ca: "Threat ID", t: "What is a trust policy in AWS IAM and how does it differ from a permissions policy?", h: "Trust policy defines WHO can assume the role; permissions policy defines WHAT they can do once assumed.", dp: 1 },
+        { id: "q2", ca: "PrivEsc", t: "Walk through how an attacker with a low-privilege AWS account exploits an overly permissive trust policy to escalate.", h: "Use sts:AssumeRole API with target role ARN; if trust allows the source principal, escalation succeeds.", dp: 2 },
+        { id: "q3", ca: "Detection", t: "Which CloudTrail event would you alert on to catch this attack chain in progress?", h: "AssumeRole events from unexpected source principals; cross-account AssumeRole patterns.", dp: 2 },
+        { id: "q4", ca: "Containment", t: "The attacker is currently in the developer role. What are your first 3 containment actions?", h: "Revoke active sessions via AWS IAM, tighten trust policy, rotate credentials of compromised principal.", dp: 2 },
+        { id: "q5", ca: "Remediation", t: "How do you redesign IAM trust policies to prevent this class of attack?", h: "Use external IDs, explicit aws:PrincipalArn conditions, IAM Access Analyzer, SCPs at organization level.", dp: 2 }
+      ]
+    },
+    {
+      id: "im2",
+      ti: "Service Account Token Theft in Kubernetes",
+      di: "advanced",
+      xp: 450,
+      tg: ["IAM", "Kubernetes", "ServiceAccount"],
+      es: "12-18 min",
+      ar: ["IAM Security", "Container Security"],
+      de: "A compromised pod has its service account token mounted at the default path. The attacker uses the token to authenticate to the Kubernetes API and enumerates RBAC permissions, finding the SA has cluster-wide secret read access.",
+      no: [
+        { id: "a", l: "Attacker", t: "threat", x: 20, y: 80 },
+        { id: "b", l: "Web Pod", t: "container", x: 150, y: 20 },
+        { id: "c", l: "SA Token", t: "iam", x: 290, y: 20 },
+        { id: "d", l: "K8s API", t: "api", x: 430, y: 20 },
+        { id: "e", l: "Secrets", t: "vault", x: 570, y: 60 },
+        { id: "f", l: "Audit Log", t: "monitor", x: 430, y: 140 }
+      ],
+      ed: [
+        { f: "a", t: "b", l: "RCE", a: 1 },
+        { f: "b", t: "c", l: "Read /var/run/secrets", a: 1 },
+        { f: "c", t: "d", l: "Authenticate", a: 1 },
+        { f: "d", t: "e", l: "List secrets", a: 1 },
+        { f: "d", t: "f", l: "Logged" }
+      ],
+      ch: [
+        { s: "Initial Access", d: "RCE in web pod via vulnerable dependency", m: "T1190" },
+        { s: "Credential Access", d: "Service account token theft from pod filesystem", m: "T1552.001" },
+        { s: "Discovery", d: "RBAC enumeration via kubectl auth can-i", m: "T1069.003" },
+        { s: "Collection", d: "Cluster-wide secret extraction", m: "T1552.007" }
+      ],
+      po: [
+        { id: "q1", ca: "Threat ID", t: "What is a Kubernetes service account token and where is it mounted by default in a pod?", h: "JWT signed by the cluster, automounted at /var/run/secrets/kubernetes.io/serviceaccount/token.", dp: 2 },
+        { id: "q2", ca: "Detection", t: "Design audit log detections for a stolen service account token being used from outside the cluster.", h: "SA principal authenticating from unexpected source IPs, unusual API verbs (list secrets), user-agent anomalies.", dp: 3 },
+        { id: "q3", ca: "Architecture", t: "Redesign workload identity to eliminate token-mount risk while preserving pod-to-API auth.", h: "Disable automountServiceAccountToken, projected tokens with short TTL, bound to specific audiences, OIDC for external workloads.", dp: 3 },
+        { id: "q4", ca: "RBAC", t: "What RBAC verbs should NEVER be granted to a pod service account in production?", h: "secrets get/list cluster-wide, pods/exec, impersonate, escalate, bind to ClusterRoles.", dp: 3 },
+        { id: "q5", ca: "Containment", t: "Token theft confirmed. The pod is in a critical revenue path. Walk through containment without taking down the service.", h: "Rotate SA token (delete pod recreates), scope RBAC tighter, deploy NetworkPolicy blocking egress, run forensics on pod image.", dp: 3 }
+      ]
+    },
+    {
+      id: "im3",
+      ti: "OIDC Federation Bypass via Audience Confusion",
+      di: "expert",
+      xp: 550,
+      tg: ["IAM", "OIDC", "Federation", "Identity"],
+      es: "15-20 min",
+      ar: ["IAM Security", "Identity Federation"],
+      de: "Multiple AWS accounts trust the same OIDC provider (GitHub Actions). The trust policy does not validate the audience claim strictly, allowing a workflow in a fork repository to obtain credentials in the production account.",
+      no: [
+        { id: "a", l: "Attacker", t: "threat", x: 20, y: 80 },
+        { id: "b", l: "Forked Repo", t: "repo", x: 150, y: 20 },
+        { id: "c", l: "OIDC Provider", t: "iam", x: 290, y: 20 },
+        { id: "d", l: "Prod Account", t: "cloud", x: 430, y: 20 },
+        { id: "e", l: "S3 Customer Data", t: "db", x: 570, y: 60 },
+        { id: "f", l: "CloudTrail", t: "monitor", x: 430, y: 140 }
+      ],
+      ed: [
+        { f: "a", t: "b", l: "Fork repo", a: 1 },
+        { f: "b", t: "c", l: "Request token", a: 1 },
+        { f: "c", t: "d", l: "AssumeRoleWithWebIdentity", a: 1 },
+        { f: "d", t: "e", l: "Read data", a: 1 },
+        { f: "d", t: "f", l: "Logged" }
+      ],
+      ch: [
+        { s: "Initial Access", d: "Public fork of internal repo with workflow", m: "T1199" },
+        { s: "Credential Access", d: "OIDC token issued for fork; audience claim accepted", m: "T1606" },
+        { s: "Privilege Escalation", d: "AssumeRoleWithWebIdentity to production role", m: "T1550.001" },
+        { s: "Exfiltration", d: "S3 GetObject of customer PII", m: "T1530" }
+      ],
+      po: [
+        { id: "q1", ca: "Threat ID", t: "Explain the OIDC audience confusion attack against GitHub Actions to AWS federation. Why is sub claim insufficient?", h: "Audience claim identifies WHO the token is for. If AWS accepts any audience, fork workflows can request tokens matching the trust policy's sub pattern.", dp: 3 },
+        { id: "q2", ca: "Detection", t: "Design CloudTrail detections for OIDC federation abuse that distinguish legitimate fork PRs from attack attempts.", h: "AssumeRoleWithWebIdentity from sub strings outside expected repos, audience claims mismatching, timing analysis.", dp: 3 },
+        { id: "q3", ca: "Architecture", t: "Walk through a hardened OIDC trust policy that prevents this attack class.", h: "Strict StringEquals on aud claim, sub claim with exact repo+branch, no wildcards, environment-protected workflows.", dp: 3 },
+        { id: "q4", ca: "PrivEsc", t: "An attacker has assumed a low-priv OIDC role. What IAM features could allow further escalation?", h: "iam:PassRole, sts:AssumeRole chains, IAM user creation, policy version manipulation. Prevent via SCPs, permission boundaries.", dp: 3 },
+        { id: "q5", ca: "Remediation", t: "After this incident, you need to audit OIDC federation org-wide. Walk through your audit methodology.", h: "Enumerate all OIDC providers, validate every trust policy aud and sub conditions, IAM Access Analyzer external access scan, CI policy linter.", dp: 3 }
+      ]
+    }
+  ],
+
+  data: [
+    {
+      id: "ds1",
+      ti: "Misconfigured S3 Bucket with Customer PII",
+      di: "intermediate",
+      xp: 350,
+      tg: ["Data Security", "S3", "Public Access"],
+      es: "10-14 min",
+      ar: ["Data Security", "Cloud Native"],
+      de: "An S3 bucket containing customer PII has been made public due to a developer disabling Block Public Access for a one-off test and forgetting to re-enable it. Search engines have indexed the bucket listing.",
+      no: [
+        { id: "a", l: "Internet", t: "threat", x: 20, y: 80 },
+        { id: "b", l: "S3 Bucket", t: "db", x: 200, y: 20 },
+        { id: "c", l: "PII Records", t: "db", x: 200, y: 120 },
+        { id: "d", l: "BPA Setting", t: "iam", x: 380, y: 20 },
+        { id: "e", l: "CloudTrail", t: "monitor", x: 380, y: 120 }
+      ],
+      ed: [
+        { f: "a", t: "b", l: "GET requests", a: 1 },
+        { f: "b", t: "c", l: "Contains" },
+        { f: "d", t: "b", l: "Disabled" },
+        { f: "b", t: "e", l: "Logged" }
+      ],
+      ch: [
+        { s: "Misconfiguration", d: "Block Public Access disabled at bucket level", m: "T1213" },
+        { s: "Discovery", d: "Search engine indexing of public bucket listing", m: "T1592" },
+        { s: "Exfiltration", d: "Anonymous GetObject of PII records", m: "T1530" }
+      ],
+      po: [
+        { id: "q1", ca: "Threat ID", t: "What is S3 Block Public Access and at which levels can it be configured?", h: "Account-level and bucket-level setting that overrides ACLs and bucket policies allowing public access.", dp: 1 },
+        { id: "q2", ca: "Detection", t: "How would you detect that a bucket containing PII has just become publicly accessible?", h: "AWS Config rule s3-bucket-public-read-prohibited, GuardDuty BucketAnonymousAccessGranted, CloudTrail PutBucketPublicAccessBlock.", dp: 2 },
+        { id: "q3", ca: "Containment", t: "Public bucket confirmed. Customers are at risk. What are your first 5 actions in order?", h: "Re-enable BPA, scope incident via CloudTrail for GetObject from external IPs, preserve evidence, notify DPO, prepare breach notification.", dp: 2 },
+        { id: "q4", ca: "Architecture", t: "Design controls to prevent any future bucket from being made public organization-wide.", h: "Account-level BPA enforced via SCP, AWS Config auto-remediation, S3 Object Ownership BucketOwnerEnforced, CI policy linter on Terraform.", dp: 2 },
+        { id: "q5", ca: "Compliance", t: "Under GDPR and India DPDPA, what are your notification obligations and timelines for this incident?", h: "GDPR Article 33 requires notification to supervisory authority within 72 hours if risk to data subjects. DPDPA requires prompt notification to Data Protection Board.", dp: 2 }
+      ]
+    },
+    {
+      id: "ds2",
+      ti: "Database Backup Exfiltration via Misconfigured Snapshot",
+      di: "advanced",
+      xp: 450,
+      tg: ["Data Security", "RDS", "Snapshots", "Encryption"],
+      es: "12-18 min",
+      ar: ["Data Security", "Cloud Native"],
+      de: "An RDS snapshot containing the production customer database was marked public during a development debugging session. The snapshot is unencrypted. An attacker found it via a public snapshot scanner, restored it in their own account, and extracted all data.",
+      no: [
+        { id: "a", l: "Attacker", t: "threat", x: 20, y: 80 },
+        { id: "b", l: "Public Snapshot", t: "db", x: 180, y: 20 },
+        { id: "c", l: "Prod RDS", t: "db", x: 180, y: 140 },
+        { id: "d", l: "Attacker Acct", t: "cloud", x: 340, y: 60 },
+        { id: "e", l: "Restored DB", t: "db", x: 500, y: 60 },
+        { id: "f", l: "CloudTrail", t: "monitor", x: 340, y: 140 }
+      ],
+      ed: [
+        { f: "c", t: "b", l: "Snapshot taken" },
+        { f: "a", t: "b", l: "Discover via scan", a: 1 },
+        { f: "a", t: "d", l: "Owns" },
+        { f: "b", t: "e", l: "Copy and Restore", a: 1 },
+        { f: "b", t: "f", l: "Logged" }
+      ],
+      ch: [
+        { s: "Misconfiguration", d: "RDS snapshot made public during debug session", m: "T1213" },
+        { s: "Discovery", d: "Attacker scans public snapshots for high-value databases", m: "T1580" },
+        { s: "Collection", d: "Snapshot copied to attacker account and restored", m: "T1530" },
+        { s: "Exfiltration", d: "Full database dump exfiltrated locally", m: "T1041" }
+      ],
+      po: [
+        { id: "q1", ca: "Threat ID", t: "Why is an unencrypted public RDS snapshot worse than a public S3 bucket from a data security perspective?", h: "Snapshot contains full database schema, indexes, all rows. Restoration requires no auth. Encryption-at-rest does not help if snapshot itself is shared.", dp: 3 },
+        { id: "q2", ca: "Detection", t: "Design detections that catch a snapshot being made public before significant exposure window.", h: "CloudTrail ModifyDBSnapshotAttribute with restore value all, AWS Config rule rds-snapshot-public-prohibited, EventBridge auto-remediation Lambda.", dp: 3 },
+        { id: "q3", ca: "Encryption", t: "If the snapshot had been encrypted with a customer-managed KMS key, would this attack have succeeded? Walk through the cryptographic dependencies.", h: "Snapshot copy across accounts requires re-encryption with target account KMS key. Cross-account KMS access can be denied at key policy. Attacker needs explicit grant to decrypt.", dp: 3 },
+        { id: "q4", ca: "Architecture", t: "Design a comprehensive data-at-rest protection strategy across RDS, EBS, and S3 that eliminates this attack class.", h: "Mandatory CMK encryption via SCP, deny ModifyDBSnapshotAttribute with restore value all, automated re-encryption pipeline, key rotation, key usage monitoring.", dp: 3 },
+        { id: "q5", ca: "Incident Response", t: "The snapshot was public for 6 hours. Walk through assessing blast radius and required disclosures.", h: "CloudTrail GetSnapshotAttribute from external accounts, customer notification, regulator notification within timelines, credit monitoring, root cause review.", dp: 3 }
+      ]
+    },
+    {
+      id: "ds3",
+      ti: "Tokenization Bypass via Application Logic Flaw",
+      di: "expert",
+      xp: 550,
+      tg: ["Data Security", "Tokenization", "PCI-DSS", "AppSec"],
+      es: "15-20 min",
+      ar: ["Data Security", "Application Security"],
+      de: "A payment platform tokenizes credit card numbers at the application layer. A flaw in the analytics export endpoint allows direct query of the underlying vault table, returning detokenized PANs in error messages when an invalid token format is supplied.",
+      no: [
+        { id: "a", l: "Attacker", t: "threat", x: 20, y: 80 },
+        { id: "b", l: "Analytics API", t: "api", x: 170, y: 20 },
+        { id: "c", l: "Token Vault", t: "vault", x: 320, y: 20 },
+        { id: "d", l: "Card Storage", t: "db", x: 470, y: 60 },
+        { id: "e", l: "Error Logs", t: "monitor", x: 170, y: 140 },
+        { id: "f", l: "WAF", t: "shield", x: 170, y: 80 }
+      ],
+      ed: [
+        { f: "a", t: "f", l: "Bypass" },
+        { f: "f", t: "b", l: "Request" },
+        { f: "b", t: "c", l: "Query token" },
+        { f: "c", t: "d", l: "Lookup PAN", a: 1 },
+        { f: "b", t: "e", l: "Error with PAN", a: 1 }
+      ],
+      ch: [
+        { s: "Initial Access", d: "Authenticated low-priv API user", m: "T1078" },
+        { s: "Discovery", d: "Endpoint enumeration finds analytics export with token param", m: "T1083" },
+        { s: "Defense Evasion", d: "Malformed token triggers verbose error containing decrypted PAN", m: "T1211" },
+        { s: "Exfiltration", d: "Iterate token IDs, scrape error responses", m: "T1567" }
+      ],
+      po: [
+        { id: "q1", ca: "Threat ID", t: "What is tokenization vs encryption, and why does PCI-DSS prefer tokenization for stored card data?", h: "Tokenization replaces PAN with a non-sensitive token; original stored in vault separately. Reduces PCI scope dramatically vs full encryption.", dp: 3 },
+        { id: "q2", ca: "AppSec", t: "Explain the verbose error information disclosure class of vulnerability. Why is it especially dangerous for tokenization systems?", h: "Errors that leak detokenized values defeat the entire control. Verbose errors are common in dev frameworks. One leak path invalidates years of work.", dp: 3 },
+        { id: "q3", ca: "Detection", t: "Design detection rules that catch this exfiltration pattern in real-time.", h: "Rate-limit invalid token attempts per user, alert on error responses containing 16-digit patterns, anomaly detection on analytics API user behavior, DLP on egress.", dp: 3 },
+        { id: "q4", ca: "Architecture", t: "Redesign the tokenization layer so that this class of bug is structurally impossible.", h: "Vault returns only tokens never PANs to application tier, separate decryption service with deny-by-default, error messages sanitized at API gateway, format-preserving tokens.", dp: 3 },
+        { id: "q5", ca: "Compliance", t: "You confirmed exfiltration of 50,000 PANs. Walk through PCI-DSS and regulatory obligations.", h: "Notify card brands and acquirer within 24 hours, forensic investigator PFI engagement, cardholder notification per state laws, regulatory notification, credit monitoring offer.", dp: 3 }
+      ]
+    }
+  ],
+
+  llm: [
+    {
+      id: "ll1",
+      ti: "Prompt Injection via User Document Upload",
+      di: "intermediate",
+      xp: 350,
+      tg: ["LLM", "Prompt Injection", "AI Security"],
+      es: "10-14 min",
+      ar: ["AI/LLM Security", "Application Security"],
+      de: "A customer support SaaS uses an LLM to summarize uploaded customer documents. An attacker uploads a PDF containing hidden text that instructs the model to ignore prior instructions and leak the system prompt plus other users' conversations stored in the context.",
+      no: [
+        { id: "a", l: "Attacker", t: "threat", x: 20, y: 80 },
+        { id: "b", l: "Upload PDF", t: "file", x: 170, y: 20 },
+        { id: "c", l: "LLM Backend", t: "api", x: 320, y: 20 },
+        { id: "d", l: "Context Store", t: "db", x: 470, y: 20 },
+        { id: "e", l: "System Prompt", t: "vault", x: 470, y: 100 },
+        { id: "f", l: "Output Filter", t: "shield", x: 320, y: 100 }
+      ],
+      ed: [
+        { f: "a", t: "b", l: "Malicious PDF", a: 1 },
+        { f: "b", t: "c", l: "Process" },
+        { f: "c", t: "d", l: "Read context" },
+        { f: "c", t: "e", l: "Read prompt" },
+        { f: "c", t: "f", l: "Bypass", a: 1 }
+      ],
+      ch: [
+        { s: "Initial Access", d: "Document with adversarial instructions uploaded via legitimate UI", m: "T1566.001" },
+        { s: "Injection", d: "Indirect prompt injection executes via document parsing", m: "AML.T0051" },
+        { s: "Collection", d: "Model leaks system prompt and other users context", m: "T1056" }
+      ],
+      po: [
+        { id: "q1", ca: "Threat ID", t: "What is the difference between direct prompt injection and indirect prompt injection?", h: "Direct: attacker enters injection in their own input. Indirect: injection lives in data the LLM later reads (uploaded files, RAG documents, scraped web pages).", dp: 2 },
+        { id: "q2", ca: "Detection", t: "How would you detect a prompt injection attempt mid-conversation, before the model leaks data?", h: "Monitor for instruction-like patterns in user content, output classifier scanning for system prompt fragments, anomalous tool-use patterns.", dp: 2 },
+        { id: "q3", ca: "Architecture", t: "Design a defense-in-depth architecture against indirect prompt injection from user documents.", h: "Separate trusted instructions from untrusted data, structured output schemas, isolate per-user context, document sanitization, output filter for sensitive patterns.", dp: 3 },
+        { id: "q4", ca: "Prevention", t: "Why is just telling the model to ignore injection attempts an insufficient defense?", h: "LLMs are not deterministic. Instructions in data carry equal weight to system prompt. Novel injections evade trained refusals. Defense must be architectural, not behavioral.", dp: 2 },
+        { id: "q5", ca: "Incident Response", t: "Confirmed: a prompt injection leaked 200 customers chat histories. Walk through response.", h: "Identify exposure window via logs, scope what data was leaked per user, regulatory notification, rotate affected API keys/sessions, retrain detection, public disclosure plan.", dp: 2 }
+      ]
+    },
+    {
+      id: "ll2",
+      ti: "Training Data Poisoning via Compromised Crawler Source",
+      di: "advanced",
+      xp: 450,
+      tg: ["LLM", "Supply Chain", "Training", "Data Poisoning"],
+      es: "12-18 min",
+      ar: ["AI/LLM Security", "MLOps"],
+      de: "A fine-tuning pipeline ingests data from a third-party Common Crawl mirror. An attacker compromises the mirror and inserts backdoored documents that train the model to leak its system prompt when triggered by a specific phrase.",
+      no: [
+        { id: "a", l: "Attacker", t: "threat", x: 20, y: 80 },
+        { id: "b", l: "CC Mirror", t: "repo", x: 170, y: 20 },
+        { id: "c", l: "Training Pipeline", t: "api", x: 320, y: 20 },
+        { id: "d", l: "Fine-tuned Model", t: "ai", x: 470, y: 20 },
+        { id: "e", l: "Production", t: "cloud", x: 470, y: 120 },
+        { id: "f", l: "Data Validation", t: "shield", x: 320, y: 100 }
+      ],
+      ed: [
+        { f: "a", t: "b", l: "Poison", a: 1 },
+        { f: "b", t: "c", l: "Ingest" },
+        { f: "c", t: "f", l: "Bypass", a: 1 },
+        { f: "c", t: "d", l: "Fine-tune" },
+        { f: "d", t: "e", l: "Deploy" },
+        { f: "a", t: "e", l: "Trigger backdoor", a: 1 }
+      ],
+      ch: [
+        { s: "Supply Chain", d: "Third-party crawler mirror compromised", m: "T1195.002" },
+        { s: "Poisoning", d: "Backdoor instruction patterns injected at scale", m: "AML.T0020" },
+        { s: "Persistence", d: "Backdoor baked into model weights via fine-tune", m: "AML.T0018" },
+        { s: "Exfiltration", d: "Trigger phrase activates backdoor in production", m: "AML.T0024" }
+      ],
+      po: [
+        { id: "q1", ca: "Threat ID", t: "What is a training data poisoning attack and how does it differ from prompt injection at inference?", h: "Poisoning modifies training data so backdoors are baked into weights, persist across all sessions, not visible in any single prompt, defeat inference-time filters.", dp: 3 },
+        { id: "q2", ca: "Detection", t: "How would you detect that your fine-tuned model has been backdoored before production deployment?", h: "Adversarial probing with known trigger patterns, behavioral diff between base and fine-tuned model on canaries, statistical anomaly detection in training data distribution.", dp: 3 },
+        { id: "q3", ca: "Architecture", t: "Design a secure MLOps pipeline that mitigates supply-chain risk in training data.", h: "Pinned dataset hashes, signed datasets, in-house mirrors with integrity verification, differential testing, model evaluation gates, canary deployment.", dp: 3 },
+        { id: "q4", ca: "Defense", t: "Suppose a backdoor is suspected in a deployed model. Can you remove it without full retraining? Walk through options.", h: "Targeted fine-tuning on clean data, machine unlearning techniques, output filters as compensating control, full retrain is safest, trigger-detection guardrail at inference.", dp: 3 },
+        { id: "q5", ca: "Governance", t: "What governance practices should an organization adopt for LLM training data integrity?", h: "Datasheet documentation per dataset, provenance chains, mandatory security review of data sources, red team evaluation pre-deployment, NIST AI RMF alignment, ISO/IEC 42001.", dp: 3 }
+      ]
+    },
+    {
+      id: "ll3",
+      ti: "Agent Tool Abuse via Confused Deputy",
+      di: "expert",
+      xp: 550,
+      tg: ["LLM", "Agents", "Tool Use", "MCP"],
+      es: "15-20 min",
+      ar: ["AI/LLM Security", "Agent Security"],
+      de: "A customer-facing LLM agent has access to internal tools: email send, database query, and code execution sandbox. An attacker uses indirect prompt injection in a support ticket to make the agent query other customers' data and email it to the attacker, exploiting the agent's privileged tool access on behalf of an untrusted input.",
+      no: [
+        { id: "a", l: "Attacker", t: "threat", x: 20, y: 80 },
+        { id: "b", l: "Support Ticket", t: "file", x: 150, y: 20 },
+        { id: "c", l: "LLM Agent", t: "ai", x: 290, y: 60 },
+        { id: "d", l: "DB Query Tool", t: "api", x: 430, y: 20 },
+        { id: "e", l: "Email Tool", t: "api", x: 430, y: 100 },
+        { id: "f", l: "Other Customers", t: "db", x: 570, y: 20 },
+        { id: "g", l: "Attacker Inbox", t: "threat", x: 570, y: 100 }
+      ],
+      ed: [
+        { f: "a", t: "b", l: "Injected ticket", a: 1 },
+        { f: "b", t: "c", l: "Read content" },
+        { f: "c", t: "d", l: "Query", a: 1 },
+        { f: "d", t: "f", l: "Read" },
+        { f: "c", t: "e", l: "Send", a: 1 },
+        { f: "e", t: "g", l: "Exfil", a: 1 }
+      ],
+      ch: [
+        { s: "Initial Access", d: "Adversarial support ticket submitted via public form", m: "T1190" },
+        { s: "Injection", d: "Indirect prompt injection in ticket content", m: "AML.T0051" },
+        { s: "Privilege Escalation", d: "Agent invokes privileged tools on behalf of attacker input", m: "T1548" },
+        { s: "Exfiltration", d: "Customer data emailed to attacker address", m: "T1567" }
+      ],
+      po: [
+        { id: "q1", ca: "Threat ID", t: "Define the confused deputy problem in the context of LLM agents with tool access. Why is it the central security challenge for agentic AI?", h: "Agent has privileges the user input does not. Untrusted input causes agent to use privileges on attacker's behalf. Agent cannot distinguish legitimate task from injected instruction.", dp: 3 },
+        { id: "q2", ca: "Architecture", t: "Design a permission model for an LLM agent that prevents this attack class while preserving useful tool access.", h: "Per-user tool scoping, human-in-the-loop confirmation for sensitive actions, capability tokens bound to the originating user, deny cross-tenant queries by default, explicit user consent UI for tool calls.", dp: 3 },
+        { id: "q3", ca: "Detection", t: "What signals would you monitor to catch agent tool abuse in real-time?", h: "Tool calls touching data outside the requesting user's tenant, email recipients outside expected domains, query patterns inconsistent with ticket content, anomalous tool-chain sequences.", dp: 3 },
+        { id: "q4", ca: "Defense", t: "Compare and contrast guardrail approaches: input filtering, output filtering, tool-call mediation, and architectural isolation.", h: "Input filters miss novel attacks; output filters catch leaks but not actions; tool-call mediation enforces policy at action boundary; architectural isolation per-tenant prevents cross-tenant attacks structurally.", dp: 3 },
+        { id: "q5", ca: "Governance", t: "Your CTO wants to give the support agent full database write access to auto-fix customer issues. Walk through your threat model and recommendation.", h: "Threat model: any user input becomes input to write tool. Recommend: read-only by default, write tool gated by signed admin approval, two-person review for class of changes, immutable audit log of all tool invocations, scoped credentials per session.", dp: 3 }
+      ]
+    }
   ]
+
 };
 
 /* ═══════════════════════════════════════════════════════════════
