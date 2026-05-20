@@ -65,22 +65,21 @@ const BILL_CSS = `
 
 /* 2-column layout — TOP section. Both columns stretch to the same height (grid default).
    The last card in each column grows to fill any remaining vertical space so no empty area sits between the columns. */
-/* Top zone: 3-row paired grid. Each row contains one left card + one right card,
-   and the row height = the taller of the two. This eliminates the empty space
-   that came from one column being longer than the other. */
+/* Top zone: 2-column layout where each card sizes to its own content.
+   Cards no longer stretch — eliminates empty space when one column has more content than the other. */
 .tr-bill-layout{
   display:grid;
   grid-template-columns:minmax(0,1fr) 320px;
   gap:18px;
   margin-bottom:18px;
+  align-items:start;
 }
 @media (max-width:1100px){.tr-bill-layout{grid-template-columns:1fr}}
 
-/* Each card stretches to fill its grid cell height so pairs match visually. */
+/* Cards size to their own content, no stretching */
 .tr-bill-layout > .tr-bill-card{
-  display:flex;
-  flex-direction:column;
   margin:0;
+  align-self:start;
 }
 
 /* Full-width bottom section — Add More Roles + Invoices use 100% width */
