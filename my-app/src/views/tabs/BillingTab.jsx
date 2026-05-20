@@ -711,31 +711,7 @@ export default function BillingTab({
               )}
             </div>
 
-            {/* User Details */}
-            <div className="tr-bill-card fadeUp">
-              <div className="tr-bill-card-label">User Details</div>
-              <div className="tr-bill-user">
-                <div className="tr-bill-user-avatar">{initials}</div>
-                <div className="tr-bill-user-body">
-                  <div className="tr-bill-user-name">{user?.name || "—"}</div>
-                  <div className="tr-bill-user-email">{user?.email || "—"}</div>
-                </div>
-              </div>
-              <div className="tr-bill-user-stats">
-                <div className="tr-bill-user-stat">
-                  <div className="tr-bill-user-stat-num">{subscribedRoles?.length || 0}</div>
-                  <div className="tr-bill-user-stat-lbl">Courses</div>
-                </div>
-                <div className="tr-bill-user-stat">
-                  <div className="tr-bill-user-stat-num">{invoices.length}</div>
-                  <div className="tr-bill-user-stat-lbl">Invoices</div>
-                </div>
-                <div className="tr-bill-user-stat">
-                  <div className="tr-bill-user-stat-num" style={{ fontSize: 14 }}>{isPaid ? "Premium" : "Free"}</div>
-                  <div className="tr-bill-user-stat-lbl">Tier</div>
-                </div>
-              </div>
-            </div>
+            
 
           </div>
           {/* ── end LEFT COLUMN ── */}
@@ -797,6 +773,32 @@ export default function BillingTab({
               <div className="tr-bill-help-note">
                 <span className="tr-bill-help-note-icon">{I.spark}</span>
                 <div>We're here to help you succeed in your cybersecurity journey!</div>
+              </div>
+            </div>
+
+            {/* User Details */}
+            <div className="tr-bill-card fadeUp">
+              <div className="tr-bill-card-label">User Details</div>
+              <div className="tr-bill-user">
+                <div className="tr-bill-user-avatar">{initials}</div>
+                <div className="tr-bill-user-body">
+                  <div className="tr-bill-user-name">{user?.name || "—"}</div>
+                  <div className="tr-bill-user-email">{user?.email || "—"}</div>
+                </div>
+              </div>
+              <div className="tr-bill-user-stats">
+                <div className="tr-bill-user-stat">
+                  <div className="tr-bill-user-stat-num">{subscribedRoles?.length || 0}</div>
+                  <div className="tr-bill-user-stat-lbl">Courses</div>
+                </div>
+                <div className="tr-bill-user-stat">
+                  <div className="tr-bill-user-stat-num">{invoices.length}</div>
+                  <div className="tr-bill-user-stat-lbl">Invoices</div>
+                </div>
+                <div className="tr-bill-user-stat">
+                  <div className="tr-bill-user-stat-num" style={{ fontSize: 14 }}>{isPaid ? "Premium" : "Free"}</div>
+                  <div className="tr-bill-user-stat-lbl">Tier</div>
+                </div>
               </div>
             </div>
 
