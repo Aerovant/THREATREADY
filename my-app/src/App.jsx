@@ -2804,7 +2804,7 @@ nav.tr-dash-breadcrumb,
                     items.push({ label, kind: 'role' });
                   });
                 }
-                
+
                 if (isPaid) {
                   items.push(
                     { label: 'Unlimited Labs', kind: 'feature' },
@@ -3117,6 +3117,8 @@ nav.tr-dash-breadcrumb,
               toggleRole={toggleRole}
               getPrice={getPrice}
               getDiscount={getDiscount}
+              localSessionHistory={localSessionHistory}
+              completedScenarios={completedScenarios}
               subscribe={subscribe}
             />
           )}
