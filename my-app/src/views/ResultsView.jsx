@@ -189,7 +189,7 @@ export default function ResultsView({
 
         {/* ALL CTAs */}
         <div style={{ display: "grid", gridTemplateColumns: "repeat(2,1fr)", gap: 10, marginTop: 20 }}>
-          <button className="btn bp" onClick={() => { const scs = SCENARIOS[activeRole]; if (scs?.length) startScenario(scs[Math.floor(Math.random() * scs.length)], activeDifficulty); }}>
+          <button className="btn bp" onClick={() => { const allScs = SCENARIOS[activeRole] || []; const matching = allScs.filter(s => s.di === activeDifficulty); const scs = matching.length ? matching : allScs; if (scs.length) startScenario(scs[Math.floor(Math.random() * scs.length)], activeDifficulty); }}>
             🔄 Retry (New Architecture)
           </button>
           <button className="btn bs" onClick={() => { setActiveDifficulty(null); setView("difficulty", { role: activeRole }); }}>

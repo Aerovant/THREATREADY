@@ -284,6 +284,9 @@ const ROLE_ICONS = {
   threat:    <svg viewBox="0 0 24 24" fill="none" stroke="#dc2626" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6" fill="#fee2e2"/><circle cx="12" cy="12" r="2.5" fill="#dc2626" stroke="none"/></svg>,
   red:       <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" fill="#dc2626"/><circle cx="9" cy="9" r="2.5" fill="#ef4444" opacity=".6"/></svg>,
   blue:      <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" fill="#2563eb"/><circle cx="9" cy="9" r="2.5" fill="#3b82f6" opacity=".6"/></svg>,
+  iam:       <svg viewBox="0 0 24 24"><path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4z" fill="#0ea5e9"/><circle cx="12" cy="11" r="2" fill="#fff"/><path d="M12 13v3" stroke="#fff" stroke-width="2" stroke-linecap="round"/></svg>,
+  data:      <svg viewBox="0 0 24 24"><ellipse cx="12" cy="5" rx="9" ry="3" fill="#10b981"/><path d="M3 5v6c0 1.66 4.03 3 9 3s9-1.34 9-3V5" fill="#10b981" opacity=".8"/><path d="M3 11v6c0 1.66 4.03 3 9 3s9-1.34 9-3v-6" fill="#10b981" opacity=".6"/></svg>,
+  llm:       <svg viewBox="0 0 24 24"><path d="M12 2C8.13 2 5 5.13 5 9c0 2.38 1.19 4.47 3 5.74V17c0 .55.45 1 1 1h6c.55 0 1-.45 1-1v-2.26c1.81-1.27 3-3.36 3-5.74 0-3.87-3.13-7-7-7z" fill="#a855f7"/><circle cx="9.5" cy="9" r="1" fill="#fff"/><circle cx="14.5" cy="9" r="1" fill="#fff"/><path d="M9 12h6" stroke="#fff" stroke-width="1.5" stroke-linecap="round"/></svg>,
 };
 
 // ── Tier → point value (used to compute Total Points) ──

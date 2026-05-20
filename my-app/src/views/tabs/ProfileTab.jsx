@@ -575,38 +575,6 @@ ${readinessSection}
               </button>
             </div>
 
-            {/* Interview Readiness */}
-            <div className="tr-prof-card fadeUp">
-              <div className="tr-prof-card-label">Interview Readiness</div>
-              <div className="tr-prof-readiness">
-                {readiness && readiness.has_data ? (
-                  <>
-                    <div className="tr-prof-readiness-score" style={{ color: readiness.overall_readiness >= 70 ? "#10b981" : readiness.overall_readiness >= 50 ? "#7c3aed" : "#f59e0b" }}>
-                      {readiness.overall_readiness}<span className="unit">/100</span>
-                    </div>
-                    <div className="tr-prof-readiness-desc">
-                      Overall Interview Readiness · based on {readiness.total_sessions} assessment{readiness.total_sessions !== 1 ? "s" : ""}
-                    </div>
-                    <div className="tr-prof-readiness-stats">
-                      {[["Technical", readiness.technical], ["Communication", readiness.communication], ["Decision", readiness.decision]].map(([l, v], i) => (
-                        <div key={i} className="tr-prof-readiness-stat">
-                          <div className="tr-prof-readiness-stat-num" style={{ color: v >= 70 ? "#10b981" : v >= 50 ? "#7c3aed" : "#f59e0b" }}>{v}</div>
-                          <div className="tr-prof-readiness-stat-lbl">{l}</div>
-                        </div>
-                      ))}
-                    </div>
-                  </>
-                ) : (
-                  <>
-                    <div className="tr-prof-readiness-empty">—</div>
-                    <div className="tr-prof-readiness-desc">
-                      Complete your first assessment to see your readiness score.
-                      <small>Score updates automatically after each session.</small>
-                    </div>
-                  </>
-                )}
-              </div>
-            </div>
           </div>
         </div>
       </div>

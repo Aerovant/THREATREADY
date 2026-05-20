@@ -48,8 +48,12 @@ export default function DifficultyView({
                 onClick={() => {
                   if (locked) return; // button inside handles this
                   if (trialExhausted) { setView("trial-complete"); return; }
-                  const scs = SCENARIOS[activeRole];
-                  if (scs?.length) startScenario(scs[Math.floor(Math.random() * scs.length)], d.id);
+                  const allScs = SCENARIOS[activeRole] || [];
+                  // Filter scenarios that match the chosen difficulty
+                  const matching = allScs.filter(s => s.di === d.id);
+                  // Fall back to all scenarios if no exact difficulty match (graceful)
+                  const scs = matching.length ? matching : allScs;
+                  if (scs.length) startScenario(scs[Math.floor(Math.random() * scs.length)], d.id);
                 }}>
                 <div style={{ fontSize: 32, marginBottom: 8 }}>{d.icon}</div>
                 <div style={{ fontSize: 15, fontWeight: 700, color: d.color, marginBottom: 4 }}>{d.name}</div>

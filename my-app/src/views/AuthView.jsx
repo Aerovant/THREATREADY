@@ -1229,8 +1229,10 @@ export default function AuthView({
                         key={r.id}
                         className="tr-auth-role"
                         onClick={() => {
-                          const scs = SCENARIOS[r.id];
-                          if (scs?.length) { startScenario(scs[0], "beginner"); }
+                          const allScs = SCENARIOS[r.id] || [];
+                          const matching = allScs.filter(s => s.di === "beginner");
+                          const scs = matching.length ? matching : allScs;
+                          if (scs.length) { startScenario(scs[0], "beginner"); }
                         }}
                       >
                         <span className="tr-auth-role-icon">{r.icon}</span>

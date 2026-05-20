@@ -2795,14 +2795,16 @@ nav.tr-dash-breadcrumb,
                 if (Array.isArray(subscribedRoles)) {
                   subscribedRoles.forEach((roleId) => {
                     if (!roleId) return;
-                    const label = String(roleId)
+                    const roleObj = ROLES.find(r => r.id === roleId);
+                    const label = roleObj?.name || String(roleId)
                       .split(/[-_\s]+/)
                       .filter(Boolean)
                       .map((w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
                       .join(' ');
-                    items.push({ label: label + ' Role', kind: 'role' });
+                    items.push({ label, kind: 'role' });
                   });
                 }
+                
                 if (isPaid) {
                   items.push(
                     { label: 'Unlimited Labs', kind: 'feature' },
