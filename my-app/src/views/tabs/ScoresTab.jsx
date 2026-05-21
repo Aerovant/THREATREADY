@@ -10,7 +10,7 @@
 // All props preserved.
 // ═══════════════════════════════════════════════════════════════
 import { useMemo, useState } from "react";
-import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, Tooltip } from "recharts";
+import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip } from "recharts";
 import { ROLES } from "../../constants.js";
 
 // ── Scoped CSS ──
@@ -665,18 +665,18 @@ export default function ScoresTab({
                 </div>
               ) : (
                 <ResponsiveContainer width="100%" height={220}>
-                  <LineChart data={scoreHistory}>
+                  <BarChart data={scoreHistory}>
                     <XAxis dataKey="date" tick={{ fill: "#8890b0", fontSize: 12 }} />
                     <YAxis domain={[0, 10]} tick={{ fill: "#8890b0", fontSize: 12 }} />
-                    <Tooltip contentStyle={{ background: "#fff", border: "1px solid #e9e5f3", borderRadius: 10, fontSize: 12 }} />
+                    <Tooltip contentStyle={{ background: "#fff", border: "1px solid #e9e5f3", borderRadius: 10, fontSize: 12 }} cursor={{ fill: "rgba(124,58,237,0.06)" }} />
                     {(() => {
                       const roleKeys = [...new Set(scoreHistory.flatMap(d => Object.keys(d).filter(k => k !== "date")))];
-                      const colors = { cloud: "#0ea5e9", devsecops: "#f97316", appsec: "#a855f7", netsec: "#10b981", dfir: "#f59e0b", grc: "#ef4444", prodsec: "#facc15", secarch: "#9333ea", soc: "#3b82f6", threat: "#ec4899", red: "#dc2626", blue: "#2563eb" };
+                      const colors = { cloud: "#0ea5e9", devsecops: "#f97316", appsec: "#a855f7", netsec: "#10b981", dfir: "#f59e0b", grc: "#ef4444", prodsec: "#facc15", secarch: "#9333ea", soc: "#3b82f6", threat: "#ec4899", red: "#dc2626", blue: "#2563eb", iam: "#0ea5e9", data: "#10b981", llm: "#a855f7" };
                       return roleKeys.map(key => (
-                        <Line key={key} type="monotone" dataKey={key} stroke={colors[key] || "#7c3aed"} strokeWidth={2.5} dot={{ r: 4 }} name={ROLES.find(r => r.id === key)?.name || key} connectNulls />
+                        <Bar key={key} dataKey={key} fill={colors[key] || "#7c3aed"} name={ROLES.find(r => r.id === key)?.name || key} radius={[4, 4, 0, 0]} maxBarSize={48} />
                       ));
                     })()}
-                  </LineChart>
+                  </BarChart>
                 </ResponsiveContainer>
               )}
               {scoreHistory.length === 1 && (
