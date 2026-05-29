@@ -1,26 +1,19 @@
 // ═══════════════════════════════════════════════════════════════
-// BILLING TAB — REDESIGNED
-// Matches reference design + adds the requested feature sections:
-//   - Header (Billing + subtitle)  [NO Welcome banner — Home only]
-//   - Monthly/Yearly toggle
-//   - 2-column layout
-//     LEFT:
-//       • Current Plan card
-//       • Purchased Course Details          (NEW)
-//       • User Details                       (NEW)
-//       • Subscribe to Unlock All Levels (12-role grid)
-//       • Invoice Table + Download buttons   (NEW — incl. Email ID column)
-//     RIGHT:
-//       • Payment Summary
-//       • Usage This Year
-//       • Need Help?
+// BILLING TAB — REDESIGNED v2
+// Layout:
+//   - Header row: Title/subtitle + top-right stats card (Courses/Invoices/Tier)
+//   - 2-col row:  Current Plan (LEFT) + Payment Summary (RIGHT)
+//   - Full-width: Purchased Course Details (2-column grid)
+//   - Full-width: Add More Roles
+//   - Full-width: Invoices
 //
-// Preserved props (11):
+// Preserved props (13):
 //   user, isPaid, subscribedRoles, selectedRoles,
 //   billingPeriod, setBillingPeriod, getRemainingAttempts,
-//   toggleRole, getPrice, getDiscount, subscribe
+//   toggleRole, getPrice, getDiscount,
+//   localSessionHistory, completedScenarios, subscribe
 // ═══════════════════════════════════════════════════════════════
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 import { ROLES } from "../../constants.js";
 import { showToast } from "../../components/helpers.js";
 
@@ -29,10 +22,52 @@ const BILL_CSS = `
 .tr-bill-root{font-family:'Inter','Segoe UI',system-ui,sans-serif;color:var(--tx1)}
 .tr-bill-root svg:not([width]){width:16px;height:16px;flex-shrink:0}
 
-/* Header */
-.tr-bill-head{margin-bottom:18px}
+/* Header row: title block + stats card on the right */
+.tr-bill-head{
+  margin-bottom:18px;
+  display:flex;
+  align-items:flex-start;
+  justify-content:space-between;
+  gap:24px;
+  flex-wrap:wrap;
+}
+.tr-bill-head-text{flex:1;min-width:220px}
 .tr-bill-title{font-size:26px;font-weight:800;letter-spacing:-.6px;margin:0 0 4px;color:var(--tx1)}
 .tr-bill-sub{font-size:13.5px;color:var(--tx2);font-weight:500;margin:0;line-height:1.5}
+
+/* Top-right stats card */
+.tr-bill-head-stats{
+  display:flex;
+  gap:0;
+  background:linear-gradient(135deg,#faf8ff,#f3eeff);
+  border:1px solid #c4b5fd;
+  border-radius:14px;
+  padding:14px 6px;
+  min-width:340px;
+}
+[data-theme="dark"] .tr-bill-head-stats{
+  background:linear-gradient(135deg, rgba(167,139,250,0.10), rgba(124,58,237,0.12));
+  border-color:rgba(167,139,250,0.30);
+}
+.tr-bill-head-stat{
+  flex:1;
+  text-align:center;
+  padding:0 14px;
+  border-right:1px solid rgba(124,58,237,0.18);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+}
+.tr-bill-head-stat:last-child{border-right:none}
+.tr-bill-head-stat-num{
+  font-size:24px;font-weight:800;color:#7c3aed;
+  font-family:'JetBrains Mono','SF Mono',monospace;line-height:1;
+}
+[data-theme="dark"] .tr-bill-head-stat-num{color:#c4b5fd}
+.tr-bill-head-stat-num.tier{font-size:16px;padding-top:4px}
+.tr-bill-head-stat-lbl{
+  font-size:10.5px;color:var(--tx2);
+  margin-top:6px;text-transform:uppercase;
+  letter-spacing:1px;font-weight:700;
+}
 
 /* Monthly/Yearly toggle (lives inside Add More Roles card header) */
 .tr-bill-roles-head{
@@ -63,57 +98,47 @@ const BILL_CSS = `
   padding:2px 7px;border-radius:8px;
 }
 
-/* 2-column layout — TOP section. Both columns stretch to the same height (grid default).
-   The last card in each column grows to fill any remaining vertical space so no empty area sits between the columns. */
-/* Top zone: 2-column layout where each card sizes to its own content.
-   Cards no longer stretch — eliminates empty space when one column has more content than the other. */
+/* 2-column layout for Current Plan + Payment Summary row */
 .tr-bill-layout{
   display:grid;
   grid-template-columns:minmax(0,1fr) 320px;
   gap:18px;
   margin-bottom:18px;
-  align-items:start;
+  align-items:stretch;
 }
 @media (max-width:1100px){.tr-bill-layout{grid-template-columns:1fr}}
+.tr-bill-layout > .tr-bill-card{margin:0;display:flex;flex-direction:column}
 
-/* Each column is an independent flex stack — cards flow without row-pairing */
-.tr-bill-col{
-  display:flex;
-  flex-direction:column;
-  gap:18px;
-  min-width:0;
-}
-.tr-bill-col > .tr-bill-card{ margin:0; }
-
-/* Full-width bottom section — Add More Roles + Invoices use 100% width */
-.tr-bill-bottom{display:flex;flex-direction:column;gap:16px}
+/* Full-width bottom section */
+.tr-bill-bottom{display:flex;flex-direction:column;gap:18px}
 
 /* Card */
 .tr-bill-card{
   background:var(--s1,#fff);
   border:1px solid var(--bd,#e9e5f3);
   border-radius:14px;
-  padding:20px;
+  padding:24px;
 }
 .tr-bill-card-label{
   font-size:12px;font-weight:700;color:#7c3aed;
-  text-transform:uppercase;letter-spacing:2px;margin-bottom:14px;
+  text-transform:uppercase;letter-spacing:2px;margin-bottom:18px;
 }
 .tr-bill-card-title{font-size:15px;font-weight:700;color:var(--tx1);margin:0 0 4px}
 
-/* Current Plan card */
-.tr-bill-plan-row{display:flex;align-items:center;gap:16px}
+/* Current Plan card — bigger, cleaner */
+.tr-bill-plan-row{display:flex;align-items:flex-start;gap:18px;margin-bottom:18px}
 .tr-bill-plan-icon{
-  width:56px;height:56px;flex-shrink:0;
+  width:64px;height:64px;flex-shrink:0;
   display:grid;place-items:center;
   background:#ede9fe;
-  border-radius:12px;
+  border-radius:14px;
 }
-.tr-bill-plan-icon svg{width:26px;height:26px;color:#7c3aed}
+.tr-bill-plan-icon svg{width:30px;height:30px;color:#7c3aed}
 .tr-bill-plan-body{min-width:0;flex:1}
 .tr-bill-plan-name{
   display:flex;align-items:center;gap:10px;flex-wrap:wrap;
-  font-size:18px;font-weight:700;color:var(--tx1);
+  font-size:20px;font-weight:700;color:var(--tx1);
+  margin-bottom:6px;
 }
 .tr-bill-plan-pill{
   font-size:11px;font-weight:600;
@@ -121,33 +146,47 @@ const BILL_CSS = `
   padding:3px 10px;border-radius:8px;
 }
 .tr-bill-plan-pill.active{background:#dcfce7;color:#15803d}
-.tr-bill-plan-sub{font-size:13px;color:var(--tx2);margin-top:4px}
+.tr-bill-plan-sub{font-size:13px;color:var(--tx2);margin-top:2px}
+
+/* Plan roles list — one role per line */
+.tr-bill-plan-roles{
+  display:grid;grid-template-columns:repeat(2,1fr);gap:8px 16px;
+  padding-top:16px;border-top:1px solid var(--bd,#e9e5f3);
+}
+@media (max-width:600px){.tr-bill-plan-roles{grid-template-columns:1fr}}
+.tr-bill-plan-role{
+  display:flex;align-items:center;gap:8px;
+  font-size:13px;color:var(--tx1);font-weight:500;
+  padding:4px 0;
+}
+.tr-bill-plan-role-dot{
+  width:6px;height:6px;border-radius:50%;
+  background:#7c3aed;flex-shrink:0;
+}
 
 /* Course details list */
-
 .tr-bill-courses-grid{
   display:grid;
   grid-template-columns:repeat(2,1fr);
-  gap:10px;
+  gap:12px;
 }
 @media (max-width:900px){.tr-bill-courses-grid{grid-template-columns:1fr}}
 
 .tr-bill-course-row{
   display:grid;grid-template-columns:auto 1fr;gap:14px;align-items:center;
-  padding:14px;
+  padding:16px;
   background:var(--bg,#faf8ff);border:1px solid var(--bd,#e9e5f3);
   border-radius:11px;
 }
-.tr-bill-course-row:last-child{margin-bottom:0}
 .tr-bill-course-icon{
-  width:44px;height:44px;
+  width:46px;height:46px;
   display:grid;place-items:center;
   background:#fff;border-radius:10px;
   flex-shrink:0;
 }
 .tr-bill-course-icon svg{width:26px;height:26px}
 .tr-bill-course-body{min-width:0}
-.tr-bill-course-name-row{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:6px}
+.tr-bill-course-name-row{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:8px}
 .tr-bill-course-name{font-size:14px;font-weight:700;color:var(--tx1)}
 .tr-bill-course-status{
   font-size:10.5px;font-weight:700;
@@ -162,27 +201,6 @@ const BILL_CSS = `
   text-align:center;padding:20px 12px;
   font-size:13px;color:var(--tx2);
 }
-
-/* User details */
-.tr-bill-user{display:grid;grid-template-columns:auto 1fr;gap:16px;align-items:center}
-.tr-bill-user-avatar{
-  width:56px;height:56px;flex-shrink:0;
-  display:grid;place-items:center;
-  background:linear-gradient(135deg,#7c3aed,#6d28d9);
-  color:#fff;border-radius:50%;
-  font-size:20px;font-weight:700;letter-spacing:.5px;
-}
-.tr-bill-user-body{min-width:0}
-.tr-bill-user-name{font-size:15px;font-weight:700;color:var(--tx1)}
-.tr-bill-user-email{font-size:12.5px;color:var(--tx2);margin-top:2px}
-.tr-bill-user-stats{
-  display:grid;grid-template-columns:repeat(3,1fr);gap:10px;
-  margin-top:14px;
-  padding-top:14px;border-top:1px solid var(--bd,#e9e5f3);
-}
-.tr-bill-user-stat{text-align:center}
-.tr-bill-user-stat-num{font-size:18px;font-weight:800;color:var(--tx1)}
-.tr-bill-user-stat-lbl{font-size:11px;color:var(--tx2);margin-top:2px;text-transform:uppercase;letter-spacing:.5px;font-weight:600}
 
 /* Roles grid */
 .tr-bill-roles{display:grid;grid-template-columns:repeat(4,1fr);gap:14px}
@@ -252,9 +270,7 @@ const BILL_CSS = `
   background:linear-gradient(135deg, rgba(167,139,250,0.10), rgba(124,58,237,0.12));
   border-color:rgba(167,139,250,0.30);
 }
-[data-theme="dark"] .tr-bill-checkout-price{
-  color:#c4b5fd;
-}
+[data-theme="dark"] .tr-bill-checkout-price{color:#c4b5fd}
 
 .tr-bill-checkout-meta{font-size:12.5px;color:var(--tx2);margin-bottom:8px;font-weight:500}
 .tr-bill-checkout-price{
@@ -339,10 +355,8 @@ const BILL_CSS = `
 .tr-bill-inv-status.pending{background:#fef3c7;color:#92400e}
 .tr-bill-inv-status.refunded{background:#fee2e2;color:#b91c1c}
 
-/* Sidebar cards */
-.tr-bill-side-title{font-size:15px;font-weight:700;color:var(--tx1);margin:0 0 12px}
-
 /* Payment summary */
+.tr-bill-side-title{font-size:15px;font-weight:700;color:var(--tx1);margin:0 0 12px}
 .tr-bill-pay-amt{
   font-size:36px;font-weight:800;color:var(--tx1);letter-spacing:-1px;
   font-family:'JetBrains Mono','SF Mono',monospace;
@@ -358,79 +372,16 @@ const BILL_CSS = `
 .tr-bill-pay-info-row{font-size:12.5px;color:var(--tx1);margin-bottom:6px;line-height:1.5}
 .tr-bill-pay-info-row:last-child{margin-bottom:0}
 .tr-bill-pay-info-row strong{color:var(--tx1);font-weight:600;display:block}
-
-/* Usage */
-.tr-bill-usage{display:flex;flex-direction:column;gap:14px}
-.tr-bill-usage-row{}
-.tr-bill-usage-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;font-size:12.5px}
-.tr-bill-usage-name{color:var(--tx1);font-weight:600}
-.tr-bill-usage-val{color:var(--tx2);font-weight:500;font-family:'JetBrains Mono','SF Mono',monospace}
-.tr-bill-usage-bar{
-  height:6px;background:var(--bd,#e9e5f3);border-radius:3px;overflow:hidden;
-}
-.tr-bill-usage-fill{
-  height:100%;
-  background:linear-gradient(90deg,#7c3aed,#a78bfa);
-  border-radius:3px;
-  transition:width .4s ease;
-}
-
-/* Need help */
-.tr-bill-help-link{
-  display:flex;align-items:center;justify-content:space-between;
-  padding:9px 0;
-  font-size:13px;color:var(--tx1);
-  text-decoration:none;
-  border-bottom:1px solid var(--bd,#e9e5f3);
-  background:transparent;border-left:none;border-right:none;border-top:none;
-  width:100%;cursor:pointer;font-family:inherit;font-weight:500;
-}
-.tr-bill-help-link:last-of-type{border-bottom:none}
-.tr-bill-help-link:hover{color:#7c3aed}
-.tr-bill-help-link-left{display:inline-flex;align-items:center;gap:8px}
-.tr-bill-help-link-left svg{color:#7c3aed}
-.tr-bill-help-link-right svg{color:var(--tx2);width:13px;height:13px}
-
-.tr-bill-help-note{
-  margin-top:12px;
-  padding:12px;
-  background:linear-gradient(135deg,#faf8ff,#f3eeff);
-  border:1px solid #c4b5fd;
-  border-radius:11px;
-  font-size:12px;color:var(--tx1);line-height:1.5;
-  display:flex;align-items:flex-start;gap:9px;
-}
-[data-theme="dark"] .tr-bill-help-note{
-  background:linear-gradient(135deg, rgba(167,139,250,0.10), rgba(124,58,237,0.12));
-  border-color:rgba(167,139,250,0.30);
-}
-.tr-bill-help-note-icon{
-  width:24px;height:24px;flex-shrink:0;
-  display:grid;place-items:center;
-  background:#fff;border-radius:7px;color:#7c3aed;
-}
-[data-theme="dark"] .tr-bill-help-note-icon{
-  background:rgba(167,139,250,0.18);
-  color:#c4b5fd;
-}
-.tr-bill-help-note-icon svg{width:14px;height:14px}
 `;
 
-// ── Icons (every one explicitly sized) ──
+// ── Icons ──
 const I = {
   shield: <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" /></svg>,
   check: <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>,
   download: <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="7 10 12 15 17 10" /><line x1="12" y1="15" x2="12" y2="3" /></svg>,
-  invoice: <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><polyline points="14 2 14 8 20 8" /><line x1="8" y1="13" x2="16" y2="13" /><line x1="8" y1="17" x2="13" y2="17" /></svg>,
-  help: <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10" /><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3" /><line x1="12" y1="17" x2="12.01" y2="17" /></svg>,
-  chat: <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z" /></svg>,
-  faq: <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10" /><line x1="12" y1="8" x2="12" y2="12" /><line x1="12" y1="16" x2="12.01" y2="16" /></svg>,
-  external: <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" /><polyline points="15 3 21 3 21 9" /><line x1="10" y1="14" x2="21" y2="3" /></svg>,
-  spark: <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2L9.5 9.5 2 12l7.5 2.5L12 22l2.5-7.5L22 12l-7.5-2.5z" /></svg>,
-  user: <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" /><circle cx="12" cy="7" r="4" /></svg>,
 };
 
-// ── Per-role SVG icons (matching design's flat-colored icons; reused from Badges) ──
+// ── Per-role SVG icons ──
 const ROLE_ICONS = {
   cloud: <svg width="28" height="28" viewBox="0 0 24 24" fill="#cbd5e1" stroke="#94a3b8" strokeWidth="1"><path d="M19 18H6a4 4 0 0 1-.6-7.95A6 6 0 0 1 17.7 9.5 4.5 4.5 0 0 1 19 18z" /></svg>,
   devsecops: <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#64748b" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z" /></svg>,
@@ -464,7 +415,6 @@ const addMonths = (date, months) => {
 };
 
 const buildInvoiceHTML = (inv) => {
-  // Simple printable HTML invoice — opens in a new window where the user can Print → Save as PDF
   return `<!doctype html><html><head><meta charset="utf-8"><title>${inv.invoice_no}</title>
 <style>
   body{font-family:'Inter',Arial,sans-serif;color:#1a1530;padding:40px;max-width:720px;margin:0 auto}
@@ -552,7 +502,7 @@ export default function BillingTab({
     }).filter(Boolean);
   }, [subscribedRoles, billingPeriod, isPaid, getRemainingAttempts]);
 
-  // Derived: invoices (one per purchased course, with stable mock IDs)
+  // Derived: invoices
   const invoices = useMemo(() => {
     if (!Array.isArray(subscribedRoles) || subscribedRoles.length === 0) return [];
     const today = new Date();
@@ -561,7 +511,6 @@ export default function BillingTab({
       if (!role) return null;
       const yearly = billingPeriod === "yearly";
       const amount = yearly ? Math.round(role.price * 12 * 0.8) : role.price;
-      // Stable IDs (deterministic per role id)
       const stamp = today.getTime() - idx * 86400000;
       const invoice_no = `INV-${today.getFullYear()}-${String(idx + 1).padStart(4, "0")}`;
       const payment_id = `PAY-${rid.toUpperCase()}-${stamp.toString().slice(-8)}`;
@@ -580,12 +529,6 @@ export default function BillingTab({
     }).filter(Boolean);
   }, [subscribedRoles, billingPeriod, isPaid, user]);
 
-  // Initials for avatar
-  const initials = useMemo(() => {
-    const name = user?.name || user?.email?.split("@")[0] || "U";
-    return name.trim().split(/\s+/).slice(0, 2).map(s => s[0]?.toUpperCase()).join("");
-  }, [user]);
-
   // Payment summary
   const totalAmount = useMemo(() => {
     if (selectedRoles?.length > 0 && typeof getPrice === "function") {
@@ -595,41 +538,8 @@ export default function BillingTab({
     return 0;
   }, [selectedRoles, getPrice, billingPeriod]);
 
-  // Usage stats — wired to REAL data from sessions and completed scenarios
-  const usage = useMemo(() => {
-    const completedCount = Array.isArray(completedScenarios)
-      ? completedScenarios.length
-      : (completedScenarios?.size || 0);
-    const sessionsCount = Array.isArray(localSessionHistory) ? localSessionHistory.length : 0;
-    const freeLimit = 2;
-    return [
-      {
-        name: "Scenarios Completed",
-        cur: completedCount,
-        max: isPaid ? Math.max(50, completedCount) : freeLimit,
-        suffix: "completed",
-        textLabel: isPaid ? `${completedCount} completed` : `${completedCount} / ${freeLimit} used`,
-      },
-      {
-        name: "Total Sessions",
-        cur: sessionsCount,
-        max: isPaid ? Math.max(100, sessionsCount) : freeLimit,
-        suffix: "sessions",
-        textLabel: isPaid ? `${sessionsCount} sessions` : `${sessionsCount} / ${freeLimit} used`,
-      },
-      {
-        name: "Plan Tier",
-        cur: isPaid ? 1 : 0,
-        max: 1,
-        suffix: "tier",
-        textLabel: isPaid ? "Premium" : "Free Trial",
-      },
-    ];
-  }, [completedScenarios, localSessionHistory, isPaid]);
-
   // ── Handlers ──
   const handleDownloadInvoicePDF = (inv) => {
-    // Opens a printable invoice; user uses browser's "Save as PDF"
     const html = buildInvoiceHTML(inv);
     const w = window.open("", "_blank", "width=820,height=900");
     if (!w) { showToast("Pop-up blocked. Please allow pop-ups to download.", "error"); return; }
@@ -652,52 +562,106 @@ export default function BillingTab({
     downloadFile(`threatready-invoices-${new Date().toISOString().slice(0, 10)}.csv`, blob);
   };
 
+  // Get role names for Current Plan display
+  const subscribedRoleNames = useMemo(() => {
+    if (!Array.isArray(subscribedRoles)) return [];
+    return subscribedRoles
+      .map(rid => ROLES.find(r => r.id === rid)?.name)
+      .filter(Boolean);
+  }, [subscribedRoles]);
+
   return (
     <>
       <style>{BILL_CSS}</style>
 
       <div className="tr-bill-root" style={{ opacity: !user ? 0.4 : 1, pointerEvents: !user ? "none" : "auto" }}>
 
-        {/* ── Header ── */}
+        {/* ── Header row: title + top-right stats card ── */}
         <div className="tr-bill-head fadeUp">
-          <h2 className="tr-bill-title">Billing</h2>
-          <p className="tr-bill-sub">Manage your subscription, payment methods, and billing history.</p>
+          <div className="tr-bill-head-text">
+            <h2 className="tr-bill-title">Billing</h2>
+            <p className="tr-bill-sub">Manage your subscription, payment methods, and billing history.</p>
+          </div>
+          <div className="tr-bill-head-stats">
+            <div className="tr-bill-head-stat">
+              <div className="tr-bill-head-stat-num">{subscribedRoles?.length || 0}</div>
+              <div className="tr-bill-head-stat-lbl">Courses</div>
+            </div>
+            <div className="tr-bill-head-stat">
+              <div className="tr-bill-head-stat-num">{invoices.length}</div>
+              <div className="tr-bill-head-stat-lbl">Invoices</div>
+            </div>
+            <div className="tr-bill-head-stat">
+              <div className="tr-bill-head-stat-num tier">{isPaid ? "Premium" : "Free"}</div>
+              <div className="tr-bill-head-stat-lbl">Tier</div>
+            </div>
+          </div>
         </div>
 
-        {/* ── 2-column layout: LEFT and RIGHT columns flow independently ── */}
+        {/* ── 2-column row: Current Plan + Payment Summary ── */}
         <div className="tr-bill-layout">
 
-          {/* ── LEFT COLUMN ── */}
-          <div className="tr-bill-col">
-
-            {/* Current Plan */}
-            <div className="tr-bill-card fadeUp">
-              <div className="tr-bill-card-label">Current Plan</div>
-              <div className="tr-bill-plan-row">
-                <div className="tr-bill-plan-icon">{I.shield}</div>
-                <div className="tr-bill-plan-body">
-                  <div className="tr-bill-plan-name">
-                    {isPaid ? `${subscribedRoles?.length || 0} Role${(subscribedRoles?.length || 0) > 1 ? "s" : ""} · Active` : "Free Trial"}
-                    <span className={`tr-bill-plan-pill${isPaid ? " active" : ""}`}>
-                      {isPaid ? "Active" : "Current Plan"}
-                    </span>
-                  </div>
-                  <div className="tr-bill-plan-sub">
-                    {isPaid
-                      ? (subscribedRoles?.map(r => ROLES.find(x => x.id === r)?.name).filter(Boolean).join(", ") || "All access")
-                      : (subscribedRoles?.length > 0 ? "Free trial active · Beginner level only" : "Select roles to start trial")}
-                  </div>
+          {/* Current Plan — bigger, cleaner, each role on own line */}
+          <div className="tr-bill-card fadeUp">
+            <div className="tr-bill-card-label">Current Plan</div>
+            <div className="tr-bill-plan-row">
+              <div className="tr-bill-plan-icon">{I.shield}</div>
+              <div className="tr-bill-plan-body">
+                <div className="tr-bill-plan-name">
+                  {isPaid ? `${subscribedRoles?.length || 0} Role${(subscribedRoles?.length || 0) > 1 ? "s" : ""} · Active` : "Free Trial"}
+                  <span className={`tr-bill-plan-pill${isPaid ? " active" : ""}`}>
+                    {isPaid ? "Active" : "Current Plan"}
+                  </span>
+                </div>
+                <div className="tr-bill-plan-sub">
+                  {isPaid
+                    ? `You are on the ${billingPeriod === "yearly" ? "Annual" : "Monthly"} plan with full access`
+                    : (subscribedRoles?.length > 0 ? "Free trial active · Beginner level only" : "Select roles to start trial")}
                 </div>
               </div>
             </div>
 
-            {/* Purchased Course Details */}
-            <div className="tr-bill-card fadeUp">
-              <div className="tr-bill-card-label">Purchased Course Details</div>
-              {purchasedCourses.length === 0 ? (
-                <div className="tr-bill-empty">No courses purchased yet. Select roles below to start.</div>
-              ) : (
-                <div className="tr-bill-courses-grid">
+            {/* Roles list — one per line, 2-column grid */}
+            {subscribedRoleNames.length > 0 && (
+              <div className="tr-bill-plan-roles">
+                {subscribedRoleNames.map((name, idx) => (
+                  <div key={idx} className="tr-bill-plan-role">
+                    <span className="tr-bill-plan-role-dot"></span>
+                    <span>{name}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Payment Summary */}
+          <div className="tr-bill-card fadeUp">
+            <h4 className="tr-bill-side-title">Payment Summary</h4>
+            <div className="tr-bill-pay-amt">₹{totalAmount.toLocaleString("en-IN")}</div>
+            <div className="tr-bill-pay-amt-lbl">Total Amount</div>
+            <div className="tr-bill-pay-info">
+              <div className="tr-bill-pay-info-row">
+                <strong>{totalAmount > 0 ? "Upcoming payment" : "No upcoming payment"}</strong>
+                {isPaid ? `You are on the ${billingPeriod === "yearly" ? "Annual" : "Monthly"} plan` : "You are on Free Trial plan"}
+              </div>
+            </div>
+            <button type="button" className="tr-bill-btn full" onClick={subscribe}>
+              {isPaid ? "Manage Plan" : "Upgrade Plan"}
+            </button>
+          </div>
+
+        </div>
+
+        {/* ════════ FULL-WIDTH BOTTOM ════════ */}
+        <div className="tr-bill-bottom">
+
+          {/* Purchased Course Details — full-width, 2-column grid */}
+          <div className="tr-bill-card fadeUp">
+            <div className="tr-bill-card-label">Purchased Course Details</div>
+            {purchasedCourses.length === 0 ? (
+              <div className="tr-bill-empty">No courses purchased yet. Select roles below to start.</div>
+            ) : (
+              <div className="tr-bill-courses-grid">
                 {purchasedCourses.map(c => (
                   <div key={c.id} className="tr-bill-course-row">
                     <div className="tr-bill-course-icon">{c.icon}</div>
@@ -716,110 +680,11 @@ export default function BillingTab({
                     </div>
                   </div>
                 ))}
-                </div>
-              )}
-            </div>
-            
+              </div>
+            )}
           </div>
-          {/* ── end LEFT COLUMN ── */}
 
-          {/* ── RIGHT COLUMN ── */}
-          <div className="tr-bill-col">
-
-            {/* Payment Summary */}
-            <div className="tr-bill-card fadeUp">
-              <h4 className="tr-bill-side-title">Payment Summary</h4>
-              <div className="tr-bill-pay-amt">₹{totalAmount.toLocaleString("en-IN")}</div>
-              <div className="tr-bill-pay-amt-lbl">Total Amount</div>
-              <div className="tr-bill-pay-info">
-                <div className="tr-bill-pay-info-row">
-                  <strong>{totalAmount > 0 ? "Upcoming payment" : "No upcoming payment"}</strong>
-                  {isPaid ? `You are on the ${billingPeriod === "yearly" ? "Annual" : "Monthly"} plan` : "You are on Free Trial plan"}
-                </div>
-              </div>
-              <button type="button" className="tr-bill-btn full" onClick={subscribe}>
-                {isPaid ? "Manage Plan" : "Upgrade Plan"}
-              </button>
-            </div>
-
-            {/* Usage This Year */}
-            <div className="tr-bill-card fadeUp">
-              <h4 className="tr-bill-side-title">Usage This Year</h4>
-              <div className="tr-bill-usage">
-                {usage.map((u) => (
-                  <div key={u.name} className="tr-bill-usage-row">
-                    <div className="tr-bill-usage-head">
-                      <span className="tr-bill-usage-name">{u.name}</span>
-                      <span className="tr-bill-usage-val">
-                        {u.textLabel || `${u.cur} / ${u.max} ${u.suffix}`}
-                      </span>
-                    </div>
-                    <div className="tr-bill-usage-bar">
-                      <div className="tr-bill-usage-fill" style={{ width: `${Math.min(100, (u.cur / Math.max(u.max, 1)) * 100)}%` }} />
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {/* Need Help? */}
-            <div className="tr-bill-card fadeUp">
-              <h4 className="tr-bill-side-title">Need Help?</h4>
-              <button type="button" className="tr-bill-help-link" onClick={() => window.open("https://threatready.io/help", "_blank")}>
-                <span className="tr-bill-help-link-left">{I.help} Visit our Help Center</span>
-                <span className="tr-bill-help-link-right">{I.external}</span>
-              </button>
-              <button type="button" className="tr-bill-help-link" onClick={() => window.open("mailto:admin@aerovanttech.com")}>
-                <span className="tr-bill-help-link-left">{I.chat} Contact Support</span>
-                <span className="tr-bill-help-link-right">{I.external}</span>
-              </button>
-              <button type="button" className="tr-bill-help-link" onClick={() => window.open("https://threatready.io/faq", "_blank")}>
-                <span className="tr-bill-help-link-left">{I.faq} FAQ</span>
-                <span className="tr-bill-help-link-right">{I.external}</span>
-              </button>
-              <div className="tr-bill-help-note">
-                <span className="tr-bill-help-note-icon">{I.spark}</span>
-                <div>We're here to help you succeed in your cybersecurity journey!</div>
-              </div>
-            </div>
-
-            {/* User Details */}
-            <div className="tr-bill-card fadeUp">
-              <div className="tr-bill-card-label">User Details</div>
-              <div className="tr-bill-user">
-                <div className="tr-bill-user-avatar">{initials}</div>
-                <div className="tr-bill-user-body">
-                  <div className="tr-bill-user-name">{user?.name || "—"}</div>
-                  <div className="tr-bill-user-email">{user?.email || "—"}</div>
-                </div>
-              </div>
-              <div className="tr-bill-user-stats">
-                <div className="tr-bill-user-stat">
-                  <div className="tr-bill-user-stat-num">{subscribedRoles?.length || 0}</div>
-                  <div className="tr-bill-user-stat-lbl">Courses</div>
-                </div>
-                <div className="tr-bill-user-stat">
-                  <div className="tr-bill-user-stat-num">{invoices.length}</div>
-                  <div className="tr-bill-user-stat-lbl">Invoices</div>
-                </div>
-                <div className="tr-bill-user-stat">
-                  <div className="tr-bill-user-stat-num" style={{ fontSize: 14 }}>{isPaid ? "Premium" : "Free"}</div>
-                  <div className="tr-bill-user-stat-lbl">Tier</div>
-                </div>
-              </div>
-            </div>
-
-          </div>
-          {/* ── end RIGHT COLUMN ── */}
-
-        </div>
-        {/* ── end .tr-bill-layout ── */}
-
-
-        {/* ════════ FULL-WIDTH BOTTOM ════════ */}
-        <div className="tr-bill-bottom">
-
-          {/* Subscribe to Unlock All Levels — now full-width */}
+          {/* Subscribe to Unlock All Levels / Add More Roles */}
           <div className="tr-bill-card fadeUp">
             <div className="tr-bill-roles-head">
               <div className="tr-bill-card-label" style={{ marginBottom: 0 }}>
@@ -900,7 +765,7 @@ export default function BillingTab({
             )}
           </div>
 
-          {/* Invoice Section — full-width */}
+          {/* Invoice Section */}
           <div className="tr-bill-card fadeUp">
             <div className="tr-bill-inv-head">
               <div className="tr-bill-card-label" style={{ marginBottom: 0 }}>Invoices</div>
