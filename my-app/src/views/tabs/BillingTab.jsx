@@ -150,9 +150,10 @@ const BILL_CSS = `
 
 /* Plan roles list — one role per line */
 .tr-bill-plan-roles{
-  display:grid;grid-template-columns:repeat(2,1fr);gap:8px 16px;
+  display:grid;grid-template-columns:repeat(3,1fr);gap:8px 16px;
   padding-top:16px;border-top:1px solid var(--bd,#e9e5f3);
 }
+@media (max-width:900px){.tr-bill-plan-roles{grid-template-columns:repeat(2,1fr)}}
 @media (max-width:600px){.tr-bill-plan-roles{grid-template-columns:1fr}}
 .tr-bill-plan-role{
   display:flex;align-items:center;gap:8px;
