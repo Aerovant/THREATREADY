@@ -124,12 +124,19 @@ const BILL_CSS = `
 .tr-bill-plan-sub{font-size:13px;color:var(--tx2);margin-top:4px}
 
 /* Course details list */
+
+.tr-bill-courses-grid{
+  display:grid;
+  grid-template-columns:repeat(2,1fr);
+  gap:10px;
+}
+@media (max-width:900px){.tr-bill-courses-grid{grid-template-columns:1fr}}
+
 .tr-bill-course-row{
   display:grid;grid-template-columns:auto 1fr;gap:14px;align-items:center;
   padding:14px;
   background:var(--bg,#faf8ff);border:1px solid var(--bd,#e9e5f3);
   border-radius:11px;
-  margin-bottom:10px;
 }
 .tr-bill-course-row:last-child{margin-bottom:0}
 .tr-bill-course-icon{
@@ -690,7 +697,8 @@ export default function BillingTab({
               {purchasedCourses.length === 0 ? (
                 <div className="tr-bill-empty">No courses purchased yet. Select roles below to start.</div>
               ) : (
-                purchasedCourses.map(c => (
+                <div className="tr-bill-courses-grid">
+                {purchasedCourses.map(c => (
                   <div key={c.id} className="tr-bill-course-row">
                     <div className="tr-bill-course-icon">{c.icon}</div>
                     <div className="tr-bill-course-body">
@@ -707,12 +715,11 @@ export default function BillingTab({
                       </div>
                     </div>
                   </div>
-                ))
+                ))}
+                </div>
               )}
             </div>
-
             
-
           </div>
           {/* ── end LEFT COLUMN ── */}
 
