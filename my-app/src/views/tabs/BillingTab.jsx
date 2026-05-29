@@ -684,35 +684,6 @@ export default function BillingTab({
               </div>
             </div>
 
-            {/* Purchased Course Details */}
-            <div className="tr-bill-card fadeUp">
-              <div className="tr-bill-card-label">Purchased Course Details</div>
-              {purchasedCourses.length === 0 ? (
-                <div className="tr-bill-empty">No courses purchased yet. Select roles below to start.</div>
-              ) : (
-                purchasedCourses.map(c => (
-                  <div key={c.id} className="tr-bill-course-row">
-                    <div className="tr-bill-course-icon">{c.icon}</div>
-                    <div className="tr-bill-course-body">
-                      <div className="tr-bill-course-name-row">
-                        <span className="tr-bill-course-name">{c.name}</span>
-                        <span className={`tr-bill-course-status ${c.status === "Active" ? "active" : "trial"}`}>{c.status}</span>
-                      </div>
-                      <div className="tr-bill-course-meta">
-                        <span>Start: <strong>{formatDate(c.startDate)}</strong></span>
-                        <span>End: <strong>{formatDate(c.endDate)}</strong></span>
-                        <span>Attempts: <strong>{c.attempts}</strong></span>
-                        <span>Plan: <strong>{c.plan}</strong></span>
-                        <span style={{ gridColumn: "1 / -1" }}>Access: <strong>{c.level}</strong></span>
-                      </div>
-                    </div>
-                  </div>
-                ))
-              )}
-            </div>
-
-            
-
           </div>
           {/* ── end LEFT COLUMN ── */}
 
@@ -811,7 +782,32 @@ export default function BillingTab({
 
         {/* ════════ FULL-WIDTH BOTTOM ════════ */}
         <div className="tr-bill-bottom">
-
+          {/* Purchased Course Details */}
+          <div className="tr-bill-card fadeUp">
+            <div className="tr-bill-card-label">Purchased Course Details</div>
+            {purchasedCourses.length === 0 ? (
+              <div className="tr-bill-empty">No courses purchased yet. Select roles below to start.</div>
+            ) : (
+              purchasedCourses.map(c => (
+                <div key={c.id} className="tr-bill-course-row">
+                  <div className="tr-bill-course-icon">{c.icon}</div>
+                  <div className="tr-bill-course-body">
+                    <div className="tr-bill-course-name-row">
+                      <span className="tr-bill-course-name">{c.name}</span>
+                      <span className={`tr-bill-course-status ${c.status === "Active" ? "active" : "trial"}`}>{c.status}</span>
+                    </div>
+                    <div className="tr-bill-course-meta">
+                      <span>Start: <strong>{formatDate(c.startDate)}</strong></span>
+                      <span>End: <strong>{formatDate(c.endDate)}</strong></span>
+                      <span>Attempts: <strong>{c.attempts}</strong></span>
+                      <span>Plan: <strong>{c.plan}</strong></span>
+                      <span style={{ gridColumn: "1 / -1" }}>Access: <strong>{c.level}</strong></span>
+                    </div>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
           {/* Subscribe to Unlock All Levels — now full-width */}
           <div className="tr-bill-card fadeUp">
             <div className="tr-bill-roles-head">
