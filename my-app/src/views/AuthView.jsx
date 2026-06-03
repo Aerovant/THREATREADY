@@ -76,7 +76,7 @@ const AUTH_CSS = `
   background: var(--ta-bg-base);
   color: var(--ta-fg);
   font-family:'Inter','Segoe UI',system-ui,sans-serif;
-  overflow:hidden;
+  overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch;
   z-index:1;
   transition: background .35s ease, color .35s ease;
 }
@@ -211,15 +211,15 @@ const AUTH_CSS = `
 .tr-auth-shell{
   position:relative;z-index:2;
   display:grid;grid-template-columns:minmax(0,1fr) 460px;
-  width:100%;height:100vh;height:100dvh;
+  width:100%;min-height:100vh;min-height:100dvh;
 }
 @media (max-width: 1280px){
   .tr-auth-shell{grid-template-columns:minmax(0,1fr) 440px}
 }
 @media (max-width: 980px){
-  .tr-auth-shell{grid-template-columns:1fr;height:100vh;height:100dvh}
+  .tr-auth-shell{grid-template-columns:1fr;min-height:100vh;min-height:100dvh}
   .tr-auth-brand{display:none}
-  .tr-auth-formpanel{padding:12px 14px}
+  .tr-auth-formpanel{padding:24px 16px;align-items:flex-start}
 }
 
 /* Belt-and-braces: hide any residual scrollbars on the auth root */
@@ -231,7 +231,7 @@ const AUTH_CSS = `
   padding:28px clamp(48px, 6vw, 96px) 24px;
   display:flex;flex-direction:column;justify-content:space-between;gap:14px;
   height:100%;min-width:0;min-height:0;
-  overflow:hidden;
+  overflow:visible;
   position:relative;
 }
 .tr-auth-brand::after{
@@ -329,8 +329,8 @@ const AUTH_CSS = `
 .tr-auth-formpanel{
   padding:18px 22px;
   display:flex;align-items:center;justify-content:center;
-  height:100%;min-width:0;min-height:0;
-  overflow:hidden;
+  min-height:100%;min-width:0;
+  overflow:visible;
 }
 .tr-auth-card{
   width:100%;max-width:400px;
@@ -624,7 +624,7 @@ const AUTH_CSS = `
    ═══════════════════════════════════════════════════════════════ */
 
 @media (max-width: 640px){
-  .tr-auth-formpanel{padding:10px 12px}
+  .tr-auth-formpanel{padding:20px 12px}
   .tr-auth-card{padding:18px 18px;border-radius:14px;max-width:100%}
   .tr-auth-card-controls{margin-bottom:12px}
   .tr-auth-card-controls .tr-auth-back{padding:6px 10px;font-size:12px}
@@ -657,7 +657,7 @@ const AUTH_CSS = `
 
 /* Small phones (≤420px) — OAuth stacks vertically, tighter everything */
 @media (max-width: 420px){
-  .tr-auth-formpanel{padding:8px 10px}
+  .tr-auth-formpanel{padding:16px 10px}
   .tr-auth-card{padding:16px 16px;border-radius:12px}
   .tr-auth-title{font-size:18px}
   .tr-auth-oauth{grid-template-columns:1fr;gap:7px}
