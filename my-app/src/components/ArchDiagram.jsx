@@ -12,8 +12,13 @@ export default function ArchDiagram({ nodes, edges, zoom = 1 }) {
   const lastPos = useRef({ x: 0, y: 0 });
 
   if (!nodes?.length) return null;
-  const maxX = Math.max(...nodes.map(n => n.x)) + 120;
-  const maxY = Math.max(...nodes.map(n => n.y)) + 80;
+  // Content bounds with padding so nodes/labels aren't flush against the edges.
+  const minX = Math.min(...nodes.map(n => n.x)) - 30;
+  const minY = Math.min(...nodes.map(n => n.y)) - 30;
+  const maxX = Math.max(...nodes.map(n => n.x)) + 130;
+  const maxY = Math.max(...nodes.map(n => n.y)) + 90;
+  const vbW = maxX - minX;
+  const vbH = maxY - minY;
 
   return (
     <div style={{ position: "relative", marginBottom: 12 }}>
@@ -28,7 +33,7 @@ export default function ArchDiagram({ nodes, edges, zoom = 1 }) {
         onMouseMove={e => { if (!dragging.current) return; setPan(p => ({ x: p.x + e.clientX - lastPos.current.x, y: p.y + e.clientY - lastPos.current.y })); lastPos.current = { x: e.clientX, y: e.clientY }; }}
         onMouseUp={() => { dragging.current = false; }}
         onMouseLeave={() => { dragging.current = false; }}>
-        <svg viewBox={`0 0 ${maxX} ${maxY}`} style={{ width: "100%", height: 200, transform: `scale(${z}) translate(${pan.x / z}px, ${pan.y / z}px)`, transformOrigin: "center" }}>
+        <svg viewBox={`${minX} ${minY} ${vbW} ${vbH}`} preserveAspectRatio="xMidYMid meet" style={{ width: "100%", height: 360, display: "block", margin: "0 auto", transform: `scale(${z}) translate(${pan.x / z}px, ${pan.y / z}px)`, transformOrigin: "center" }}>
           <defs><marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 Z" fill="#ff5252" /></marker></defs>
 
           {/* PASS 1: Draw edge lines (connecting nodes) */}
@@ -83,29 +88,39 @@ export default function ArchDiagram({ nodes, edges, zoom = 1 }) {
               perpY = -perpY;
             }
 
-            const offsetDistance = 18;
+            const offsetDistance = 26;
             const labelX = mx + perpX * offsetDistance;
             const labelY = my + perpY * offsetDistance;
 
+            // Approx text width so the backing chip fits the label (SVG can't
+            // measure text synchronously; ~6.2px per char at fontSize 11 is close).
+            const chipW = label.length * 6.2 + 14;
+            const chipH = 18;
+
             return (
-              <text
-                key={`label-${i}`}
-                x={labelX}
-                y={labelY}
-                fill="#ffffff"
-                fontSize="11"
-                fontWeight="700"
-                textAnchor="middle"
-                dominantBaseline="middle"
-                style={{
-                  paintOrder: 'stroke',
-                  stroke: '#0a0e1a',
-                  strokeWidth: '4px',
-                  strokeLinejoin: 'round',
-                  pointerEvents: 'none',
-                  userSelect: 'none'
-                }}
-              >{label}</text>
+              <g key={`label-${i}`} style={{ pointerEvents: "none" }}>
+                <rect
+                  x={labelX - chipW / 2}
+                  y={labelY - chipH / 2}
+                  width={chipW}
+                  height={chipH}
+                  rx={5}
+                  fill="#0a0e1a"
+                  opacity="0.92"
+                  stroke="#ffffff22"
+                  strokeWidth="1"
+                />
+                <text
+                  x={labelX}
+                  y={labelY}
+                  fill="#ffffff"
+                  fontSize="11"
+                  fontWeight="700"
+                  textAnchor="middle"
+                  dominantBaseline="middle"
+                  style={{ userSelect: 'none' }}
+                >{label}</text>
+              </g>
             );
           })}
         </svg>
