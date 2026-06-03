@@ -229,11 +229,23 @@ export default function InterviewSession({
   const [voiceSupported, setVoiceSupported] = useState(false);
   const recognitionRef = useRef(null);
   const baseTextBeforeRecord = useRef("");
+  // True while the user WANTS the mic on. Drives auto-restart on browser
+  // onend (silence gaps) so dictation stays live until the user stops it.
+  const recordingIntentRef = useRef(false);
 
   const textareaRef = useRef(null);
   const historyEndRef = useRef(null);
   const sessionStartedAtRef = useRef(new Date().toISOString());
   const sessionEndedAtRef = useRef(null);
+  // Hard stop flag. Once the session ends (Exit / Submit-end / Time's up),
+  // this blocks any in-flight typing/TTS chain from speaking the next question.
+  const endedRef = useRef(false);
+  // Tracks every active typing-animation interval so we can clear them all
+  // the instant the session ends (otherwise a queued question keeps typing+speaking).
+  const typingTimersRef = useRef([]);
+  // Mirror of `stage` for async callbacks that would otherwise read a stale closure.
+  const stageRef = useRef("active");
+  useEffect(() => { stageRef.current = stage; }, [stage]);
 
   useEffect(() => {
     historyEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -261,6 +273,7 @@ export default function InterviewSession({
   }, []);
 
   const speakText = (text, panelistIdx) => {
+    if (endedRef.current) return;
     if (!ttsAvailableRef.current || ttsMutedRef.current || !text) return;
     try {
       window.speechSynthesis.cancel();
@@ -312,24 +325,87 @@ export default function InterviewSession({
     };
 
     recognition.onend = () => {
+      // Commit whatever was captured so manual edits build on it.
       setCurrentAnswer((current) => {
         baseTextBeforeRecord.current = current;
         return current;
       });
-      setIsRecording(false);
+      // Browsers fire onend on every silence gap even with continuous=true.
+      // If the user still wants the mic on (and the session is live and the
+      // page is visible), seamlessly restart so they never have to re-click.
+      if (
+        recordingIntentRef.current &&
+        !endedRef.current &&
+        stageRef.current === "active" &&
+        !document.hidden
+      ) {
+        setTimeout(() => {
+          if (
+            recordingIntentRef.current &&
+            !endedRef.current &&
+            stageRef.current === "active" &&
+            !document.hidden &&
+            recognitionRef.current
+          ) {
+            try { recognitionRef.current.start(); }
+            catch (_) { /* already started / transient — ignore */ }
+          }
+        }, 200);
+      } else {
+        setIsRecording(false);
+      }
     };
 
     recognition.onerror = (e) => {
       console.error("Speech recognition error:", e.error);
+      // Permission/hardware errors are terminal — stop trying to restart.
+      if (e.error === "not-allowed" || e.error === "service-not-allowed") {
+        recordingIntentRef.current = false;
+        setIsRecording(false);
+        showToast("Microphone blocked. Allow mic access and try again.", "error");
+        return;
+      }
+      // "no-speech" / "aborted" are normal pauses — let onend handle restart.
       if (e.error !== "no-speech" && e.error !== "aborted") {
         showToast("Voice error: " + e.error, "error");
       }
-      setIsRecording(false);
     };
 
     recognitionRef.current = recognition;
     return () => {
+      recordingIntentRef.current = false;
       try { recognition.stop(); } catch (_) {}
+    };
+  }, []);
+
+  // ─── Auto-off the mic when the user leaves: switches browser tab, minimizes,
+  //     or the window loses focus. Also stop any speech so nothing plays in the
+  //     background. (In-app tab/page changes unmount this component, which the
+  //     recognition cleanup above already handles.)
+  useEffect(() => {
+    const stopForLeave = () => {
+      if (document.hidden) {
+        recordingIntentRef.current = false;
+        if (recognitionRef.current) {
+          try { recognitionRef.current.stop(); } catch (_) {}
+        }
+        setIsRecording(false);
+        try { window.speechSynthesis.cancel(); } catch (_) {}
+        setIsSpeaking(false);
+      }
+    };
+    const stopOnBlur = () => {
+      recordingIntentRef.current = false;
+      if (recognitionRef.current) {
+        try { recognitionRef.current.stop(); } catch (_) {}
+      }
+      setIsRecording(false);
+    };
+    document.addEventListener("visibilitychange", stopForLeave);
+    window.addEventListener("blur", stopOnBlur);
+    return () => {
+      document.removeEventListener("visibilitychange", stopForLeave);
+      window.removeEventListener("blur", stopOnBlur);
     };
   }, []);
 
@@ -339,8 +415,11 @@ export default function InterviewSession({
       return;
     }
     if (isRecording) {
+      recordingIntentRef.current = false;
       recognitionRef.current.stop();
+      setIsRecording(false);
     } else {
+      if (endedRef.current || stageRef.current !== "active") return;
       stopSpeaking();
       // When resuming dictation after previous speech, ensure new words don't
       // stick to the previous text without a space.
@@ -351,10 +430,12 @@ export default function InterviewSession({
       }
       baseTextBeforeRecord.current = base;
       try {
+        recordingIntentRef.current = true;
         recognitionRef.current.start();
         setIsRecording(true);
       } catch (e) {
         console.error(e);
+        recordingIntentRef.current = false;
         showToast("Could not start voice. Try again.", "error");
       }
     }
@@ -404,26 +485,38 @@ export default function InterviewSession({
   // (from new panelist) in sequence.
   const animateTyping = (fullText, panelistIdx) => {
     return new Promise((resolve) => {
+      // If the session already ended, don't type or speak anything.
+      if (endedRef.current || stageRef.current !== "active") { resolve(); return; }
       setTypingText("");
       let i = 0;
       const interval = setInterval(() => {
+        // Abort mid-animation if the user ended the session.
+        if (endedRef.current || stageRef.current !== "active") {
+          clearInterval(interval);
+          typingTimersRef.current = typingTimersRef.current.filter((t) => t !== interval);
+          setTypingText("");
+          resolve();
+          return;
+        }
         if (i < fullText.length) {
           setTypingText(fullText.slice(0, i + 1));
           i += 2;
         } else {
           clearInterval(interval);
+          typingTimersRef.current = typingTimersRef.current.filter((t) => t !== interval);
           setTypingText("");
           setMessages((prev) => [...prev, { role: "assistant", content: fullText, panelistIdx }]);
 
           // Speak and resolve when speech finishes (or if TTS unavailable, resolve now).
           // Use refs (not state) to read CURRENT values, since this function may have
           // been captured from a render where ttsAvailable was still false.
-          if (!ttsAvailableRef.current || ttsMutedRef.current || !fullText) {
+          if (endedRef.current || !ttsAvailableRef.current || ttsMutedRef.current || !fullText) {
             resolve();
             return;
           }
 
           try {
+            if (endedRef.current) { resolve(); return; }
             window.speechSynthesis.cancel();
             const utterance = new SpeechSynthesisUtterance(fullText);
             const panelist = PANELISTS[panelistIdx % PANELISTS.length];
@@ -444,6 +537,7 @@ export default function InterviewSession({
           }
         }
       }, 18);
+      typingTimersRef.current.push(interval);
     });
   };
 
@@ -525,8 +619,10 @@ export default function InterviewSession({
   const submitAnswer = async () => {
     if (!currentAnswer.trim() || isLoading || stage !== "active") return;
     stopSpeaking();
+    recordingIntentRef.current = false;
     if (isRecording) {
       try { recognitionRef.current?.stop(); } catch (_) {}
+      setIsRecording(false);
     }
     const userMessage = { role: "user", content: currentAnswer.trim() };
     const newMessages = [...messages, userMessage];
@@ -540,6 +636,10 @@ export default function InterviewSession({
       const reply = await callAI(newMessages);
       setIsLoading(false);
 
+      // If the user ended the session while we were waiting on the AI,
+      // stop here — do not type or speak the next question.
+      if (endedRef.current || stageRef.current !== "active") return;
+
       // Try to split the AI response on the `===` separator we instructed
       // the AI to use. If split succeeds:
       //   - feedback is delivered by the CURRENT panelist (who asked the question I just answered)
@@ -552,8 +652,10 @@ export default function InterviewSession({
       if (feedback) {
         // STEP 1: Same avatar (prev) gives feedback on the answer
         await animateTyping(feedback, prevIdx);
+        if (endedRef.current || stageRef.current !== "active") return;
         // brief pause so it feels natural
         await new Promise((r) => setTimeout(r, 400));
+        if (endedRef.current || stageRef.current !== "active") return;
         // STEP 2: Next avatar asks the next question
         setActivePanelistIdx(nextIdx);
         animateTyping(question, nextIdx);
@@ -573,12 +675,26 @@ export default function InterviewSession({
   // ─── Session end → goes to "completed" stage (NOT closing) ───
   const handleSessionEnd = (reason = "Session ended") => {
     if (stage !== "active") return;
+    // Hard stop FIRST so any in-flight typing/TTS chain bails immediately.
+    endedRef.current = true;
+    stageRef.current = "completed";
+    recordingIntentRef.current = false;
     sessionEndedAtRef.current = new Date().toISOString();
     setStage("completed");
-    stopSpeaking();
-    if (isRecording) {
-      try { recognitionRef.current?.stop(); } catch (_) {}
+
+    // Cancel speech (both queued and active) and any pending typing animations.
+    try { window.speechSynthesis.cancel(); } catch (_) {}
+    setIsSpeaking(false);
+    setTypingText("");
+    typingTimersRef.current.forEach((t) => clearInterval(t));
+    typingTimersRef.current = [];
+
+    // Stop the mic.
+    if (recognitionRef.current) {
+      try { recognitionRef.current.stop(); } catch (_) {}
     }
+    setIsRecording(false);
+
     // Notify the InterviewTab reports widget to refresh
     try { window.dispatchEvent(new CustomEvent('threatready:interview-complete')); } catch (_) {}
     showToast(reason, "info");
@@ -658,6 +774,22 @@ export default function InterviewSession({
       // No dummy/sample data — only entries written here, one per real completed interview.
       try {
         const r = data.report || {};
+        const ov = r.overall || {};
+        // The report stores the headline score at report.overall.score, on a
+        // /100 scale (see InterviewReport). The history card + dashboard expect
+        // a top-level overall_score on a /10 scale. Read the nested value as the
+        // source of truth and normalise. Any value >10 is treated as /100.
+        const rawScore =
+          r.overall_score ?? r.overallScore ?? ov.score ?? r.score ?? null;
+        const overallScore10 =
+          rawScore == null ? null
+          : (Number(rawScore) > 10 ? Math.round((Number(rawScore) / 10) * 10) / 10
+                                   : Math.round(Number(rawScore) * 10) / 10);
+        const earnedXp =
+          r.earned_xp ?? r.earnedXp ?? ov.earnedXp ?? ov.earned_xp ?? ov.xp ?? r.xp ?? 0;
+        const badgeVal =
+          r.badge ?? r.badge_level ?? ov.badge ?? null;
+
         const historyEntry = {
           id: `INT-${Date.now()}-${Math.random().toString(36).slice(2, 7).toUpperCase()}`,
           completed_at: endedAt,
@@ -667,13 +799,13 @@ export default function InterviewSession({
           duration_seconds: durationSeconds,
           questions_answered: questionsAnswered,
           panel_size: PANELISTS.length,
-          // Score & badge fields (mapped to common shapes the report may return)
-          overall_score: r.overall_score ?? r.overallScore ?? r.score ?? null,
+          // Score & badge fields (normalised so the history widget + dashboard read them directly)
+          overall_score: overallScore10,
           skills_score: r.skills_score ?? r.skillsScore ?? null,
           attack_score: r.attack_score ?? r.attackScore ?? r.communication_score ?? null,
-          badge: r.badge ?? r.badge_level ?? null,
-          earned_xp: r.earned_xp ?? r.earnedXp ?? r.xp ?? 0,
-          verdict: r.verdict ?? r.summary ?? r.overall_verdict ?? null,
+          badge: badgeVal,
+          earned_xp: earnedXp,
+          verdict: r.verdict ?? r.summary ?? ov.verdict ?? r.overall_verdict ?? null,
           // Full report payload preserved so the history "View Full Report" can re-render it later
           report: r,
         };
@@ -697,6 +829,13 @@ export default function InterviewSession({
 
   const restartSession = () => {
     stopSpeaking();
+    // Clear the hard-stop guard so a fresh interview can type/speak again.
+    endedRef.current = false;
+    stageRef.current = "active";
+    recordingIntentRef.current = false;
+    typingTimersRef.current.forEach((t) => clearInterval(t));
+    typingTimersRef.current = [];
+    sessionEndedAtRef.current = null;
     // Long persistent primer keeps the speech engine continuously running
     // through the backend wait, so the welcome auto-plays on restart.
     // speakText() calls cancel() before the real welcome, stopping this primer.
@@ -1152,7 +1291,22 @@ export default function InterviewSession({
               setCurrentAnswer(e.target.value);
               if (!isRecording) baseTextBeforeRecord.current = e.target.value;
             }}
+            onPaste={(e) => {
+              // Assessment integrity: answers must be typed (or dictated), not pasted.
+              e.preventDefault();
+              showToast("Pasting is disabled — please type your answer.", "warning");
+            }}
+            onDrop={(e) => { e.preventDefault(); }}
+            onContextMenu={(e) => { e.preventDefault(); }}
             onKeyDown={(e) => {
+              // Block keyboard paste (Ctrl/Cmd+V) and shift+insert paste.
+              const k = e.key.toLowerCase();
+              if ((e.ctrlKey || e.metaKey) && k === "v") {
+                e.preventDefault();
+                showToast("Pasting is disabled — please type your answer.", "warning");
+                return;
+              }
+              if (e.shiftKey && e.key === "Insert") { e.preventDefault(); return; }
               if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) submitAnswer();
             }}
             placeholder={`Type your answer to the panel… (Ctrl+Enter to submit)${voiceSupported ? " · or click 🎤 to dictate" : ""}`}

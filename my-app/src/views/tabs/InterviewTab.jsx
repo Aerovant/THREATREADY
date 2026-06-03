@@ -1023,6 +1023,15 @@ export default function InterviewTab({
   }, [sessionActive]);
 
   const reportShortId = (id) => String(id || '').replace(/[^A-Z0-9]/gi, '').slice(-4).toUpperCase() || '0000';
+  // Normalised /10 score for an entry. Prefers top-level overall_score, falls
+  // back to the nested report.overall.score (which is on a /100 scale).
+  const reportScore10 = (r) => {
+    const raw = r.overall_score != null
+      ? parseFloat(r.overall_score)
+      : (r.report?.overall?.score != null ? parseFloat(r.report.overall.score) : null);
+    if (raw == null || isNaN(raw)) return null;
+    return raw > 10 ? Math.round((raw / 10) * 10) / 10 : raw;
+  };
   const reportDifficulty = (r) => {
     // Real difficulty stored by InterviewSession at completion time
     const d = String(r.difficulty || '').toLowerCase();
@@ -1073,19 +1082,19 @@ export default function InterviewTab({
     completed: reports.filter(r => r.completed_at).length,
     inProgress: reports.filter(r => !r.completed_at).length,
     avgScore: (() => {
-      const arr = reports.filter(r => r.completed_at && r.overall_score != null);
+      const arr = reports.filter(r => r.completed_at && reportScore10(r) != null);
       if (arr.length === 0) return '—';
-      const s = arr.reduce((a, r) => a + parseFloat(r.overall_score), 0);
+      const s = arr.reduce((a, r) => a + reportScore10(r), 0);
       return (s / arr.length).toFixed(1);
     })(),
     totalXP: reports.reduce((a, r) => a + (parseInt(r.earned_xp) || 0), 0),
     trend: (() => {
-      const completed = reports.filter(r => r.completed_at && r.overall_score != null);
+      const completed = reports.filter(r => r.completed_at && reportScore10(r) != null);
       if (completed.length < 2) return null;
       const recent = completed.slice(0, Math.ceil(completed.length / 2));
       const older = completed.slice(Math.ceil(completed.length / 2));
-      const a = recent.reduce((s, r) => s + parseFloat(r.overall_score), 0) / recent.length;
-      const b = older.reduce((s, r) => s + parseFloat(r.overall_score), 0) / older.length;
+      const a = recent.reduce((s, r) => s + reportScore10(r), 0) / recent.length;
+      const b = older.reduce((s, r) => s + reportScore10(r), 0) / older.length;
       return (a - b).toFixed(1);
     })(),
   };
@@ -1792,7 +1801,11 @@ export default function InterviewTab({
                   const time = r.completed_at
                     ? new Date(r.completed_at).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })
                     : '';
-                  const sc = r.overall_score != null ? parseFloat(r.overall_score) : null;
+                  const rawSc = r.overall_score != null
+                    ? parseFloat(r.overall_score)
+                    : (r.report?.overall?.score != null ? parseFloat(r.report.overall.score) : null);
+                  // report.overall.score is on a /100 scale; the card shows /10.
+                  const sc = rawSc == null ? null : (rawSc > 10 ? Math.round((rawSc / 10) * 10) / 10 : rawSc);
                   const scoreStr = sc != null ? sc.toFixed(1) : '—';
                   const scoreColor = sc == null ? '#8890b0' : sc >= 7 ? '#10b981' : sc >= 5 ? '#f59e0b' : '#ef4444';
                   const diff = reportDifficulty(r);
