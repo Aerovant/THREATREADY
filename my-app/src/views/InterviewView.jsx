@@ -34,6 +34,32 @@ export default function InterviewView({
   submitAnswer,
   exitScenario,
 }) {
+  // Keep the typed store (answers[currentQ.id]) and the dictated store
+  // (voice.transcript) in sync whenever the user toggles Type ⇄ Dictate, so
+  // nothing is lost. The store the user was just editing is the source of truth.
+  const switchMode = (mode) => {
+    if (mode === inputMode) return;
+    const fromText = (answers[currentQ.id] || "").trim();
+    const fromVoice = (voice.transcript || "").trim();
+    // Whatever store was active before the switch wins; fall back to the other.
+    const current = inputMode === "voice"
+      ? (fromVoice || fromText)
+      : (fromText || fromVoice);
+
+    if (mode === "text") {
+      // Leaving Dictate → stop recording and push the spoken text into the
+      // editable typed box so it can be corrected without disappearing.
+      if (voice.recording) { try { voice.stop(); } catch (_) {} }
+      setAnswers(p => ({ ...p, [currentQ.id]: current }));
+    } else {
+      // Entering Dictate → seed the voice transcript with the typed text so new
+      // dictation appends to it instead of starting blank.
+      if (voice.setTranscript) voice.setTranscript(current);
+      setAnswers(p => ({ ...p, [currentQ.id]: current }));
+    }
+    setInputMode(mode);
+  };
+
   return (
     <div className="app"><style>{CSS}</style><div className="scanbar" /><div className="gridbg" />
 
@@ -121,8 +147,8 @@ export default function InterviewView({
 
         {/* Answer Input (No Copy-Paste) */}
         <div style={{ display: "flex", gap: 6, marginBottom: 10 }}>
-          <button className={`btn ${inputMode === "text" ? "bp" : "bs"}`} style={{ padding: "4px 12px", fontSize: 12 }} onClick={() => setInputMode("text")}>✏️ Type</button>
-          <button className={`btn ${inputMode === "voice" ? "bp" : "bs"}`} style={{ padding: "4px 12px", fontSize: 12 }} onClick={() => setInputMode("voice")}>🎤 Dictate</button>
+          <button className={`btn ${inputMode === "text" ? "bp" : "bs"}`} style={{ padding: "4px 12px", fontSize: 12 }} onClick={() => switchMode("text")}>✏️ Type</button>
+          <button className={`btn ${inputMode === "voice" ? "bp" : "bs"}`} style={{ padding: "4px 12px", fontSize: 12 }} onClick={() => switchMode("voice")}>🎤 Dictate</button>
         </div>
         {inputMode === "text" ? (
           <NoPasteInput placeholder="Type your answer... (copy-paste disabled)" value={answers[currentQ.id] || ""}
@@ -143,7 +169,7 @@ export default function InterviewView({
                 </div>
                 <NoPasteInput
                   value={voice.transcript}
-                  onChange={e => voice.setTranscript(e.target.value)}
+                  onChange={e => { voice.setTranscript(e.target.value); setAnswers(p => ({ ...p, [currentQ.id]: e.target.value })); }}
                   placeholder="Your dictated answer will appear here. Edit to fix errors..."
                   style={{ minHeight: 80, padding: 10, background: "var(--s2)", borderRadius: 8, fontSize: 12, textAlign: "left", lineHeight: 1.6, width: "100%" }}
                 />

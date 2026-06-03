@@ -1650,7 +1650,14 @@ export default function ThreatReady() {
 
   // ── SUBMIT ANSWER ──
   const submitAnswer = async () => {
-    const ans = answers[currentQ.id] || voice.transcript;
+    // Trust whichever input the user is actively using: in Dictate mode the
+    // live transcript wins; in Type mode the typed text wins. Falls back to the
+    // other store so a mode-switched answer is never lost.
+    const typed = answers[currentQ.id];
+    const spoken = voice.transcript;
+    const ans = inputMode === "voice"
+      ? (spoken?.trim() ? spoken : typed)
+      : (typed?.trim() ? typed : spoken);
     if (!ans?.trim()) return;
     setLoading(true);
     const ev = await evaluateAnswer(currentQ, ans, scenario);
@@ -2120,7 +2127,6 @@ export default function ThreatReady() {
       setIsMuted={setIsMuted}
 
       submitAnswer={submitAnswer}
-      exitScenario={exitScenario}
       exitScenario={exitScenario}
       speakQuestion={speakQuestion}
     />
