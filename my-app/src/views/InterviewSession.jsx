@@ -315,8 +315,13 @@ export default function InterviewSession({
     recognition.lang = "en-US";
 
     recognition.onresult = (event) => {
+      // Rebuild this recognition session's text from the FIRST result every time.
+      // Using event.resultIndex here would drop earlier phrases as they finalize
+      // (the base never absorbed them), which made dictation appear to "restart"
+      // or lose text. Rebuilding from 0 + committing the base on onend means the
+      // text always grows and survives pauses/auto-restarts.
       let interim = "", final = "";
-      for (let i = event.resultIndex; i < event.results.length; i++) {
+      for (let i = 0; i < event.results.length; i++) {
         const t = event.results[i][0].transcript;
         if (event.results[i].isFinal) final += t; else interim += t;
       }
@@ -575,6 +580,17 @@ export default function InterviewSession({
     setIsLoading(true);
     setError(null);
 
+    // ── Question variety: stop the same opening question recurring each session.
+    // Keep a rolling list of previously-asked openers and tell the model to
+    // avoid them, plus a random seed to discourage deterministic output.
+    let askedList = [];
+    try { askedList = JSON.parse(localStorage.getItem("tr_interview_asked_qs") || "[]"); } catch (_) {}
+    const seed = Math.random().toString(36).slice(2, 8);
+    const avoidClause = askedList.length
+      ? `\n\nDo NOT repeat or closely paraphrase any of these previously-asked questions: ${askedList.slice(-12).map((q) => `"${q}"`).join("; ")}.`
+      : "";
+    const varietyNote = `\n\n[VARIETY] Session seed ${seed}. Vary your FIRST question every session — do NOT default to the most common textbook opener (e.g. "difference between authentication and authorization"). Choose a different sub-topic and phrasing each time, appropriate to the ${level} level.${avoidClause}`;
+
     // Prime the speech engine while we're still in user-gesture context.
     // Without this, Chrome blocks the first auto-play because the backend call
     // takes several seconds — by then Chrome thinks the user gesture is "stale"
@@ -601,13 +617,21 @@ export default function InterviewSession({
       const reply = await callAI(
         [{
           role: "user",
-          content: "Begin the interview now. Start with a short, friendly welcome greeting (ONE line, under 10 words), then immediately ask your first technical question.\n\nIMPORTANT FORMATTING RULES for this entire interview:\n- The opening welcome must be ONE short line under 10 words. Example: \"Hi, welcome to the panel — let's get started.\"\n- After I provide each answer, you MUST format your response in TWO PARTS separated by a line containing only `===` (three equals signs):\n  Part 1 (above ===): a SHORT acknowledgment of my answer (under 10 words, e.g. \"Solid reasoning.\" \"Good point.\" \"Let's move on.\")\n  Part 2 (below ===): a SHORT greeting from the next panelist (under 10 words, e.g. \"Hi, I'll take it from here.\") followed by the next technical question.\n- Example response format after my answer:\n  ```\n  Solid reasoning on identity boundaries.\n  ===\n  My turn now. How would you architect zero-trust for a hybrid cloud workload?\n  ```\n- For the VERY FIRST message (welcome + first question), do NOT use the separator — just welcome + first question.\n- Never explain at length why an answer was good or bad."
+          content: "Begin the interview now. Start with a short, friendly welcome greeting (ONE line, under 10 words), then immediately ask your first technical question.\n\nIMPORTANT FORMATTING RULES for this entire interview:\n- The opening welcome must be ONE short line under 10 words. Example: \"Hi, welcome to the panel — let's get started.\"\n- After I provide each answer, you MUST format your response in TWO PARTS separated by a line containing only `===` (three equals signs):\n  Part 1 (above ===): a SHORT acknowledgment of my answer (under 10 words, e.g. \"Solid reasoning.\" \"Good point.\" \"Let's move on.\")\n  Part 2 (below ===): a SHORT greeting from the next panelist (under 10 words, e.g. \"Hi, I'll take it from here.\") followed by the next technical question.\n- Example response format after my answer:\n  ```\n  Solid reasoning on identity boundaries.\n  ===\n  My turn now. How would you architect zero-trust for a hybrid cloud workload?\n  ```\n- For the VERY FIRST message (welcome + first question), do NOT use the separator — just welcome + first question.\n- Never explain at length why an answer was good or bad." + varietyNote
         }],
         true
       );
       setIsLoading(false);
       setActivePanelistIdx(0);
       animateTyping(reply, 0);
+      // Remember this opening question so future sessions don't repeat it.
+      try {
+        const q = String(reply || "").replace(/\s+/g, " ").trim().slice(0, 160);
+        if (q) {
+          askedList.push(q);
+          localStorage.setItem("tr_interview_asked_qs", JSON.stringify(askedList.slice(-30)));
+        }
+      } catch (_) {}
     } catch (e) {
       console.error("Start session error:", e);
       setError(e.message);
@@ -1195,7 +1219,11 @@ export default function InterviewSession({
               </div>
               <div
                 className="tr-is-question"
-                style={{ borderLeftColor: questionPanelist.color }}
+                style={{ borderLeftColor: questionPanelist.color, userSelect: "none", WebkitUserSelect: "none", MozUserSelect: "none", msUserSelect: "none" }}
+                onCopy={(e) => e.preventDefault()}
+                onCut={(e) => e.preventDefault()}
+                onContextMenu={(e) => e.preventDefault()}
+                onDragStart={(e) => e.preventDefault()}
               >
                 {currentQuestion.content}
                 {currentQuestion.isTyping && (
@@ -1251,7 +1279,11 @@ export default function InterviewSession({
                     )}
                     <div
                       className={`tr-is-msg-bubble${isUser ? " user" : ""}`}
-                      style={!isUser ? { borderLeft: `3px solid ${panelist.color}` } : undefined}
+                      style={!isUser ? { borderLeft: `3px solid ${panelist.color}`, userSelect: "none", WebkitUserSelect: "none", MozUserSelect: "none", msUserSelect: "none" } : undefined}
+                      onCopy={!isUser ? (e) => e.preventDefault() : undefined}
+                      onCut={!isUser ? (e) => e.preventDefault() : undefined}
+                      onContextMenu={!isUser ? (e) => e.preventDefault() : undefined}
+                      onDragStart={!isUser ? (e) => e.preventDefault() : undefined}
                     >
                       <div className={`tr-is-msg-from${isUser ? " user" : ""}`}>
                         {isUser
