@@ -293,7 +293,7 @@ export default function HelpTab({
 
             {/* Was this page helpful? (moved to sidebar) */}
             <div className="tr-help-rating tr-help-rating-side fadeUp">
-              <div className="tr-help-rating-icon">{I.smile}</div>
+              {/* <div className="tr-help-rating-icon">{I.smile}</div> */}
               <div className="tr-help-rating-body">
                 <div className="tr-help-rating-title">Was this page helpful?</div>
                 <div className="tr-help-rating-sub">Your feedback helps us improve our support.</div>
