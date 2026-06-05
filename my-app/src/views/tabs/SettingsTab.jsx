@@ -184,7 +184,7 @@ export default function SettingsTab({
   // ── Billing props (passed through from App.jsx the same way BillingTab gets them) ──
   subscribedRoles = [],
   billingPeriod = "yearly",
-  setView, showConfirm,
+  setView, setDashTab, showConfirm,
 }) {
   const [activeTab, setActiveTab] = useState('profile');
   const [isEditingProfile, setIsEditingProfile] = useState(false);
@@ -1302,13 +1302,13 @@ export default function SettingsTab({
             {/* Help & Support */}
             <div className="tr-set-help fadeUp">
               <h4 className="tr-set-side-title">Help &amp; Support</h4>
-              <button type="button" className="tr-set-help-link" onClick={() => window.open('https://threatready.io/help', '_blank')}>
+              <button type="button" className="tr-set-help-link" onClick={() => { setDashTab && setDashTab('help'); }}>
                 <span className="tr-set-help-link-left">{I.help} Visit our Help Center</span>{I.external}
               </button>
-              <button type="button" className="tr-set-help-link" onClick={() => window.open('mailto:admin@aerovanttech.com', '_blank')}>
+              <button type="button" className="tr-set-help-link" onClick={() => { window.location.href = 'mailto:admin@aerovanttech.com'; }}>
                 <span className="tr-set-help-link-left">{I.chat} Contact Support</span>{I.external}
               </button>
-              <button type="button" className="tr-set-help-link" onClick={() => window.open('https://threatready.io/faq', '_blank')}>
+              <button type="button" className="tr-set-help-link" onClick={() => { try { sessionStorage.setItem('tr_help_scroll_faq', '1'); } catch (_) {} setDashTab && setDashTab('help'); }}>
                 <span className="tr-set-help-link-left">{I.shieldQ} FAQ</span>{I.external}
               </button>
               <div className="tr-set-help-note">

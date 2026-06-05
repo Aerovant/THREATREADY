@@ -3144,6 +3144,7 @@ nav.tr-dash-breadcrumb,
               allowBenchmarking={allowBenchmarking}
               setAllowBenchmarking={setAllowBenchmarking}
               setView={setView}
+              setDashTab={setDashTab}
               showConfirm={showConfirm}
             />
           )}
