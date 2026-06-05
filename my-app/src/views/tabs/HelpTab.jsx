@@ -6,7 +6,7 @@
 //   • POST /api/feedback  (submit feedback with text or voice transcript)
 //   • Voice dictation toggle (Type / Dictate)
 // ═══════════════════════════════════════════════════════════════
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { showToast } from "../../components/helpers.js";
 
 /* ── Inline SVG icons ── */
@@ -55,6 +55,35 @@ export default function HelpTab({
   const [searchQuery, setSearchQuery] = useState("");
   const [expandedFaqs, setExpandedFaqs] = useState([0, 1, 2, 3]); // all open by default to match mockup
   const [pageHelpful, setPageHelpful] = useState(null); // null | 'yes' | 'no'
+
+  // Arriving on the Help tab should always start at the TOP (the page scrolls
+  // on the window, so a long previous tab like Settings would otherwise leave
+  // us clamped at the bottom near Feedback). If the user came via the "FAQ"
+  // link in Settings, scroll to the FAQ section instead — positioned just below
+  // the Help Center heading + search box.
+  useEffect(() => {
+    let faq = false;
+    try { faq = sessionStorage.getItem('tr_help_scroll_faq') === '1'; } catch (_) {}
+    if (faq) { try { sessionStorage.removeItem('tr_help_scroll_faq'); } catch (_) {} }
+
+    // Layout-based absolute offset — unaffected by the fadeUp transform, so it's
+    // correct even if the entry animation is still running.
+    const absTop = (el) => { let y = 0; while (el) { y += el.offsetTop; el = el.offsetParent; } return y; };
+
+    const go = () => {
+      if (faq) {
+        const el = document.getElementById('tr-help-faq-section');
+        if (el) { window.scrollTo({ top: Math.max(0, absTop(el) - 96), behavior: 'smooth' }); return; }
+      }
+      window.scrollTo({ top: 0 });
+    };
+
+    // Run once after the new content is committed, and once more shortly after
+    // in case the browser re-clamps the scroll position during the tab swap.
+    const r = requestAnimationFrame(go);
+    const t = setTimeout(go, 140);
+    return () => { cancelAnimationFrame(r); clearTimeout(t); };
+  }, []);
 
   const toggleFaq = (i) => {
     setExpandedFaqs(prev =>
@@ -129,7 +158,7 @@ export default function HelpTab({
             </div>
 
             {/* FAQ */}
-            <div className="tr-help-card fadeUp">
+            <div className="tr-help-card fadeUp" id="tr-help-faq-section">
               <div className="tr-help-card-label">Frequently Asked Questions</div>
               <div className="tr-help-faq-list">
                 {filteredFaq.length === 0 ? (
@@ -293,7 +322,7 @@ export default function HelpTab({
 
             {/* Was this page helpful? (moved to sidebar) */}
             <div className="tr-help-rating tr-help-rating-side fadeUp">
-              {/* <div className="tr-help-rating-icon">{I.smile}</div> */}
+              <div className="tr-help-rating-icon">{I.smile}</div>
               <div className="tr-help-rating-body">
                 <div className="tr-help-rating-title">Was this page helpful?</div>
                 <div className="tr-help-rating-sub">Your feedback helps us improve our support.</div>
