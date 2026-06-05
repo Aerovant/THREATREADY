@@ -232,32 +232,6 @@ export default function HelpTab({
               )}
             </div>
 
-            {/* Was this page helpful? */}
-            <div className="tr-help-rating fadeUp">
-              <div className="tr-help-rating-icon">{I.smile}</div>
-              <div className="tr-help-rating-body">
-                <div className="tr-help-rating-title">Was this page helpful?</div>
-                <div className="tr-help-rating-sub">Your feedback helps us improve our support.</div>
-              </div>
-              <div className="tr-help-rating-btns">
-                <button
-                  type="button"
-                  className={`tr-help-rating-btn${pageHelpful === 'yes' ? ' selected' : ''}`}
-                  onClick={() => handlePageHelpful('yes')}
-                  disabled={pageHelpful !== null}
-                >
-                  {I.thumbsUp} Yes, helpful
-                </button>
-                <button
-                  type="button"
-                  className={`tr-help-rating-btn${pageHelpful === 'no' ? ' selected' : ''}`}
-                  onClick={() => handlePageHelpful('no')}
-                  disabled={pageHelpful !== null}
-                >
-                  {I.thumbsDown} Not really
-                </button>
-              </div>
-            </div>
           </div>
 
           {/* ───── RIGHT SIDEBAR ───── */}
@@ -287,23 +261,6 @@ export default function HelpTab({
               </div>
             </div>
 
-            {/* System Status */}
-            <div className="tr-help-side-card fadeUp">
-              <h4 className="tr-help-side-title">System Status</h4>
-              <div className="tr-help-status-row">
-                <span className="tr-help-status-icon">{I.checkCircle}</span>
-                <span className="tr-help-status-label">All systems operational</span>
-              </div>
-              <div className="tr-help-status-meta">Last updated: 2 mins ago</div>
-              <button
-                type="button"
-                className="tr-help-link-btn"
-                onClick={() => window.open('https://threatready.io/status', '_blank')}
-              >
-                View Status Page {I.arrow}
-              </button>
-            </div>
-
             {/* Quick Links */}
             <div className="tr-help-side-card fadeUp">
               <h4 className="tr-help-side-title">Quick Links</h4>
@@ -328,10 +285,37 @@ export default function HelpTab({
               <button
                 type="button"
                 className="tr-help-btn outline"
-                onClick={() => window.open('mailto:admin@aerovanttech.com', '_blank')}
+                onClick={() => { window.location.href = 'mailto:admin@aerovanttech.com'; }}
               >
                 Contact Support {I.arrow}
               </button>
+            </div>
+
+            {/* Was this page helpful? (moved to sidebar) */}
+            <div className="tr-help-rating tr-help-rating-side fadeUp">
+              <div className="tr-help-rating-icon">{I.smile}</div>
+              <div className="tr-help-rating-body">
+                <div className="tr-help-rating-title">Was this page helpful?</div>
+                <div className="tr-help-rating-sub">Your feedback helps us improve our support.</div>
+              </div>
+              <div className="tr-help-rating-btns">
+                <button
+                  type="button"
+                  className={`tr-help-rating-btn${pageHelpful === 'yes' ? ' selected' : ''}`}
+                  onClick={() => handlePageHelpful('yes')}
+                  disabled={pageHelpful !== null}
+                >
+                  {I.thumbsUp} Yes, helpful
+                </button>
+                <button
+                  type="button"
+                  className={`tr-help-rating-btn${pageHelpful === 'no' ? ' selected' : ''}`}
+                  onClick={() => handlePageHelpful('no')}
+                  disabled={pageHelpful !== null}
+                >
+                  {I.thumbsDown} Not really
+                </button>
+              </div>
             </div>
           </aside>
         </div>
@@ -624,6 +608,16 @@ export default function HelpTab({
 .tr-help-rating-btn:disabled:not(.selected){
   opacity:.4;cursor:not-allowed;
 }
+
+/* ── Rating card when placed in the narrow right sidebar ── */
+.tr-help-rating-side{
+  flex-direction:column;
+  align-items:stretch;
+  gap:12px;
+}
+.tr-help-rating-side .tr-help-rating-body{min-width:0}
+.tr-help-rating-side .tr-help-rating-btns{width:100%}
+.tr-help-rating-side .tr-help-rating-btn{flex:1;justify-content:center}
 
 /* ── Sidebar cards ── */
 .tr-help-side-card{
