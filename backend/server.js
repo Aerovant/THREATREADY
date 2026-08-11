@@ -18,7 +18,7 @@ const pool = new Pool({
 const JWT_SECRET = process.env.JWT_SECRET;
 
 // ── AI MODEL CONFIGURATION ──
-const MODEL_EVALUATION = 'claude-sonnet-4-20250514'; // Deep evaluation - accurate scoring
+const MODEL_EVALUATION = 'claude-sonnet-4-5'; // Deep evaluation - accurate scoring
 const MODEL_QUESTIONS = 'claude-haiku-4-5-20251001'; // Question generation - fast & cheap
 
 // ═══════════════════════════════════════════════════════════════
@@ -4256,7 +4256,7 @@ ${jdText ? '=== JOB DESCRIPTION ===\n' + jdText.substring(0, 5000) + '\n\n' : ''
         'anthropic-version': '2023-06-01',
       },
       body: JSON.stringify({
-        model: 'claude-sonnet-4-20250514',
+        model: 'claude-sonnet-4-5',
         max_tokens: 500,
         messages: [{ role: 'user', content: prompt }],
       }),
@@ -4340,7 +4340,7 @@ ${resumeText ? '\nCANDIDATE BACKGROUND:\n' + resumeText.substring(0, 3000) : ''}
         'anthropic-version': '2023-06-01',
       },
       body: JSON.stringify({
-        model: 'claude-sonnet-4-20250514',
+        model: 'claude-sonnet-4-5',
         max_tokens: 600,
         system: systemPrompt,
         messages: messages.map(m => ({ role: m.role, content: m.content })),
