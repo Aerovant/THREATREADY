@@ -31,6 +31,7 @@ const auth = (req, res, next) => {
     req.user = jwt.verify(token, JWT_SECRET);
     next();
   } catch (e) {
+    console.error('AUTH FAIL:', e.name, '|', e.message, '| secret set:', !!JWT_SECRET);
     return res.status(401).json({ error: 'Invalid or expired token. Please login again.' });
   }
 };
