@@ -3,10 +3,13 @@
 // Free Trial Entry — Pick exactly 1-2 roles for free trial
 // Extracted from App.jsx lines 1830-1913 (84 lines)
 // ═══════════════════════════════════════════════════════════════
+import { useState } from "react";
 import { CSS } from "../styles.js";
 import { ROLES } from "../constants.js";
 import { showToast } from "../components/helpers.js";
 import ToastContainer from "../components/ToastContainer.jsx";
+
+const API_BASE = "https://threatready-db.onrender.com";
 
 export default function TrialRoleSelectView({
   // ── STATE ──
@@ -21,6 +24,53 @@ export default function TrialRoleSelectView({
   // ── HANDLERS ──
   goBack,
 }) {
+  const [starting, setStarting] = useState(false);
+
+  const startFreeTrial = async () => {
+    if (starting) return;
+    setStarting(true);
+    try {
+      // ── Get a real trial JWT so the backend accepts /api/interview/chat + /api/interview/generate-report
+      const res = await fetch(`${API_BASE}/api/trial/start`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+      });
+      if (!res.ok) {
+        const text = await res.text().catch(() => "");
+        throw new Error(`Trial start failed (${res.status}) ${text.slice(0, 120)}`);
+      }
+      const data = await res.json();
+      if (!data?.token) throw new Error("No token returned from backend");
+
+      // ── CRITICAL: store the trial token as 'token' so InterviewSession picks it up
+      localStorage.setItem("token", data.token);
+    } catch (e) {
+      console.error("Trial start error:", e);
+      showToast("Could not start trial: " + e.message, "error");
+      setStarting(false);
+      return;
+    }
+
+    // ── Local state / flags (as before)
+    const init = {};
+    trialRoles.forEach((rid) => { init[rid] = 0; });
+    setRoleAttempts(init);
+    setSubscribedRoles(trialRoles);
+    setIsPaid(false);
+    localStorage.setItem("subscribedRoles", JSON.stringify(trialRoles));
+    localStorage.setItem("trialRoles", JSON.stringify(trialRoles));
+    localStorage.setItem("roleAttempts", JSON.stringify(init));
+    localStorage.setItem("cyberprep_freetrial", "true");
+    localStorage.setItem("cyberprep_usertype", "b2c");
+    localStorage.setItem("cyberprep_session_start", Date.now().toString());
+    // CRITICAL: Clear any leftover isPaid flag from previous sessions
+    localStorage.removeItem("isPaid");
+    setView("dashboard");
+    setDashTab("home");
+    showToast("Free trial started! 2 total attempts on Beginner only.", "success");
+    setStarting(false);
+  };
+
   return (
     <div className="app"><style>{CSS}</style><div className="scanbar" /><div className="gridbg" />
       <ToastContainer />
@@ -78,26 +128,13 @@ export default function TrialRoleSelectView({
               <div style={{ fontSize: 13, color: "var(--tx2)", marginBottom: 16 }}>
                 {trialRoles.length} role{trialRoles.length > 1 ? "s" : ""} selected · Beginner difficulty · 2 total attempts
               </div>
-              <button className="btn bp" style={{ width: "100%", padding: "14px 0", fontSize: 15 }}
-                onClick={() => {
-                  const init = {};
-                  trialRoles.forEach(rid => { init[rid] = 0; });
-                  setRoleAttempts(init);
-                  setSubscribedRoles(trialRoles);
-                  setIsPaid(false);
-                  localStorage.setItem('subscribedRoles', JSON.stringify(trialRoles));
-                  localStorage.setItem('trialRoles', JSON.stringify(trialRoles));
-                  localStorage.setItem('roleAttempts', JSON.stringify(init));
-                  localStorage.setItem('cyberprep_freetrial', 'true');
-                  localStorage.setItem('cyberprep_usertype', 'b2c');
-                  localStorage.setItem('cyberprep_session_start', Date.now().toString());
-                  // CRITICAL: Clear any leftover isPaid flag from previous sessions
-                  localStorage.removeItem('isPaid');
-                  setView("dashboard");
-                  setDashTab("home");
-                  showToast("Free trial started! 2 total attempts on Beginner only.", "success");
-                }}>
-                Start Free Trial →
+              <button
+                className="btn bp"
+                style={{ width: "100%", padding: "14px 0", fontSize: 15, opacity: starting ? 0.6 : 1 }}
+                disabled={starting}
+                onClick={startFreeTrial}
+              >
+                {starting ? "Starting..." : "Start Free Trial →"}
               </button>
             </div>
           )}
