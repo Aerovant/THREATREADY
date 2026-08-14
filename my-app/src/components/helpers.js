@@ -76,6 +76,12 @@ export function useVoice() {
   const committedRef = useRef("");      // text committed from prior SR sessions
   const sessionFinalRef = useRef("");   // current SR session's final text
   const manuallyStopped = useRef(false);
+  // ── EDIT-GUARD ──
+  // When the user manually edits the textarea, we bump this counter.
+  // Any in-flight recognition callbacks compare against the snapshot they
+  // captured at start — if it changed, they abort silently. This prevents
+  // stale browser-buffered speech from overwriting the user's manual edit.
+  const editEpochRef = useRef(0);
 
   const startRecognition = useCallback(() => {
     if (manuallyStopped.current) return;
@@ -93,7 +99,17 @@ export function useVoice() {
     // Fresh session — reset the per-session final ref
     sessionFinalRef.current = "";
 
+    // Snapshot the edit epoch at recognition start. If the user edits the
+    // textarea DURING this recognition session, editEpochRef bumps and this
+    // callback becomes stale — it must not overwrite the user's edit.
+    const epochAtStart = editEpochRef.current;
+
     r.onresult = (e) => {
+      // If the user edited the textbox while we were listening, bail out —
+      // the buffered speech in `e.results` is stale. The edited text is the
+      // source of truth and will be re-synced via setTranscript below.
+      if (editEpochRef.current !== epochAtStart) return;
+
       // Rebuild this session's transcript from scratch each call.
       // Mobile browsers emit progressively-longer "final" results for the
       // same utterance; rebuilding (instead of appending) avoids duplicates.
@@ -119,11 +135,15 @@ export function useVoice() {
     };
 
     r.onend = () => {
-      // ── DEDUPE-AWARE COMMIT ──
-      // Merge session final into committed with overlap stripping.
-      // Without this, silence gaps + auto-restart cause "step by step" to
-      // get committed 3+ times as the browser re-emits the same buffer.
-      committedRef.current = _mergeDedupe(committedRef.current, sessionFinalRef.current);
+      // If the user edited during this session, discard the buffered final —
+      // it's stale and would clobber the manual edit.
+      if (editEpochRef.current === epochAtStart) {
+        // ── DEDUPE-AWARE COMMIT ──
+        // Merge session final into committed with overlap stripping.
+        // Without this, silence gaps + auto-restart cause "step by step" to
+        // get committed 3+ times as the browser re-emits the same buffer.
+        committedRef.current = _mergeDedupe(committedRef.current, sessionFinalRef.current);
+      }
       sessionFinalRef.current = "";
 
       if (!manuallyStopped.current) {
@@ -188,9 +208,21 @@ export function useVoice() {
   }, []);
 
   const setTranscript = useCallback((text) => {
-    committedRef.current = text + ' ';
+    // ── USER MANUAL EDIT ──
+    // Bump the epoch so any in-flight recognition callback becomes stale
+    // and aborts. Then take the edited text as the new source of truth.
+    editEpochRef.current += 1;
+    committedRef.current = text + (text && !/\s$/.test(text) ? ' ' : '');
     sessionFinalRef.current = "";
     setTr(text);
+
+    // If recording is still active, restart the recognition instance so its
+    // internal browser-side buffer (which we can't otherwise clear) is
+    // flushed. The next result event will build fresh from the edited text.
+    if (!manuallyStopped.current && recRef.current) {
+      try { recRef.current.stop(); } catch (e) {}
+      // onend will auto-restart via the setTimeout path, with a fresh buffer.
+    }
   }, []);
 
   // Cleanup: stop recognition when component using this hook unmounts
