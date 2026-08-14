@@ -21,6 +21,53 @@ export const fmt = s => `${Math.floor(s / 60)}:${(s % 60).toString().padStart(2,
 // ── RANDOM PICK ──
 export const pick = arr => arr[Math.floor(Math.random() * arr.length)];
 
+// ─────────────────────────────────────────────────────────────
+// TEXT-DEDUPE UTILITIES (for voice hook)
+// ─────────────────────────────────────────────────────────────
+// Normalize for comparison: collapse whitespace, lowercase, strip punctuation.
+// This lets us detect "step by step." matches "Step by step" as overlap.
+const _norm = (s) => (s || "")
+  .toLowerCase()
+  .replace(/[.,!?;:'"()\-]/g, ' ')
+  .replace(/\s+/g, ' ')
+  .trim();
+
+// Returns the length (in NORMALIZED words) of the longest suffix of `a`
+// that also appears as a prefix of `b`. Used to strip overlap when appending.
+const _overlapWords = (a, b) => {
+  const aw = _norm(a).split(' ').filter(Boolean);
+  const bw = _norm(b).split(' ').filter(Boolean);
+  if (aw.length === 0 || bw.length === 0) return 0;
+  const maxCheck = Math.min(aw.length, bw.length, 20); // cap: check up to 20 words back
+  for (let k = maxCheck; k >= 1; k--) {
+    const aTail = aw.slice(aw.length - k).join(' ');
+    const bHead = bw.slice(0, k).join(' ');
+    if (aTail === bHead) return k;
+  }
+  return 0;
+};
+
+// Append `addition` to `committed`, stripping any word-level overlap.
+// Returns the merged string.
+const _mergeDedupe = (committed, addition) => {
+  const clean = (addition || "").trim();
+  if (!clean) return committed;
+  if (!committed) return clean + ' ';
+
+  const overlap = _overlapWords(committed, clean);
+  if (overlap === 0) {
+    // No overlap — just append with a space
+    const sep = /\s$/.test(committed) ? '' : ' ';
+    return committed + sep + clean + ' ';
+  }
+  // Strip the first `overlap` words from the addition, then append
+  const addWords = clean.split(/\s+/);
+  const rest = addWords.slice(overlap).join(' ');
+  if (!rest) return committed; // fully overlapped — nothing new
+  const sep = /\s$/.test(committed) ? '' : ' ';
+  return committed + sep + rest + ' ';
+};
+
 // ── VOICE HOOK ──
 export function useVoice() {
   const [recording, setRec] = useState(false);
@@ -61,12 +108,22 @@ export function useVoice() {
         }
       }
       sessionFinalRef.current = sessionFinal;
-      setTr(committedRef.current + sessionFinal + interim);
+
+      // ── DEDUPE-AWARE DISPLAY ──
+      // Show committed + (deduped session final) + interim.
+      // This prevents Chrome's carry-over buffer from making the SAME phrase
+      // appear twice on screen while the user is still speaking.
+      const merged = _mergeDedupe(committedRef.current, sessionFinal);
+      const sepInt = interim && !/\s$/.test(merged) ? ' ' : '';
+      setTr((merged + sepInt + interim).trim());
     };
 
     r.onend = () => {
-      // Commit the session's final text to the global committed text
-      committedRef.current += sessionFinalRef.current;
+      // ── DEDUPE-AWARE COMMIT ──
+      // Merge session final into committed with overlap stripping.
+      // Without this, silence gaps + auto-restart cause "step by step" to
+      // get committed 3+ times as the browser re-emits the same buffer.
+      committedRef.current = _mergeDedupe(committedRef.current, sessionFinalRef.current);
       sessionFinalRef.current = "";
 
       if (!manuallyStopped.current) {
