@@ -3975,6 +3975,16 @@ async function runMigrations() {
         created_at TIMESTAMP DEFAULT NOW()
       )
     `);
+
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS trials (
+        id UUID PRIMARY KEY,
+        attempts_used INTEGER DEFAULT 0,
+        ip TEXT,
+        created_at TIMESTAMP DEFAULT NOW()
+      )
+    `);
+    
     await pool.query(`
       CREATE INDEX IF NOT EXISTS idx_interview_reports_user_created
         ON interview_reports(user_id, created_at DESC)
@@ -4271,6 +4281,22 @@ ${jdText ? '=== JOB DESCRIPTION ===\n' + jdText.substring(0, 5000) + '\n\n' : ''
   }
 });
 
+app.post('/api/trial/start', async (req, res) => {
+  try {
+    const trialId = crypto.randomUUID();
+    await pool.query(
+      'INSERT INTO trials (id, attempts_used, ip) VALUES ($1, 0, $2)',
+      [trialId, req.ip]
+    );
+    const token = jwt.sign({ trial: true, trialId }, JWT_SECRET, { expiresIn: '24h' });
+    console.log('Trial started:', trialId);
+    res.json({ token });
+  } catch (e) {
+    console.error('Trial start error:', e.message);
+    res.status(500).json({ error: 'Could not start trial' });
+  }
+});
+
 app.post('/api/interview/chat', auth, async (req, res) => {
   try {
     const { messages = [], jdText = '', resumeText = '', durationMinutes = 30, level = 'intermediate', timeRemaining } = req.body;
@@ -4390,13 +4416,13 @@ app.post('/api/interview/generate-report', auth, async (req, res) => {
       const userId = req.user?.id || req.user?.userId;
       if (userId) {
         const userResult = await pool.query(
-          'SELECT name, email, role FROM users WHERE id = $1 LIMIT 1',
+          'SELECT name, email FROM users WHERE id = $1 LIMIT 1',
           [userId]
         );
         if (userResult.rows && userResult.rows[0]) {
           candidateName = userResult.rows[0].name || candidateName;
           candidateEmail = userResult.rows[0].email || '';
-          candidateRole = userResult.rows[0].role || '';
+          // candidateRole stays '' — role column doesn't exist in users table
         }
       }
     } catch (dbErr) {
